@@ -1,6 +1,6 @@
 {
         "Input": {
-            "Url": "https://download.samplelib.com/mp4/sample-30s.mp4"
+            "Url": "udp://239.0.0.11:5002"
         },
         "Output": {
             "Stream_type": "dash",

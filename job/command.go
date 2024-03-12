@@ -110,7 +110,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec) []string {
 	ffmpegArgs = append(ffmpegArgs, "-seg_duration")
 	ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
 
-	// -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash
 	ffmpegArgs = append(ffmpegArgs, "-window_size")
 	ffmpegArgs = append(ffmpegArgs, "15")
 

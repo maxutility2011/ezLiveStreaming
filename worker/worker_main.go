@@ -38,8 +38,6 @@ func main() {
     //ffmpegArgs = append(ffmpegArgs, "out.mp4")
 
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
-    return
-    
     cmd := exec.Command("ffmpeg", ffmpegArgs...)
     //fmt.Println("Args count: ", cmd.Args[4])
 
