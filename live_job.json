@@ -1,0 +1,36 @@
+{
+        "Input": {
+            "Url": "https://download.samplelib.com/mp4/sample-30s.mp4"
+        },
+        "Output": {
+            "Stream_type": "hls",
+            "Segment_format": "fmp4",
+            "Segment_duration": 4,
+            "Video_outputs": [
+                {
+                    "Label": "video145k",
+                    "Codec": "h264",
+                    "Framerate": 25,
+                    "Width": 416,
+                    "Height": 234,
+                    "Bitrate": 145,
+                    "Gop_size": 2
+                },
+                {
+                    "Label": "video365k",
+                    "Codec": "h264",
+                    "Framerate": 25,
+                    "Width": 640,
+                    "Height": 360,
+                    "Bitrate": 365,
+                    "Gop_size": 2
+                }
+            ],
+            "Audio_outputs": [
+                {
+                    "Codec": "aac",
+                    "Bitrate": 128
+                }
+            ]
+        }
+    }
