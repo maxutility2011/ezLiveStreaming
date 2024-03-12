@@ -1,34 +1,55 @@
-package worker
+package main
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
+    "os"
+	//"strings"
 	"encoding/json"
     "os/exec"
-    "live_transcoder_server/api_server_main"
-	//"github.com/google/uuid"
-	//"io/ioutil"
+    "ezliveStreaming/job"
+	"io/ioutil"
+    "log"
+    "flag"
+    "bytes"
 )
 
 // live_worker -f job.json 
 // live_worker -p [job_json] 
 func main() {
-    var jobSpecPath
-    if len(os.Args) == 2 {
-        jobSpecPath = os.Args[1]
-    }
+    jobSpecPathPtr := flag.String("file", "job.json", "input job spec file")
+    //jobSpecStringPtr := flag.String("p", "", "input job spec string")
 
-    job_spec_string, err := os.Open(jobSpecPath)
+    flag.Parse()
+
+    jobSpecFile, err := os.Open(*jobSpecPathPtr)
     if err != nil {
         fmt.Println(err)
     }
 
-    var j api_server_main.liveJobSpec
+    defer jobSpecFile.Close() 
+    var j job.LiveJobSpec
+    bytesJobSpec, _ := ioutil.ReadAll(jobSpecFile)
+    json.Unmarshal(bytesJobSpec, &j)
+    fmt.Println("Input Url: ", j.Input.Url)
 
-    defer job_spec.Close() 
+    //var ffmpegArgs []string
+    //ffmpegArgs = append(ffmpegArgs, "-i")
+    //ffmpegArgs = append(ffmpegArgs, "2.mp4")
+    //ffmpegArgs = append(ffmpegArgs, "out.mp4")
 
-    // ffmpeg -f flv -listen 1 -i [live_input] -vf scale=w=640:h=360 -c:v libx264 -profile:v baseline -an -use_template 1 -adaptation_sets "id=0,streams=v id=1,streams=a" -seg_duration 4 -utc_timing_url https://time.akamai.com/?iso -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash /var/www/html/[job_ib]/1.mpd
+    ffmpegArgs := job.JobSpecToEncoderArgs(j)
+    return
+    
+    cmd := exec.Command("ffmpeg", ffmpegArgs...)
+    //fmt.Println("Args count: ", cmd.Args[4])
 
-    cmd := exec.Command("git", "checkout", "develop")
+    var cmdOutput bytes.Buffer
+    cmd.Stdout = &cmdOutput
+    err = cmd.Run()
+    if err != nil {
+        // error case : status code of command is different from 0
+        log.Fatal("ffmpeg error:", err)
+    }
+
+    fmt.Println(cmdOutput.String())
 }

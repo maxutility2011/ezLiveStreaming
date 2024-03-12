@@ -1,4 +1,4 @@
-package api_server_main
+package main
 
 import (
 	"fmt"
@@ -45,7 +45,8 @@ type liveJobSpec struct {
 }
 */
 
-type liveVideoOutputSpec struct {
+/*
+type LiveVideoOutputSpec struct {
 	//video_output_label string `json:"label"`
 	Codec string 
 	Framerate float32
@@ -55,38 +56,39 @@ type liveVideoOutputSpec struct {
 	Gop_size int 
 }
 
-type liveAudioOutputSpec struct {
+type LiveAudioOutputSpec struct {
 	//audio_output_label string `json:"label"`
 	Codec string 
 	Bitrate float32 
 }
 
-type liveJobOutputSpec struct {
+type LiveJobOutputSpec struct {
 	Stream_type string 
 	Segment_format string 
 	Segment_duration int 
-	Video_outputs []liveVideoOutputSpec 
-	Audio_outputs []liveAudioOutputSpec 
+	Video_outputs []LiveVideoOutputSpec 
+	Audio_outputs []LiveAudioOutputSpec 
 }
 
-type liveJobInputSpec struct {
+type LiveJobInputSpec struct {
 	Url string 
 }
 
-type liveJobSpec struct {
-    Input liveJobInputSpec 
-    Output liveJobOutputSpec 
+type LiveJobSpec struct {
+    Input LiveJobInputSpec 
+    Output LiveJobOutputSpec 
 }
 
-type liveJob struct {
+type LiveJob struct {
 	Id string
-	Spec liveJobSpec
+	Spec LiveJobSpec
 }
+*/
 
-var jobs = make(map[string]liveJob)
+var jobs = make(map[string]LiveJob)
 
-func createJob(j liveJobSpec) error {
-	var job liveJob
+func createJob(j LiveJobSpec) error {
+	var job LiveJob
 	job.Id = uuid.New().String()
 	job.Spec = j
 	fmt.Println("Generating a random job ID: ", job.Id)
@@ -106,12 +108,12 @@ func createJob(j liveJobSpec) error {
 	return nil
 }
 
-func createUpdateJob(j liveJob) error {
+func createUpdateJob(j LiveJob) error {
 	jobs[j.Id] = j
 	return nil
 }
 
-func getJobById(jid string) (liveJob, bool) {
+func getJobById(jid string) (LiveJob, bool) {
 	job, ok := jobs[jid]
 	return job, ok
 }
@@ -146,7 +148,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             return
         }
 
-		var job liveJobSpec
+		var job LiveJobSpec
 		e := json.NewDecoder(r.Body).Decode(&job)
 		if e != nil {
             res := "Failed to decode job request"

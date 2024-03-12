@@ -3,9 +3,10 @@
             "Url": "https://download.samplelib.com/mp4/sample-30s.mp4"
         },
         "Output": {
-            "Stream_type": "hls",
+            "Stream_type": "dash",
             "Segment_format": "fmp4",
             "Segment_duration": 4,
+            "Low_latency_mode": true,
             "Video_outputs": [
                 {
                     "Label": "video145k",
