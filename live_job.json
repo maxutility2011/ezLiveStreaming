@@ -14,7 +14,11 @@
                     "Framerate": 25,
                     "Width": 640,
                     "Height": 360,
-                    "Bitrate": 365,
+                    "Bitrate": "365k",
+                    "Max_bitrate": "500k",
+                    "Buf_size": "500k",
+                    "Preset": "faster",
+                    "Threads": 2,
                     "Gop_size": 2
                 },
                 {
@@ -23,7 +27,11 @@
                     "Framerate": 25,
                     "Width": 768,
                     "Height": 432,
-                    "Bitrate": 550,
+                    "Bitrate": "550k",
+                    "Max_bitrate": "750k",
+                    "Buf_size": "750k",
+                    "Preset": "faster",
+                    "Threads": 2,
                     "Gop_size": 2
                 }
             ],

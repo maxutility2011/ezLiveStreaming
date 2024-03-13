@@ -24,13 +24,28 @@ const H265_CODEC = "h265"
 const FFMPEG_H265 = "libx265"
 const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
+const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
+
+/*
+// key: video height as a string, e.g., "234p_"
+// value: bitrate as a string, e.g., "500k", "2m"
+var h264_rendition_bitrate_table = make(map[string]string)
+var h265_rendition_bitrate_table = make(map[string]string)
+var h265_hdr_rendition_bitrate_table = make(map[int]string)
+
+func createBitrateTable(codec string, bool isHdr) {
+	if codec == H264_CODEC {
+		h264_rendition_bitrate_table[234] = "145k"
+		h264_rendition_bitrate_table[360] = "365k"
+		h264_rendition_bitrate_table[432] = "730k"
+		h264_rendition_bitrate_table[234] = "145k"
+	} else if codec == H265_CODEC {
+
+	}
+}
+*/
 
 func ArgumentArrayToString(args []string) string {
-	/*var s string
-	for i := range args {
-		s += args[i]
-	}*/
-
 	return strings.Join(args, " ")
 }
 
@@ -60,7 +75,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec) []string {
 
 	// Video encoding params
 	for i := range j.Output.Video_outputs {
-		fmt.Println("i: ", i)
 		vo := j.Output.Video_outputs[i]
 
 		ffmpegArgs = append(ffmpegArgs, "-map")
@@ -93,12 +107,35 @@ func JobSpecToEncoderArgs(j LiveJobSpec) []string {
 
 		ffmpegArgs = append(ffmpegArgs, "-profile:v")
 		ffmpegArgs = append(ffmpegArgs, h26xProfile)
-	}
 
-	/*
-	ffmpegArgs = append(ffmpegArgs, "-c:v")
-	ffmpegArgs = append(ffmpegArgs, "copy")
-	*/
+		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
+			bv := "-b:v:"
+			bv += strconv.Itoa(i)
+			ffmpegArgs = append(ffmpegArgs, bv)
+			ffmpegArgs = append(ffmpegArgs, vo.Bitrate)
+
+			ffmpegArgs = append(ffmpegArgs, "-maxrate")
+			ffmpegArgs = append(ffmpegArgs, vo.Max_bitrate)
+
+			ffmpegArgs = append(ffmpegArgs, "-bufsize")
+			ffmpegArgs = append(ffmpegArgs, vo.Buf_size)
+		} else if vo.Bitrate != "" && vo.Max_bitrate == "" && vo.Buf_size == "" {
+			bv := "-b:v:"
+			bv += strconv.Itoa(i)
+			ffmpegArgs = append(ffmpegArgs, bv)
+			ffmpegArgs = append(ffmpegArgs, vo.Bitrate)
+		}
+
+		if vo.Preset != "" {
+			ffmpegArgs = append(ffmpegArgs, "-preset")
+			ffmpegArgs = append(ffmpegArgs, vo.Preset)
+		}
+
+		if vo.Threads != 0 {
+			ffmpegArgs = append(ffmpegArgs, "-threads")
+			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Threads))
+		}
+	}
 
 	// Audio encoding params
 	if len(j.Output.Audio_outputs) == 0 {

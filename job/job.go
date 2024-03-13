@@ -7,6 +7,10 @@ type LiveVideoOutputSpec struct {
 	Width int
 	Height int
 	Bitrate string 
+	Max_bitrate string
+	Buf_size string
+	Preset string
+	Threads int
 	Gop_size int 
 }
 

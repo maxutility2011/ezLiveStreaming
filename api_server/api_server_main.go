@@ -169,7 +169,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 var server_ip = "0.0.0.0"
-var server_port = "80" 
+var server_port = "1080" 
 var server_addr = server_ip + ":" + server_port
 
 func main() {
