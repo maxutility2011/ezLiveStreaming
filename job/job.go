@@ -6,14 +6,14 @@ type LiveVideoOutputSpec struct {
 	Framerate float64
 	Width int
 	Height int
-	Bitrate float64 
+	Bitrate string 
 	Gop_size int 
 }
 
 type LiveAudioOutputSpec struct {
 	//audio_output_label string `json:"label"`
 	Codec string 
-	Bitrate float64 
+	Bitrate string 
 }
 
 type LiveJobOutputSpec struct {

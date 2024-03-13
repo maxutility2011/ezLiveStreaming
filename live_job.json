@@ -1,22 +1,13 @@
 {
         "Input": {
-            "Url": "udp://239.0.0.11:5002"
+            "Url": "rtmp://127.0.0.1:1935/live/app"
         },
         "Output": {
             "Stream_type": "dash",
             "Segment_format": "fmp4",
             "Segment_duration": 4,
-            "Low_latency_mode": true,
+            "Low_latency_mode": false,
             "Video_outputs": [
-                {
-                    "Label": "video145k",
-                    "Codec": "h264",
-                    "Framerate": 25,
-                    "Width": 416,
-                    "Height": 234,
-                    "Bitrate": 145,
-                    "Gop_size": 2
-                },
                 {
                     "Label": "video365k",
                     "Codec": "h264",
@@ -25,12 +16,21 @@
                     "Height": 360,
                     "Bitrate": 365,
                     "Gop_size": 2
+                },
+                {
+                    "Label": "video550k",
+                    "Codec": "h264",
+                    "Framerate": 25,
+                    "Width": 768,
+                    "Height": 432,
+                    "Bitrate": 550,
+                    "Gop_size": 2
                 }
             ],
             "Audio_outputs": [
                 {
                     "Codec": "aac",
-                    "Bitrate": 128
+                    "Bitrate": "128k"
                 }
             ]
         }

@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
     "log"
     "flag"
-    "bytes"
+    //"bytes"
 )
 
 // live_worker -f job.json 
@@ -38,16 +38,11 @@ func main() {
     //ffmpegArgs = append(ffmpegArgs, "out.mp4")
 
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
-    cmd := exec.Command("ffmpeg", ffmpegArgs...)
-    //fmt.Println("Args count: ", cmd.Args[4])
-
-    var cmdOutput bytes.Buffer
-    cmd.Stdout = &cmdOutput
-    err = cmd.Run()
-    if err != nil {
+    out, err2 := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput()
+    if err2 != nil {
         // error case : status code of command is different from 0
-        log.Fatal("ffmpeg error:", err)
+        log.Fatal("ffmpeg error: %v", err2, string(out))
     }
 
-    fmt.Println(cmdOutput.String())
+    //fmt.Println(cmdErr.String())
 }
