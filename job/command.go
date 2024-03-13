@@ -26,25 +26,6 @@ const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
 const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
 
-/*
-// key: video height as a string, e.g., "234p_"
-// value: bitrate as a string, e.g., "500k", "2m"
-var h264_rendition_bitrate_table = make(map[string]string)
-var h265_rendition_bitrate_table = make(map[string]string)
-var h265_hdr_rendition_bitrate_table = make(map[int]string)
-
-func createBitrateTable(codec string, bool isHdr) {
-	if codec == H264_CODEC {
-		h264_rendition_bitrate_table[234] = "145k"
-		h264_rendition_bitrate_table[360] = "365k"
-		h264_rendition_bitrate_table[432] = "730k"
-		h264_rendition_bitrate_table[234] = "145k"
-	} else if codec == H265_CODEC {
-
-	}
-}
-*/
-
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
 }

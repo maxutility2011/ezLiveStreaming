@@ -6,7 +6,10 @@ import (
 	"strings"
 	"encoding/json"
 	"github.com/google/uuid"
+	"os/exec"
+	"log"
 	//"io/ioutil"
+	"ezliveStreaming/job"
 )
 
 var createLiveJobEndpoint = "createLiveJob"
@@ -85,21 +88,21 @@ type LiveJob struct {
 }
 */
 
-var jobs = make(map[string]LiveJob)
+var jobs = make(map[string]job.LiveJob)
 
-func createJob(j LiveJobSpec) error {
-	var job LiveJob
-	job.Id = uuid.New().String()
-	job.Spec = j
-	fmt.Println("Generating a random job ID: ", job.Id)
+func createJob(j job.LiveJobSpec) error {
+	var lj job.LiveJob
+	lj.Id = uuid.New().String()
+	lj.Spec = j
+	fmt.Println("Generating a random job ID: ", lj.Id)
 
-	e := createUpdateJob(job)
+	e := createUpdateJob(lj)
 	if e != nil {
-		fmt.Println("Error: Failed to create/update job ID: ", job.Id)
+		fmt.Println("Error: Failed to create/update job ID: ", lj.Id)
 		return e
 	}
 
-	j2, ok := getJobById(job.Id) 
+	j2, ok := getJobById(lj.Id) 
 	if ok {
 		fmt.Printf("New job created: %+v\n", j2)
 		return nil
@@ -108,12 +111,12 @@ func createJob(j LiveJobSpec) error {
 	return nil
 }
 
-func createUpdateJob(j LiveJob) error {
+func createUpdateJob(j job.LiveJob) error {
 	jobs[j.Id] = j
 	return nil
 }
 
-func getJobById(jid string) (LiveJob, bool) {
+func getJobById(jid string) (job.LiveJob, bool) {
 	job, ok := jobs[jid]
 	return job, ok
 }
@@ -148,7 +151,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             return
         }
 
-		var job LiveJobSpec
+		var job job.LiveJobSpec
 		e := json.NewDecoder(r.Body).Decode(&job)
 		if e != nil {
             res := "Failed to decode job request"
@@ -165,6 +168,17 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 		}
+
+		b, _ := json.Marshal(job)
+		//fmt.Println(string(b[:]))
+		paramArg := "-param=" 
+		paramArg += string(b[:])
+		out, err2 := exec.Command("worker", paramArg).CombinedOutput()
+    	if err2 != nil {
+        	// error case : status code of command is different from 0
+        	log.Fatal("ffmpeg error: %v", err2, string(out))
+    	}
+		
 	}
 }
 

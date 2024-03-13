@@ -42,8 +42,3 @@ type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
 }
-
-type TestJob struct {
-	Id string
-	Spec LiveJobSpec
-}
