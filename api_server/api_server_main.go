@@ -102,9 +102,10 @@ func createJob(j job.LiveJobSpec) error {
 		return e
 	}
 
-	j2, ok := getJobById(lj.Id) 
+	//j2, ok := getJobById(lj.Id) 
+	_, ok := getJobById(lj.Id) 
 	if ok {
-		fmt.Printf("New job created: %+v\n", j2)
+		//fmt.Printf("New job created: %+v\n", j2)
 		return nil
 	} 
 
@@ -162,7 +163,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 		//fmt.Println("Header: ", r.Header)
 		//fmt.Printf("Job: %+v\n", job)
-		//fmt.Println(job.input.url);
 
 		e = createJob(job)
 		if e != nil {
@@ -171,14 +171,21 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 		b, _ := json.Marshal(job)
 		//fmt.Println(string(b[:]))
-		paramArg := "-param=" 
+
+		var workerArgs []string
+		paramArg := "-param="
 		paramArg += string(b[:])
-		out, err2 := exec.Command("worker", paramArg).CombinedOutput()
+		workerArgs = append(workerArgs, paramArg)
+
+		//workerArgs = append(workerArgs, ">")
+		//workerArgs = append(workerArgs, "worker.log")
+
+		fmt.Println("Worker arguments: ", strings.Join(workerArgs, " "))
+		out, err2 := exec.Command("worker", workerArgs...).CombinedOutput()
+		//fmt.Printf("Worker log: %v", string(out))
     	if err2 != nil {
-        	// error case : status code of command is different from 0
-        	log.Fatal("ffmpeg error: %v", err2, string(out))
+        	log.Fatal("Failed to launch worker: %v ", string(out))
     	}
-		
 	}
 }
 
