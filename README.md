@@ -3,7 +3,7 @@ A work-in-progress live transcoding and streaming service.
 
 api_server/ contains the implementation of a live streaming api server which accepts requests to create live channels, parse the requests and schedule live workers to fulfill the requests.
 
-job/ contains definition of api requests and live job states.
+job/ contains definition of api requests and live job states, and the FFmpeg commands that are used to execute a live job.
 
 worker/ contains the implementation of live transcoding/streaming workers.
 
