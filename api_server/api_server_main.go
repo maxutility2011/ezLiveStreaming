@@ -7,6 +7,7 @@ import (
 	"strings"
 	"encoding/json"
 	"github.com/google/uuid"
+	"os"
 	"os/exec"
 	"log"
 	//"io/ioutil"
@@ -95,7 +96,7 @@ func createJob(j job.LiveJobSpec) error {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	lj.Spec = j
-	fmt.Println("Generating a random job ID: ", lj.Id)
+	Log.Println("Generating a random job ID: ", lj.Id)
 
 	e := createUpdateJob(lj)
 	if e != nil {
@@ -124,9 +125,9 @@ func getJobById(jid string) (job.LiveJob, bool) {
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
-    fmt.Println("----------------------------------------")
-    fmt.Println("Received new request:")
-    fmt.Println(r.Method, r.URL.Path)
+    Log.Println("----------------------------------------")
+    Log.Println("Received new request:")
+    Log.Println(r.Method, r.URL.Path)
 
     posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
     UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
@@ -141,14 +142,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	if UrlLastPart == createLiveJobEndpoint {
 		if r.Method != "POST" {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
 		if r.Body == nil {
             res := "Error New live job without job specification"
-            fmt.Println("Error New live job without job specifications")
+            Log.Println("Error New live job without job specifications")
             http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             return
         }
@@ -157,13 +158,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		e := json.NewDecoder(r.Body).Decode(&job)
 		if e != nil {
             res := "Failed to decode job request"
-            fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            Log.Println("Error happened in JSON marshal. Err: %s", e)
             http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             return
         }
 
-		//fmt.Println("Header: ", r.Header)
-		//fmt.Printf("Job: %+v\n", job)
+		//Log.Println("Header: ", r.Header)
+		//Log.Printf("Job: %+v\n", job)
 
 		e = createJob(job)
 		if e != nil {
@@ -171,19 +172,15 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		b, _ := json.Marshal(job)
-		//fmt.Println(string(b[:]))
+		//Log.Println(string(b[:]))
 
 		var workerArgs []string
 		paramArg := "-param="
 		paramArg += string(b[:])
 		workerArgs = append(workerArgs, paramArg)
 
-		//workerArgs = append(workerArgs, ">")
-		//workerArgs = append(workerArgs, "worker.log")
-
-		fmt.Println("Worker arguments: ", strings.Join(workerArgs, " "))
+		Log.Println("Worker arguments: ", strings.Join(workerArgs, " "))
 		out, err2 := exec.Command("worker", workerArgs...).CombinedOutput()
-		//fmt.Printf("Worker log: %v", string(out))
     	if err2 != nil {
         	log.Fatal("Failed to launch worker: %v ", string(out))
     	}
@@ -193,10 +190,17 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 var server_ip = "0.0.0.0"
 var server_port = "1080" 
 var server_addr = server_ip + ":" + server_port
+var Log *log.Logger
 
 func main() {
+	var logfile, err1 = os.Create("/tmp/api_server.log")
+    if err1 != nil {
+        panic(err1)
+    }
+
+    Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
 
-    fmt.Println("API server listening on: ", server_addr)
+    Log.Println("API server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 }

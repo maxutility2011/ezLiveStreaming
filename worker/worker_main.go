@@ -13,6 +13,8 @@ import (
     "flag"
 )
 
+var Log *log.Logger
+
 // live_worker -file job.json 
 // live_worker -param [job_json] 
 func main() {
@@ -21,7 +23,7 @@ func main() {
         panic(err1)
     }
 
-    Log := log.New(logfile, "", log.LstdFlags)
+    Log = log.New(logfile, "", log.LstdFlags)
 
     jobSpecPathPtr := flag.String("file", "", "input job spec file")
     jobSpecStringPtr := flag.String("param", "", "input job spec string")
