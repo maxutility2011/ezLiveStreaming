@@ -1,3 +1,4 @@
+// Live transcoding/streaming worker for fulfilling the live channel
 package main
 
 import (
@@ -12,29 +13,29 @@ import (
     "flag"
 )
 
-// live_worker -f job.json 
-// live_worker -p [job_json] 
+// live_worker -file job.json 
+// live_worker -param [job_json] 
 func main() {
     var logfile, err1 = os.Create("/tmp/worker.log")
     if err1 != nil {
         panic(err1)
     }
 
-    Log := log.New(logfile, "", log.LstdFlags|log.Lshortfile)
+    Log := log.New(logfile, "", log.LstdFlags)
 
     jobSpecPathPtr := flag.String("file", "", "input job spec file")
     jobSpecStringPtr := flag.String("param", "", "input job spec string")
-    Log.Println("jobSpecStringPtr: ", *jobSpecStringPtr)
-    Log.Println("jobSpecPathPtr: ", *jobSpecPathPtr)
 
     flag.Parse()
 
     var j job.LiveJobSpec
 
     if *jobSpecStringPtr != "" {
+        Log.Println("Reading job spec from command line argument: ", *jobSpecStringPtr)
         bytesJobSpec := []byte(*jobSpecStringPtr)
         json.Unmarshal(bytesJobSpec, &j)
     } else if *jobSpecPathPtr != "" {
+        Log.Println("Reading job spec from: ", *jobSpecPathPtr)
         jobSpecFile, err := os.Open(*jobSpecPathPtr)
         if err != nil {
             fmt.Println(err)
