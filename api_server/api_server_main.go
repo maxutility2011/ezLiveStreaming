@@ -149,7 +149,11 @@ func main() {
     }
 
 	conf := readConfig()
-	sqs_sender.Init(conf.Sqs.Queue_name)
+	sqs_sender.QueueName = conf.Sqs.Queue_name
+	sqs_sender.SqsClient = sqs_sender.CreateClient()
+
+	var testMsg = "test"
+	sqs_sender.Send(testMsg)
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
