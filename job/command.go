@@ -30,9 +30,9 @@ func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
 }
 
-// Contribution: ffmpeg -re -i ezliveStreaming/worker/1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
-// Regular latency: ffmpeg -f flv -listen 1 -i rtmp://127.0.0.1:1935/live/app -force_key_frames expr:gte(t,n_forced*4) -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -map a:0 -c:a aac -b:a 128k -seg_duration 4 -window_size 15 -extra_window_size 15 -remove_at_exit 1 -adaptation_sets id=0,streams=v id=1,streams=a -f dash /var/www/html/1.mpd
-// Low latency: ffmpeg -f flv -listen 1 -i [live_input] -vf scale=w=640:h=360 -c:v libx264 -profile:v baseline -an -use_template 1 -adaptation_sets "id=0,streams=v id=1,streams=a" -seg_duration 4 -utc_timing_url https://time.akamai.com/?iso -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash /var/www/html/[job_ib]/1.mpd
+// Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
+// Regular latency: ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1935/live/app -force_key_frames expr:gte(t,n_forced*4) -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -map a:0 -c:a aac -b:a 128k -seg_duration 4 -window_size 15 -extra_window_size 15 -remove_at_exit 1 -adaptation_sets id=0,streams=v id=1,streams=a -f dash /var/www/html/1.mpd
+// Low latency: ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1935/live/app -vf scale=w=640:h=360 -c:v libx264 -profile:v baseline -an -use_template 1 -adaptation_sets "id=0,streams=v id=1,streams=a" -seg_duration 4 -utc_timing_url https://time.akamai.com/?iso -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash /var/www/html/[job_ib]/1.mpd
 func JobSpecToEncoderArgs(j LiveJobSpec) []string {
     var ffmpegArgs []string 
 	

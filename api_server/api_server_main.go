@@ -10,86 +10,21 @@ import (
 	"os"
 	"os/exec"
 	"log"
-	//"io/ioutil"
+	"io/ioutil"
 	"ezliveStreaming/job"
+	"ezliveStreaming/job_sqs"
 )
 
+type SqsConfig struct {
+	Queue_name string
+}
+
+type ApiServerConfig struct {
+	Sqs SqsConfig
+}
+
 var createLiveJobEndpoint = "createLiveJob"
-/*
-type liveVideoOutputSpec struct {
-	//video_output_label string `json:"label"`
-	Video_codec string `json:"codec"`
-	Video_framerate_fps float32 `json:"framerate"`
-	Video_width int `json:"width"`
-	Video_height int `json:"height"`
-	Video_bitrate_kbps float32 `json:"bitrate"`
-	Video_gop_size_sec int `json:"gop_size"`
-}
-
-type liveAudioOutputSpec struct {
-	//audio_output_label string `json:"label"`
-	Audio_codec string `json:"codec"`
-	Audio_bitrate_kbps float32 `json:"bitrate"`
-}
-
-type liveJobOutputSpec struct {
-	Output_stream_type string `json:"stream_type"`
-	Output_segment_format string `json:"segment_format"`
-	Output_segment_duration_sec int `json:"segment_duration"`
-	Video_outputs []liveVideoOutputSpec `json:"video_outputs"`
-	Audio_outputs []liveAudioOutputSpec `json:"audio_outputs"`
-}
-
-type liveJobInputSpec struct {
-	Input_url string `json:"url"`
-}
-
-type liveJobSpec struct {
-    Job_input liveJobInputSpec `json:"input"`
-    Job_output liveJobOutputSpec `json:"output"`
-}
-*/
-
-/*
-type LiveVideoOutputSpec struct {
-	//video_output_label string `json:"label"`
-	Codec string 
-	Framerate float32
-	Width int
-	Height int
-	Bitrate float32 
-	Gop_size int 
-}
-
-type LiveAudioOutputSpec struct {
-	//audio_output_label string `json:"label"`
-	Codec string 
-	Bitrate float32 
-}
-
-type LiveJobOutputSpec struct {
-	Stream_type string 
-	Segment_format string 
-	Segment_duration int 
-	Video_outputs []LiveVideoOutputSpec 
-	Audio_outputs []LiveAudioOutputSpec 
-}
-
-type LiveJobInputSpec struct {
-	Url string 
-}
-
-type LiveJobSpec struct {
-    Input LiveJobInputSpec 
-    Output LiveJobOutputSpec 
-}
-
-type LiveJob struct {
-	Id string
-	Spec LiveJobSpec
-}
-*/
-
+// TODO: use database to store job states
 var jobs = make(map[string]job.LiveJob)
 
 func createJob(j job.LiveJobSpec) error {
@@ -104,10 +39,9 @@ func createJob(j job.LiveJobSpec) error {
 		return e
 	}
 
-	//j2, ok := getJobById(lj.Id) 
-	_, ok := getJobById(lj.Id) 
+	j2, ok := getJobById(lj.Id) 
 	if ok {
-		//fmt.Printf("New job created: %+v\n", j2)
+		Log.Printf("New job created: %+v\n", j2)
 		return nil
 	} 
 
@@ -191,6 +125,22 @@ var server_ip = "0.0.0.0"
 var server_port = "1080" 
 var server_addr = server_ip + ":" + server_port
 var Log *log.Logger
+var server_config_file_path = "config.json"
+var sqs_sender job_sqs.SqsSender
+
+func readConfig() ApiServerConfig {
+	var server_config ApiServerConfig
+	configFile, err := os.Open(server_config_file_path)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer configFile.Close() 
+	server_config_bytes, _ := ioutil.ReadAll(configFile)
+	json.Unmarshal(server_config_bytes, &server_config)
+
+	return server_config
+}
 
 func main() {
 	var logfile, err1 = os.Create("/tmp/api_server.log")
@@ -198,9 +148,12 @@ func main() {
         panic(err1)
     }
 
+	conf := readConfig()
+	sqs_sender.Init(conf.Sqs.Queue_name)
+
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
 
-    Log.Println("API server listening on: ", server_addr)
+    fmt.Println("API server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 }

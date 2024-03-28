@@ -34,7 +34,7 @@ type LiveJobInputSpec struct {
 }
 
 type LiveJobSpec struct {
-    Input LiveJobInputSpec 
+	Input LiveJobInputSpec
     Output LiveJobOutputSpec 
 }
 
