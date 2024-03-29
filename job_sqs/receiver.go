@@ -50,6 +50,7 @@ func (receiver SqsReceiver) Receive() (*sqs.ReceiveMessageOutput, error) {
 	})
 	
 	if err1 != nil {
+		fmt.Println("Job queue Receive failed")
 		return nil, err1
 	}
 
