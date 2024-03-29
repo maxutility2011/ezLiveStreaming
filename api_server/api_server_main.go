@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"os"
-	"os/exec"
+	//"os/exec"
 	"log"
 	"io/ioutil"
 	"ezliveStreaming/job"
@@ -27,7 +27,7 @@ var createLiveJobEndpoint = "createLiveJob"
 // TODO: use database to store job states
 var jobs = make(map[string]job.LiveJob)
 
-func createJob(j job.LiveJobSpec) error {
+func createJob(j job.LiveJobSpec) (error, string) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	lj.Spec = j
@@ -36,16 +36,17 @@ func createJob(j job.LiveJobSpec) error {
 	e := createUpdateJob(lj)
 	if e != nil {
 		fmt.Println("Error: Failed to create/update job ID: ", lj.Id)
-		return e
+		return e, ""
 	}
 
 	j2, ok := getJobById(lj.Id) 
-	if ok {
-		Log.Printf("New job created: %+v\n", j2)
-		return nil
+	if !ok {
+		fmt.Println("Error: Failed to find job ID: ", lj.Id)
+		return e, ""
 	} 
 
-	return nil
+	Log.Printf("New job created: %+v\n", j2)
+	return nil, lj.Id
 }
 
 func createUpdateJob(j job.LiveJob) error {
@@ -100,14 +101,24 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		//Log.Println("Header: ", r.Header)
 		//Log.Printf("Job: %+v\n", job)
 
-		e = createJob(job)
-		if e != nil {
+		e1, jid := createJob(job)
+		if e1 != nil {
 			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 		}
 
 		b, _ := json.Marshal(job)
 		//Log.Println(string(b[:]))
 
+		// Send the new job to job scheduler via SQS
+		jobMsg := string(b[:])
+		sqs_sender.Send(jobMsg)
+
+		FileContentType := "application/json"
+        w.Header().Set("Content-Type", FileContentType)
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(jobs[jid])
+
+		/*
 		var workerArgs []string
 		paramArg := "-param="
 		paramArg += string(b[:])
@@ -118,6 +129,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
     	if err2 != nil {
         	log.Fatal("Failed to launch worker: %v ", string(out))
     	}
+		*/
 	}
 }
 
@@ -152,8 +164,8 @@ func main() {
 	sqs_sender.QueueName = conf.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
 
-	var testMsg = "test"
-	sqs_sender.Send(testMsg)
+	//var testMsg = "test"
+	//sqs_sender.Send(testMsg)
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
