@@ -47,6 +47,12 @@ func main() {
 	sqs_receiver.QueueName = conf.Sqs.Queue_name
 	sqs_receiver.SqsClient = sqs_receiver.CreateClient()
 
-	var receivedMsg string
-	sqs_receiver.Receive(&receivedMsg)
+	//msgResult := *sqs.ReceiveMessageOutput
+	msgResult, err := sqs_receiver.Receive()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("Message ID:     " + *msgResult.Messages[0].MessageId)
+	fmt.Println("Message body:     " + *msgResult.Messages[0].Body)
 }

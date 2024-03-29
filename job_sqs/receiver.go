@@ -24,18 +24,36 @@ func (receiver SqsReceiver) GetQueueURL(queue *string) (*sqs.GetQueueUrlOutput, 
 	return result, nil
 }
 
-func (receiver SqsReceiver) Receive(msg *string) error {
+func (receiver SqsReceiver) Receive() (*sqs.ReceiveMessageOutput, error) {
 	urlResult, err := receiver.GetQueueURL(&receiver.QueueName)
 	if err != nil {
 		fmt.Println("Got an error getting the queue URL:")
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
 
 	queueURL := urlResult.QueueUrl
-	fmt.Println("Queue URL: ", *queueURL)
+	//fmt.Println("Queue URL: ", *queueURL)
 
-	return nil
+	var timeout int64
+	timeout = 60
+	msgResult, err1 := receiver.SqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
+		AttributeNames: []*string{
+			aws.String(sqs.MessageSystemAttributeNameSentTimestamp),
+		},
+		MessageAttributeNames: []*string{
+			aws.String(sqs.QueueAttributeNameAll),
+		},
+		QueueUrl:            queueURL,
+		MaxNumberOfMessages: aws.Int64(1),
+		VisibilityTimeout:   &timeout,
+	})
+	
+	if err1 != nil {
+		return nil, err1
+	}
+
+	return msgResult, nil
 }
 
 func (receiver SqsReceiver) CreateClient() *sqs.SQS {
