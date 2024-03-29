@@ -1,0 +1,5 @@
+{
+    "Sqs": {
+        "Queue_name": "ezlive_job_queue.fifo"
+    }
+}
