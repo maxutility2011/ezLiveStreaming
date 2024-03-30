@@ -24,7 +24,7 @@ func (sender SqsSender) GetQueueURL(queue *string) (*sqs.GetQueueUrlOutput, erro
 	return result, nil
 }
 
-func (sender SqsSender) Send(data string) error {
+func (sender SqsSender) SendMsg(data string, dedupId string) error {
 	result, err := sender.GetQueueURL(&sender.QueueName)
 	if err != nil {
 		fmt.Println("Got an error getting the queue URL:")
@@ -34,6 +34,7 @@ func (sender SqsSender) Send(data string) error {
 
 	queueURL := result.QueueUrl
 	//fmt.Println("Queue URL: ", *queueURL)
+	fmt.Println("Sending job to queue...")
 
 	_, err1 := sender.SqsClient.SendMessage(&sqs.SendMessageInput{
 		//DelaySeconds: aws.Int64(10),
@@ -48,11 +49,12 @@ func (sender SqsSender) Send(data string) error {
 			},
 			"WeeksOn": &sqs.MessageAttributeValue{
 				DataType:    aws.String("Number"),
-				StringValue: aws.String("6"),
+				StringValue: aws.String("8"),
 			},
 		},
 		MessageGroupId: aws.String("livejob"),
 		MessageBody: aws.String(data),
+		MessageDeduplicationId: aws.String(dedupId),
 		QueueUrl:    queueURL,
 	})
 	
@@ -71,17 +73,4 @@ func (sender SqsSender) CreateClient() *sqs.SQS {
 
 	client := sqs.New(sess)
 	return client
-	
-	/*
-	sess, _ := session.NewSession(&aws.Config{
-		Region: aws.String("us-east-1")},
-	)
-
-	svc := sqs.New(sess)
-	qs, _ := svc.ListQueues(nil)
-
-	for i, url := range qs.QueueUrls {
-		fmt.Printf("%d: %s\n", i, *url)
-	}
-	*/
 }

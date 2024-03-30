@@ -106,12 +106,12 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 		}
 
-		b, _ := json.Marshal(job)
+		b, _ := json.Marshal(jobs[jid])
 		//Log.Println(string(b[:]))
 
 		// Send the new job to job scheduler via SQS
 		jobMsg := string(b[:])
-		sqs_sender.Send(jobMsg)
+		sqs_sender.SendMsg(jobMsg, jobs[jid].Id)
 
 		FileContentType := "application/json"
         w.Header().Set("Content-Type", FileContentType)
@@ -164,8 +164,8 @@ func main() {
 	sqs_sender.QueueName = conf.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
 
-	//var testMsg = "test"
-	//sqs_sender.Send(testMsg)
+	//var testMsg = "live job 2"
+	//sqs_sender.SendMsg(testMsg)
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)

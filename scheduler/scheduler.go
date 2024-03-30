@@ -45,15 +45,18 @@ func readConfig() SchedulerConfig {
 }
 
 func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
-	msgResult, err := sqs_receiver.Receive()
+	msgResult, err := sqs_receiver.ReceiveMsg()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
+	fmt.Println("Received ", len(msgResult.Messages), " messages")
 	for i := range msgResult.Messages {
 		fmt.Println("Message ID:     " + *msgResult.Messages[i].MessageId)
 		fmt.Println("Message body:     " + *msgResult.Messages[i].Body)
+		fmt.Println("Message receipt handler:     " + *msgResult.Messages[i].ReceiptHandle) 
+		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
 	}
 
 	return nil
@@ -71,7 +74,6 @@ func main() {
 		for {
 		   select {
 			case <-ticker.C:
-				fmt.Println("timer fired")
 				pollJobQueue(sqs_receiver)
 			case <-quit:
 				ticker.Stop()
