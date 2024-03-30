@@ -79,6 +79,7 @@ func scheduleOneJob() {
 	}
 }
 
+// TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
 var pending_jobs *list.List
 
 func main() {
