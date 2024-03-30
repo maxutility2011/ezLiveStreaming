@@ -5,13 +5,13 @@ api_server/ contains the implementation of a live streaming api server which acc
 
 job/ contains definition of api requests and live job states, and the FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job.
 
-scheduler/ contains the implementation of a live job scheduler. JOb scheduler receives new live jobs from the api_server.
+scheduler/ contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes HTTP endpoints and receives new live worker registration requests from newly launched workers.
 
 job_sqs/ contains the implementation of a AWS Simple Queue Service (SQS) sender and receiver. The api_server sends new live jobs to the job queue (AWS SQS). The job scheduler periodically polls the job queue to receive new jobs.
 
 worker/ contains the implementation of live transcoding/streaming workers.
 
-live_job.json contains a sample live job request.
+sample_live_job.json contains a sample live job request.
 
 There are three executables, api_server, job scheduler and worker. After building the project (go build api_server_main.go, go build scheduler.go, go build worker_main.go), start the api_server by "./api_server". The server will run on port 1080 and in its own docker container. I'm still building the container, https://hub.docker.com/repository/docker/maxutility2011/live_streaming_api/general. To submit a live job request, you may use postman to send a POST request to "http://localhost:1080/createLiveJob" (the API endpoint. I'm testing on localhost, but feel free to host the api server anywhere). The request body is the content of live_job.json. The live worker will run also inside a docker container that I'm still building, https://hub.docker.com/repository/docker/maxutility2011/live_streaming_worker/general. 
 
