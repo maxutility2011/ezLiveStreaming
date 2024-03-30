@@ -4,15 +4,19 @@ package main
 import (
 	"fmt"
     "os"
+	"net/http"
 	"encoding/json"
 	"time"
+	"strings"
     //"os/exec"
 	"io/ioutil"
 	"container/list"
+	"github.com/google/uuid"
     //"log"
     //"flag"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
+	"ezliveStreaming/models"
 )
 
 type SqsConfig struct {
@@ -79,8 +83,95 @@ func scheduleOneJob() {
 	}
 }
 
+func createUpdateWorker(w models.LiveWorker) error {
+	workers[w.Id] = w
+	return nil
+}
+
+func getWorkerById(wid string) (models.LiveWorker, bool) {
+	worker, ok := workers[wid]
+	return worker, ok
+}
+
+func createWorker(w models.LiveWorker) (error, string) {
+	w.Id = uuid.New().String()
+	w.Registered_at = time.Now()
+	fmt.Println("Generating a random worker ID: ", w.Id)
+
+	e := createUpdateWorker(w)
+	if e != nil {
+		fmt.Println("Error: Failed to create/update worker ID: ", w.Id)
+		return e, ""
+	}
+
+	w2, ok := getWorkerById(w.Id) 
+	if !ok {
+		fmt.Println("Error: Failed to find worker ID: ", w.Id)
+		return e, ""
+	} 
+
+	fmt.Printf("New worker created: %+v\n", w2)
+	return nil, w.Id
+}
+
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
 var pending_jobs *list.List
+var server_ip = "0.0.0.0"
+var server_port = "80" 
+var server_addr = server_ip + ":" + server_port
+var workersEndpoint = "workers"
+var workers = make(map[string]models.LiveWorker)
+
+func main_server_handler(w http.ResponseWriter, r *http.Request) {
+    fmt.Println("----------------------------------------")
+    fmt.Println("Received new request:")
+    fmt.Println(r.Method, r.URL.Path)
+
+    posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
+    UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
+
+    // Remove trailing "/" if any
+    if len(UrlLastPart) == 0 {
+        path_without_trailing_slash := r.URL.Path[0 : posLastSingleSlash]
+        posLastSingleSlash = strings.LastIndex(path_without_trailing_slash, "/")
+        UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
+    } 
+
+	if UrlLastPart == workersEndpoint {
+		if r.Method != "POST" {
+            err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+            fmt.Println(err)
+            http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
+            return
+        }
+
+		if r.Body == nil {
+            res := "Error: Register worker without worker specification"
+            fmt.Println("Error: Register worker without worker specification")
+            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            return
+        }
+
+		var wkr models.LiveWorker
+		e := json.NewDecoder(r.Body).Decode(&wkr)
+		if e != nil {
+            res := "Failed to decode worker request"
+            fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            return
+        }
+
+		e1, wid := createWorker(wkr)
+		if e1 != nil {
+			fmt.Println("Failed to create new worker. Err: %s", e)
+			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+			return
+		}
+
+		b, _ := json.Marshal(workers[wid])
+		fmt.Println(string(b[:]))
+	}
+}
 
 func main() {
 	conf := readConfig()
@@ -109,8 +200,12 @@ func main() {
 				return
 			}
 		}
-	 }(ticker)
+	}(ticker)
 
-	 fmt.Println("Job scheduler started...")
-	 <-quit
+	http.HandleFunc("/", main_server_handler)
+    fmt.Println("API server listening on: ", server_addr)
+    http.ListenAndServe(server_addr, nil)
+
+	fmt.Println("Job scheduler started...")
+	<-quit
 }

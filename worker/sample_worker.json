@@ -1,0 +1,4 @@
+{
+    "HttpBaseUrl": "http://localhost:3080/",
+    "RtmpBaseUrl": "rtmp://localhost:1935/"
+}

@@ -24,7 +24,7 @@ type ApiServerConfig struct {
 	Sqs SqsConfig
 }
 
-var createLiveJobEndpoint = "createLiveJob"
+var liveJobEndpoint = "jobs"
 // TODO: use database to store job states
 var jobs = make(map[string]job.LiveJob)
 
@@ -76,7 +76,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
     } 
 
-	if UrlLastPart == createLiveJobEndpoint {
+	if UrlLastPart == liveJobEndpoint {
 		if r.Method != "POST" {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             Log.Println(err)
@@ -106,6 +106,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		e1, jid := createJob(job)
 		if e1 != nil {
 			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+			return
 		}
 
 		b, _ := json.Marshal(jobs[jid])
