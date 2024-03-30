@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"net/http"
 	"strings"
 	"encoding/json"
@@ -31,6 +32,7 @@ func createJob(j job.LiveJobSpec) (error, string) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	lj.Spec = j
+	lj.Time_created = time.Now()
 	Log.Println("Generating a random job ID: ", lj.Id)
 
 	e := createUpdateJob(lj)

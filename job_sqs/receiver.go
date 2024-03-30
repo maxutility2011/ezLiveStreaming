@@ -33,11 +33,10 @@ func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 	}
 
 	queueURL := urlResult.QueueUrl
-	//fmt.Println("Queue URL: ", *queueURL)
-	fmt.Println("Polling job queue for new jobs...")
+	//fmt.Println("Polling job queue for new jobs...")
 
-	var timeout int64
-	timeout = 60
+	//var timeout int64
+	//timeout = 60
 	msgResult, err1 := receiver.SqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
 		AttributeNames: []*string{
 			aws.String(sqs.MessageSystemAttributeNameSentTimestamp),
@@ -46,8 +45,8 @@ func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 			aws.String(sqs.QueueAttributeNameAll),
 		},
 		QueueUrl:            queueURL,
-		MaxNumberOfMessages: aws.Int64(5),
-		VisibilityTimeout:   &timeout,
+		MaxNumberOfMessages: aws.Int64(1),
+		//VisibilityTimeout:   &timeout,
 	})
 	
 	if err1 != nil {

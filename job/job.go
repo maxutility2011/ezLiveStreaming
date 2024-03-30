@@ -1,5 +1,9 @@
 package job
 
+import (
+	"time"
+)
+
 type LiveVideoOutputSpec struct {
 	//video_output_label string `json:"label"`
 	Codec string 
@@ -41,4 +45,6 @@ type LiveJobSpec struct {
 type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
+	Time_created time.Time
+	Time_received_by_scheduler time.Time
 }

@@ -54,7 +54,7 @@ func (sender SqsSender) SendMsg(data string, dedupId string) error {
 		},
 		MessageGroupId: aws.String("livejob"),
 		MessageBody: aws.String(data),
-		MessageDeduplicationId: aws.String(dedupId),
+		//MessageDeduplicationId: aws.String(dedupId),
 		QueueUrl:    queueURL,
 	})
 	
