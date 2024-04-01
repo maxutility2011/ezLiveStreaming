@@ -169,7 +169,12 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		b, _ := json.Marshal(workers[wid])
-		fmt.Println(string(b[:]))
+		fmt.Println("New worker registered:\n", string(b))
+
+		FileContentType := "application/json"
+        w.Header().Set("Content-Type", FileContentType)
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(workers[wid])
 	}
 }
 
