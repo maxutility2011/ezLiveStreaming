@@ -33,7 +33,7 @@ func createJob(j job.LiveJobSpec) (error, string) {
 	lj.Id = uuid.New().String()
 	lj.Spec = j
 	lj.Time_created = time.Now()
-	Log.Println("Generating a random job ID: ", lj.Id)
+	fmt.Println("Generating a random job ID: ", lj.Id)
 
 	e := createUpdateJob(lj)
 	if e != nil {
@@ -62,9 +62,9 @@ func getJobById(jid string) (job.LiveJob, bool) {
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
-    Log.Println("----------------------------------------")
-    Log.Println("Received new request:")
-    Log.Println(r.Method, r.URL.Path)
+    fmt.Println("----------------------------------------")
+    fmt.Println("Received new request:")
+    fmt.Println(r.Method, r.URL.Path)
 
     posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
     UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
@@ -79,14 +79,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	if UrlLastPart == liveJobEndpoint {
 		if r.Method != "POST" {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            Log.Println(err)
+            fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
 		if r.Body == nil {
             res := "Error New live job without job specification"
-            Log.Println("Error New live job without job specifications")
+            fmt.Println("Error New live job without job specifications")
             http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             return
         }
@@ -95,7 +95,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		e := json.NewDecoder(r.Body).Decode(&job)
 		if e != nil {
             res := "Failed to decode job request"
-            Log.Println("Error happened in JSON marshal. Err: %s", e)
+            fmt.Println("Error happened in JSON marshal. Err: %s", e)
             http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             return
         }

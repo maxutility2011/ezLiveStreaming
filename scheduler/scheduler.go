@@ -11,6 +11,7 @@ import (
     //"os/exec"
 	"io/ioutil"
 	"container/list"
+	"math/rand"
 	"github.com/google/uuid"
     //"log"
     //"flag"
@@ -46,6 +47,27 @@ func readConfig() SchedulerConfig {
 	return scheduler_config
 }
 
+func roundRobinAssign(j job.LiveJob) string {
+	rd := rand.Intn(len(workers))
+	fmt.Println("rd = ", rd)
+	var r string
+	var i = 0
+	for id, _ := range workers {
+		if i == rd {
+			r = id
+		}
+
+		i++
+	}
+
+	fmt.Println("Assign job id=", j.Id, " to worker id=", r)
+	return r
+}
+
+func assignWorker(j job.LiveJob) string {
+	return roundRobinAssign(j)
+}
+
 func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	msgResult, err := sqs_receiver.ReceiveMsg()
 	if err != nil {
@@ -69,6 +91,8 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 		job.Time_received_by_scheduler = time.Now()
 		pending_jobs.PushBack(job) // https://pkg.go.dev/container/list
 		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
+
+		assignWorker(job)
 	}
 
 	return nil
@@ -137,44 +161,65 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
     } 
 
-	if UrlLastPart == workersEndpoint {
-		if r.Method != "POST" {
+	if strings.Contains(r.URL.Path, workersEndpoint) {
+		if !(r.Method == "POST" || r.Method == "GET")  {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
-		if r.Body == nil {
-            res := "Error: Register worker without worker specification"
-            fmt.Println("Error: Register worker without worker specification")
-            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            return
-        }
+		if r.Method == "POST" && UrlLastPart == workersEndpoint {
+			if r.Body == nil {
+            	res := "Error: Register worker without worker specification"
+            	fmt.Println("Error: Register worker without worker specification")
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
 
-		var wkr models.LiveWorker
-		e := json.NewDecoder(r.Body).Decode(&wkr)
-		if e != nil {
-            res := "Failed to decode worker request"
-            fmt.Println("Error happened in JSON marshal. Err: %s", e)
-            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            return
-        }
+			var wkr models.LiveWorker
+			e := json.NewDecoder(r.Body).Decode(&wkr)
+			if e != nil {
+            	res := "Failed to decode worker request"
+            	fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
 
-		e1, wid := createWorker(wkr)
-		if e1 != nil {
-			fmt.Println("Failed to create new worker. Err: %s", e)
-			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
-			return
+			e1, wid := createWorker(wkr)
+			if e1 != nil {
+				fmt.Println("Failed to create new worker. Err: %s", e)
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
+
+			b, _ := json.Marshal(workers[wid])
+			fmt.Println("New worker registered:\n", string(b))
+
+			FileContentType := "application/json"
+        	w.Header().Set("Content-Type", FileContentType)
+        	w.WriteHeader(http.StatusCreated)
+        	json.NewEncoder(w).Encode(workers[wid])
+		} else if r.Method == "GET" {
+			// Get all workers: /workers/
+			if UrlLastPart == workersEndpoint {
+				FileContentType := "application/json"
+        		w.Header().Set("Content-Type", FileContentType)
+        		w.WriteHeader(http.StatusOK)
+        		json.NewEncoder(w).Encode(workers)
+			} else { // Get one worker: /workers/[worker_id]
+				worker, ok := workers[UrlLastPart]
+				if ok {
+					FileContentType := "application/json"
+        			w.Header().Set("Content-Type", FileContentType)
+        			w.WriteHeader(http.StatusOK)
+        			json.NewEncoder(w).Encode(worker)
+				} else {
+					fmt.Println("Non-existent job id: ", UrlLastPart)
+                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+				}
+			}
 		}
-
-		b, _ := json.Marshal(workers[wid])
-		fmt.Println("New worker registered:\n", string(b))
-
-		FileContentType := "application/json"
-        w.Header().Set("Content-Type", FileContentType)
-        w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(workers[wid])
 	}
 }
 
