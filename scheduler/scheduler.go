@@ -277,7 +277,7 @@ func main() {
 		for {
 		   select {
 			case <-ticker.C: {
-				scheduleOneJob() // Scheduler jobs when timer fires
+				scheduleOneJob() // Schedule jobs when timer fires
 				timer_counter += 1 
 				if timer_counter == sqs_poll_interval_multiplier { // Poll job queue to get new jobs every "sqs_poll_interval_multiplier" times when the timer fires
 					timer_counter = 0
