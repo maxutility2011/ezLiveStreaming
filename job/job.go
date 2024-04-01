@@ -47,4 +47,5 @@ type LiveJob struct {
 	Spec LiveJobSpec
 	Time_created time.Time
 	Time_received_by_scheduler time.Time
+	Timer_received_by_worker time.Time
 }

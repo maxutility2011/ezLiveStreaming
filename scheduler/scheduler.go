@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"time"
 	"strings"
+	"bytes"
     //"os/exec"
 	"io/ioutil"
 	"container/list"
@@ -49,7 +50,6 @@ func readConfig() SchedulerConfig {
 
 func roundRobinAssign(j job.LiveJob) string {
 	rd := rand.Intn(len(workers))
-	fmt.Println("rd = ", rd)
 	var r string
 	var i = 0
 	for id, _ := range workers {
@@ -92,9 +92,42 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 		job.Time_received_by_scheduler = time.Now()
 		pending_jobs.PushBack(job) // https://pkg.go.dev/container/list
 		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
-
-		assignWorker(job)
 	}
+
+	return nil
+}
+
+func sendJobToWorker(j job.LiveJob, wid string) error {
+	worker := workers[wid]
+	worker_url := "http://" + worker.Info.ServerIp + ":" + worker.Info.ServerPort + "/" + "jobs"
+	
+	b, _ := json.Marshal(j)
+
+	fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+	req, err := http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", worker_url)
+		// TODO: Need to retry registering new worker instead of giving up
+        return err
+    }
+	
+    resp, err1 := http.DefaultClient.Do(req)
+    if err1 != nil {
+        return err1
+    }
+	
+    defer resp.Body.Close()
+    bodyBytes, err2 := ioutil.ReadAll(resp.Body)
+    if err2 != nil {
+        fmt.Println("Error: Failed to read response body")
+        return err2
+    }
+
+	var j2 job.LiveJob
+	json.Unmarshal(bodyBytes, &j2)
+	j.Timer_received_by_worker = j2.Timer_received_by_worker
+	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", worker.Id, " at time=", j2.Timer_received_by_worker)
+	// TODO: need to update job.Timer_received_by_worker in database
 
 	return nil
 }
@@ -105,6 +138,8 @@ func scheduleOneJob() {
 		j := job.LiveJob(e.Value.(job.LiveJob))
 		pending_jobs.Remove(e)
 		fmt.Println("Scheduling job id: ", j.Id)
+		assigned_worker_id := assignWorker(j)
+		sendJobToWorker(j, assigned_worker_id)
 	}
 }
 
@@ -118,10 +153,14 @@ func getWorkerById(wid string) (models.LiveWorker, bool) {
 	return worker, ok
 }
 
-func createWorker(w models.LiveWorker) (error, string) {
+func createWorker(wkr models.WorkerInfo) (error, string) {
+	var w models.LiveWorker
 	w.Id = uuid.New().String()
-	w.Registered_at = time.Now()
 	fmt.Println("Generating a random worker ID: ", w.Id)
+
+	w.Registered_at = time.Now()
+	w.Info = wkr
+	w.State = "Ready"
 
 	e := createUpdateWorker(w)
 	if e != nil {
@@ -136,7 +175,7 @@ func createWorker(w models.LiveWorker) (error, string) {
 	} 
 
 	fmt.Printf("New worker created: %+v\n", w2)
-	return nil, w.Id
+	return nil, w2.Id
 }
 
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
@@ -178,7 +217,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             	return
         	}
 
-			var wkr models.LiveWorker
+			var wkr models.WorkerInfo
 			e := json.NewDecoder(r.Body).Decode(&wkr)
 			if e != nil {
             	res := "Failed to decode worker request"
@@ -194,8 +233,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			b, _ := json.Marshal(workers[wid])
-			fmt.Println("New worker registered:\n", string(b))
+			json.Marshal(workers[wid])
 
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)

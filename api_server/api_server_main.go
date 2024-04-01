@@ -47,7 +47,7 @@ func createJob(j job.LiveJobSpec) (error, string) {
 		return e, ""
 	} 
 
-	Log.Printf("New job created: %+v\n", j2)
+	fmt.Printf("New job created: %+v\n", j2)
 	return nil, lj.Id
 }
 
@@ -76,7 +76,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
     } 
 
-	//if UrlLastPart == liveJobEndpoint {
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
 		if !(r.Method == "POST" || r.Method == "GET") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path

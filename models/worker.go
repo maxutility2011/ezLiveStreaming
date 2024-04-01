@@ -2,14 +2,15 @@ package models
 
 import (
 	"time"
+	"ezliveStreaming/job"
 )
 
-type WorkerJob struct {
-	Url string
+/*type WorkerJob struct {
+	InputUrl string
 	Bitrate string
 	Video_codec string
 	Video_resolution_height string
-}
+}*/
 
 // Worker records maintained by the job scheduler
 type LiveWorker struct {
@@ -32,7 +33,7 @@ type WorkerInfo struct {
 // Sent by workers when they report status
 type WorkerReport struct {
 	Id string
-	LiveJobs []WorkerJob
+	LiveJobs []job.LiveJob
 	ComputeRemaining string
 	BandwidthRemaining string
 }

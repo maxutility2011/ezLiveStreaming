@@ -3,15 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
-	//"time"
+	"time"
 	"net/http"
 	"bytes"
-	//"strings"
+	"strings"
 	"log"
 	"io/ioutil"
 	"encoding/json"
 	"ezliveStreaming/models"
-	//"ezliveStreaming/job"
+	"ezliveStreaming/job"
 )
 
 type WorkerAppConfig struct {
@@ -20,8 +20,112 @@ type WorkerAppConfig struct {
 	WorkerAppPort string
 }
 
-func main_server_handler(w http.ResponseWriter, r *http.Request) {
+var liveJobsEndpoint = "jobs"
 
+func createJob(j job.LiveJob) (error, string) {
+	j.Timer_received_by_worker = time.Now()
+
+	e := createUpdateJob(j)
+	if e != nil {
+		fmt.Println("Error: Failed to create/update job ID: ", j.Id)
+		return e, ""
+	}
+
+	j2, ok := getJobById(j.Id) 
+	if !ok {
+		fmt.Println("Error: Failed to find job ID: ", j.Id)
+		return e, ""
+	} 
+
+	fmt.Printf("New job created: %+v\n", j2)
+	return nil, j.Id
+}
+
+func createUpdateJob(j job.LiveJob) error {
+	jobs[j.Id] = j
+	return nil
+}
+
+func getJobById(jid string) (job.LiveJob, bool) {
+	job, ok := jobs[jid]
+	return job, ok
+}
+
+func main_server_handler(w http.ResponseWriter, r *http.Request) {
+    fmt.Println("----------------------------------------")
+    fmt.Println("Received new request:")
+    fmt.Println(r.Method, r.URL.Path)
+
+    posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
+    UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
+
+    // Remove trailing "/" if any
+    if len(UrlLastPart) == 0 {
+        path_without_trailing_slash := r.URL.Path[0 : posLastSingleSlash]
+        posLastSingleSlash = strings.LastIndex(path_without_trailing_slash, "/")
+        UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
+    } 
+
+	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
+		if !(r.Method == "POST" || r.Method == "GET") {
+            err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+            fmt.Println(err)
+            http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
+            return
+        }
+
+		if r.Method == "POST" && UrlLastPart != liveJobsEndpoint {
+			res := "POST to " + r.URL.Path + "is not allowed"
+			fmt.Println(res)
+			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+		} else if r.Method == "POST" && UrlLastPart == liveJobsEndpoint {
+			if r.Body == nil {
+            	res := "Error New live job without job specification"
+            	fmt.Println("Error New live job without job specifications")
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
+
+			var job job.LiveJob
+			e := json.NewDecoder(r.Body).Decode(&job)
+			if e != nil {
+            	res := "Failed to decode job request"
+            	fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
+
+			e1, jid := createJob(job)
+			if e1 != nil {
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
+
+			FileContentType := "application/json"
+        	w.Header().Set("Content-Type", FileContentType)
+        	w.WriteHeader(http.StatusCreated)
+        	json.NewEncoder(w).Encode(jobs[jid])
+		} else if r.Method == "GET" {
+			// Get all jobs: /jobs/
+			if UrlLastPart == liveJobsEndpoint {
+				FileContentType := "application/json"
+        		w.Header().Set("Content-Type", FileContentType)
+        		w.WriteHeader(http.StatusOK)
+        		json.NewEncoder(w).Encode(jobs)
+			} else { // Get one job: /jobs/[job_id]
+				job, ok := jobs[UrlLastPart]
+				if ok {
+					FileContentType := "application/json"
+        			w.Header().Set("Content-Type", FileContentType)
+        			w.WriteHeader(http.StatusOK)
+        			json.NewEncoder(w).Encode(job)
+				} else {
+					fmt.Println("Non-existent job id: ", UrlLastPart)
+                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+				}
+			}
+		}
+	}
 }
 
 func readConfig() WorkerAppConfig {
@@ -42,7 +146,7 @@ var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
 var rtmp_port = 1935
-var jobs []models.WorkerJob // Live jobs assigned to this worker
+var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var myId string
 
 func getComputeCapacity() string {
