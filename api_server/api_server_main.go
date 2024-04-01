@@ -24,7 +24,7 @@ type ApiServerConfig struct {
 	Sqs SqsConfig
 }
 
-var liveJobEndpoint = "jobs"
+var liveJobsEndpoint = "jobs"
 // TODO: use database to store job states
 var jobs = make(map[string]job.LiveJob)
 
@@ -76,63 +76,89 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
     } 
 
-	if UrlLastPart == liveJobEndpoint {
-		if r.Method != "POST" {
+	//if UrlLastPart == liveJobEndpoint {
+	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
+		if !(r.Method == "POST" || r.Method == "GET") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
-		if r.Body == nil {
-            res := "Error New live job without job specification"
-            fmt.Println("Error New live job without job specifications")
-            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            return
-        }
+		if r.Method == "POST" && UrlLastPart != liveJobsEndpoint {
+			res := "POST to " + r.URL.Path + "is not allowed"
+			fmt.Println(res)
+			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+		} else if r.Method == "POST" && UrlLastPart == liveJobsEndpoint {
+			if r.Body == nil {
+            	res := "Error New live job without job specification"
+            	fmt.Println("Error New live job without job specifications")
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
 
-		var job job.LiveJobSpec
-		e := json.NewDecoder(r.Body).Decode(&job)
-		if e != nil {
-            res := "Failed to decode job request"
-            fmt.Println("Error happened in JSON marshal. Err: %s", e)
-            http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            return
-        }
+			var job job.LiveJobSpec
+			e := json.NewDecoder(r.Body).Decode(&job)
+			if e != nil {
+            	res := "Failed to decode job request"
+            	fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+            	return
+        	}
 
-		//Log.Println("Header: ", r.Header)
-		//Log.Printf("Job: %+v\n", job)
+			//Log.Println("Header: ", r.Header)
+			//Log.Printf("Job: %+v\n", job)
 
-		e1, jid := createJob(job)
-		if e1 != nil {
-			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
-			return
+			e1, jid := createJob(job)
+			if e1 != nil {
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
+
+			b, _ := json.Marshal(jobs[jid])
+			//Log.Println(string(b[:]))
+
+			// Send the new job to job scheduler via SQS
+			jobMsg := string(b[:])
+			sqs_sender.SendMsg(jobMsg, jobs[jid].Id)
+
+			FileContentType := "application/json"
+        	w.Header().Set("Content-Type", FileContentType)
+        	w.WriteHeader(http.StatusCreated)
+        	json.NewEncoder(w).Encode(jobs[jid])
+
+			/*
+			var workerArgs []string
+			paramArg := "-param="
+			paramArg += string(b[:])
+			workerArgs = append(workerArgs, paramArg)
+
+			Log.Println("Worker arguments: ", strings.Join(workerArgs, " "))
+			out, err2 := exec.Command("worker", workerArgs...).CombinedOutput()
+    		if err2 != nil {
+        		log.Fatal("Failed to launch worker: %v ", string(out))
+    		}
+			*/
+		} else if r.Method == "GET" {
+			// Get all jobs: /jobs/
+			if UrlLastPart == liveJobsEndpoint {
+				FileContentType := "application/json"
+        		w.Header().Set("Content-Type", FileContentType)
+        		w.WriteHeader(http.StatusOK)
+        		json.NewEncoder(w).Encode(jobs)
+			} else { // Get one job: /jobs/[job_id]
+				job, ok := jobs[UrlLastPart]
+				if ok {
+					FileContentType := "application/json"
+        			w.Header().Set("Content-Type", FileContentType)
+        			w.WriteHeader(http.StatusOK)
+        			json.NewEncoder(w).Encode(job)
+				} else {
+					fmt.Println("Non-existent job id: ", UrlLastPart)
+                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+				}
+			}
 		}
-
-		b, _ := json.Marshal(jobs[jid])
-		//Log.Println(string(b[:]))
-
-		// Send the new job to job scheduler via SQS
-		jobMsg := string(b[:])
-		sqs_sender.SendMsg(jobMsg, jobs[jid].Id)
-
-		FileContentType := "application/json"
-        w.Header().Set("Content-Type", FileContentType)
-        w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(jobs[jid])
-
-		/*
-		var workerArgs []string
-		paramArg := "-param="
-		paramArg += string(b[:])
-		workerArgs = append(workerArgs, paramArg)
-
-		Log.Println("Worker arguments: ", strings.Join(workerArgs, " "))
-		out, err2 := exec.Command("worker", workerArgs...).CombinedOutput()
-    	if err2 != nil {
-        	log.Fatal("Failed to launch worker: %v ", string(out))
-    	}
-		*/
 	}
 }
 

@@ -77,6 +77,7 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 
 	//fmt.Println("Scheduler received ", len(msgResult.Messages), " messages at ", time.Now())
 	for i := range msgResult.Messages {
+		fmt.Println("----------------------------------------")
 		fmt.Println("Message ID:     " + *msgResult.Messages[i].MessageId)
 		fmt.Println("Message body:     " + *msgResult.Messages[i].Body)
 		//fmt.Println("Message receipt handler:     " + *msgResult.Messages[i].ReceiptHandle) 
@@ -215,8 +216,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         			w.WriteHeader(http.StatusOK)
         			json.NewEncoder(w).Encode(worker)
 				} else {
-					fmt.Println("Non-existent job id: ", UrlLastPart)
-                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+					fmt.Println("Non-existent worker id: ", UrlLastPart)
+                    http.Error(w, "Non-existent worker id: " + UrlLastPart, http.StatusNotFound)
 				}
 			}
 		}
