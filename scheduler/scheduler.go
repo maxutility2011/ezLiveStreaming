@@ -125,9 +125,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 
 	var j2 job.LiveJob
 	json.Unmarshal(bodyBytes, &j2)
-	j.Timer_received_by_worker = j2.Timer_received_by_worker
-	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", worker.Id, " at time=", j2.Timer_received_by_worker)
-	// TODO: need to update job.Timer_received_by_worker in database
+	j.Time_received_by_worker = j2.Time_received_by_worker
+	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", worker.Id, " at time=", j2.Time_received_by_worker)
+	// TODO: need to update job.Time_received_by_worker in database
 
 	return nil
 }

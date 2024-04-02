@@ -147,11 +147,12 @@ var Log *log.Logger
 var job_scheduler_url string
 var rtmp_port = 1935
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
-var myId string
+var myWorkerId string
 
 func getComputeCapacity() string {
 	return "5000"
 }
+
 func getBandwidthCapacity() string {
 	return "100m"
 }
@@ -198,8 +199,8 @@ func main() {
 
 	var wkr models.LiveWorker
 	json.Unmarshal(bodyBytes, &wkr)
-	myId = wkr.Id
-	fmt.Println("Assigned worker ID by scheduler: ", myId)
+	myWorkerId = wkr.Id
+	fmt.Println("Assigned worker ID by scheduler: ", myWorkerId)
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := conf.WorkerAppIp + ":" + conf.WorkerAppPort

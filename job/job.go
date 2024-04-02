@@ -45,7 +45,9 @@ type LiveJobSpec struct {
 type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
+	StreamKey string
+	//IngestUrls []string
 	Time_created time.Time
 	Time_received_by_scheduler time.Time
-	Timer_received_by_worker time.Time
+	Time_received_by_worker time.Time
 }

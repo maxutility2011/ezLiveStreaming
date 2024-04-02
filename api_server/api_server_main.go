@@ -28,9 +28,19 @@ var liveJobsEndpoint = "jobs"
 // TODO: use database to store job states
 var jobs = make(map[string]job.LiveJob)
 
+func assignJobInputStreamId() string {
+	return uuid.New().String()
+}
+
 func createJob(j job.LiveJobSpec) (error, string) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
+	
+	lj.StreamKey = assignJobInputStreamId()
+	//j.IngestUrls = make([]string)
+	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
+	//j.IngestUrls = append(j.IngestUrls, RtmpIngestUrl)
+
 	lj.Spec = j
 	lj.Time_created = time.Now()
 	fmt.Println("Generating a random job ID: ", lj.Id)
