@@ -16,13 +16,13 @@ type Job struct {
 func testSET(k string, v string) {
 	e1 := redisClient.SetKVString(k, v, 0)
 	if e1 != nil {
-		fmt.Println("Failed to set key/value in Redis")
+		fmt.Println("Failed to SET in Redis")
 		return
 	}
 
 	r, e2 := redisClient.GetKV(k)
 	if e2 != nil {
-		fmt.Println("Failed to get key/value from Redis")
+		fmt.Println("Failed to GET from Redis")
 		return
 	}
 
@@ -32,13 +32,13 @@ func testSET(k string, v string) {
 func testHSETString(htable string, k string, v string) {
 	e1 := redisClient.HSetString(htable, k, v)
 	if e1 != nil {
-		fmt.Println("Failed to set key/value in Redis")
+		fmt.Println("Failed to HSET in Redis")
 		return
 	}
 
 	r, e2 := redisClient.HGet(htable, k)
 	if e2 != nil {
-		fmt.Println("Failed to get key/value from Redis")
+		fmt.Println("Failed to HGET from Redis")
 		return
 	}
 
@@ -48,13 +48,13 @@ func testHSETString(htable string, k string, v string) {
 func testHSETStruct(htable string, k string, v any) {
 	e1 := redisClient.HSetStruct(htable, k, v)
 	if e1 != nil {
-		fmt.Println("Failed to set key/value in Redis")
+		fmt.Println("Failed to HSET in Redis")
 		return
 	}
 
 	r, e2 := redisClient.HGet(htable, k)
 	if e2 != nil {
-		fmt.Println("Failed to get key/value from Redis")
+		fmt.Println("Failed to HGET from Redis")
 		return
 	}
 
@@ -64,7 +64,7 @@ func testHSETStruct(htable string, k string, v any) {
 func testHScan(htable string) {
 	vals, e1 := redisClient.HScan(htable)
 	if e1 != nil {
-		fmt.Println("Failed to set key/value in Redis")
+		fmt.Println("Failed to HSCAN in Redis")
 		return
 	}
 
@@ -76,13 +76,23 @@ func testHScan(htable string) {
 func testHKeys(htable string) {
 	vals, e1 := redisClient.HKeys(htable)
 	if e1 != nil {
-		fmt.Println("Failed to set key/value in Redis")
+		fmt.Println("Failed to HKEYS in Redis")
 		return
 	}
 
 	for i, element := range vals {
 		fmt.Println("key: ", i, " value: ", element)
 	}
+}
+
+func testHGet(htable string, k string) {
+	v, e := redisClient.HGet(htable, k)
+	if e != nil {
+		fmt.Println("Failed to HGET in Redis")
+		return
+	}
+
+	fmt.Println("Value: ", v)
 }
 
 func main() {
@@ -112,6 +122,7 @@ func main() {
 
 	testHSETStruct(jobs, j2.Id, j2)
 	testHKeys(jobs)
+	testHGet(jobs, j2.Id)
 	//testHScan(jobs)
 
 	//testHSETString(jobs, j.Id, string(b))

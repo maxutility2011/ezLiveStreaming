@@ -54,7 +54,7 @@ func (rc RedisClient) HSetString(htable string, k string, v string) error {
 // k: HGET member 
 func (rc RedisClient) HGet(htable string, k string) (string, error) {
 	v, err := rc.Client.HGet(rc.Ctx, htable, k).Result()
-	return v, nil
+	return v, err
 }
 
 // HSCAN
@@ -63,7 +63,7 @@ func (rc RedisClient) HGet(htable string, k string) (string, error) {
 func (rc RedisClient) HScan(htable string) ([]string, error) {
 	// In go-redis v9, HSCAN.Result() returns "keys, cursor, err"
 	keys, _, err := rc.Client.HScan(rc.Ctx, htable, 0, "", 0).Result()
-	return keys, nil
+	return keys, err
 }
 
 func (rc RedisClient) HKeys(htable string) ([]string, error) {
@@ -92,5 +92,24 @@ func (rc RedisClient) SetKVString(k string, v string, timeout time.Duration) err
 // GET
 func (rc RedisClient) GetKV(k string) (string, error) {
 	v, err := rc.Client.Get(rc.Ctx, k).Result()
-	return v, nil
+	return v, err
+}
+
+func (rc RedisClient) HDelOne(htable string, k string) error {
+	_, err := rc.Client.HDel(rc.Ctx, htable, k).Result()
+	return err
+}
+
+// Dangerous!!! Test ONLY!!!
+func (rc RedisClient) HDelAll(htable string) error {
+	keys, err := rc.Client.HKeys(rc.Ctx, htable).Result()
+	if err != nil {
+		return err
+	}
+
+	for _, k := range keys {
+		_, err = rc.Client.HDel(rc.Ctx, htable, k).Result()
+	}
+
+	return err
 }

@@ -14,14 +14,25 @@ import (
 	"io/ioutil"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
+	"ezliveStreaming/redis_client"
 )
 
 type SqsConfig struct {
 	Queue_name string
 }
 
+type RedisConfig struct {
+	RedisIp string
+	RedisPort string
+	JobsHash string
+	WaitingSet string
+	PendingSet string
+	DoneSet string
+}
+
 type ApiServerConfig struct {
 	Sqs SqsConfig
+	Redis RedisConfig
 }
 
 var liveJobsEndpoint = "jobs"
@@ -32,7 +43,7 @@ func assignJobInputStreamId() string {
 	return uuid.New().String()
 }
 
-func createJob(j job.LiveJobSpec) (error, string) {
+func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	
@@ -48,27 +59,55 @@ func createJob(j job.LiveJobSpec) (error, string) {
 	e := createUpdateJob(lj)
 	if e != nil {
 		fmt.Println("Error: Failed to create/update job ID: ", lj.Id)
-		return e, ""
+		return e, lj
 	}
 
 	j2, ok := getJobById(lj.Id) 
 	if !ok {
 		fmt.Println("Error: Failed to find job ID: ", lj.Id)
-		return e, ""
+		return e, lj
 	} 
 
 	fmt.Printf("New job created: %+v\n", j2)
-	return nil, lj.Id
+	return nil, j2
 }
 
-func createUpdateJob(j job.LiveJob) error {
+/*func createUpdateJob(j job.LiveJob) error {
 	jobs[j.Id] = j
 	return nil
+}*/
+
+func createUpdateJob(j job.LiveJob) error {
+	err := redis.HSetStruct(server_config.Redis.JobsHash, j.Id, j)
+	if err != nil {
+		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
 }
 
+/*
 func getJobById(jid string) (job.LiveJob, bool) {
 	job, ok := jobs[jid]
 	return job, ok
+}
+*/
+
+func getJobById(jid string) (job.LiveJob, bool) {
+	var j job.LiveJob
+	v, e := redis.HGet(server_config.Redis.JobsHash, jid)
+	if e != nil {
+		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
+		return j, false
+	}
+
+	e = json.Unmarshal([]byte(v), &j)
+	if e != nil {
+		fmt.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
+		return j, false
+	}
+
+	return j, true
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
@@ -118,23 +157,29 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			//Log.Println("Header: ", r.Header)
 			//Log.Printf("Job: %+v\n", job)
 
-			e1, jid := createJob(job)
+			e1, j := createJob(job)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
 
-			b, _ := json.Marshal(jobs[jid])
+			/*j2, ok := getJobById(lj.Id) 
+			if !ok {
+				fmt.Println("Error: Failed to find job ID: ", lj.Id)
+				return e, ""
+			}*/
+
+			b, _ := json.Marshal(j)
 			//fmt.Println(string(b[:]))
 
 			// Send the new job to job scheduler via SQS
 			jobMsg := string(b[:])
-			sqs_sender.SendMsg(jobMsg, jobs[jid].Id)
+			sqs_sender.SendMsg(jobMsg, j.Id)
 
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
-        	json.NewEncoder(w).Encode(jobs[jid])
+        	json.NewEncoder(w).Encode(j)
 
 			/*
 			var workerArgs []string
@@ -156,15 +201,16 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         		w.WriteHeader(http.StatusOK)
         		json.NewEncoder(w).Encode(jobs)
 			} else { // Get one job: /jobs/[job_id]
-				job, ok := jobs[UrlLastPart]
+				jid := UrlLastPart
+				j, ok := getJobById(jid) 
 				if ok {
 					FileContentType := "application/json"
         			w.Header().Set("Content-Type", FileContentType)
         			w.WriteHeader(http.StatusOK)
-        			json.NewEncoder(w).Encode(job)
+        			json.NewEncoder(w).Encode(j)
 				} else {
-					fmt.Println("Non-existent job id: ", UrlLastPart)
-                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+					fmt.Println("Non-existent job id: ", jid)
+                    http.Error(w, "Non-existent job id: " + jid, http.StatusNotFound)
 				}
 			}
 		}
@@ -177,19 +223,21 @@ var server_addr = server_ip + ":" + server_port
 var Log *log.Logger
 var server_config_file_path = "config.json"
 var sqs_sender job_sqs.SqsSender
+var redis redis_client.RedisClient
+var server_config ApiServerConfig
 
 func readConfig() ApiServerConfig {
-	var server_config ApiServerConfig
+	var config ApiServerConfig
 	configFile, err := os.Open(server_config_file_path)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	defer configFile.Close() 
-	server_config_bytes, _ := ioutil.ReadAll(configFile)
-	json.Unmarshal(server_config_bytes, &server_config)
+	config_bytes, _ := ioutil.ReadAll(configFile)
+	json.Unmarshal(config_bytes, &config)
 
-	return server_config
+	return config
 }
 
 func main() {
@@ -198,9 +246,13 @@ func main() {
         panic(err1)
     }
 
-	conf := readConfig()
-	sqs_sender.QueueName = conf.Sqs.Queue_name
+	server_config = readConfig()
+	sqs_sender.QueueName = server_config.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
+
+	redis.RedisIp = server_config.Redis.RedisIp
+	redis.RedisPort = server_config.Redis.RedisPort
+	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)

@@ -23,7 +23,7 @@ type WorkerAppConfig struct {
 var liveJobsEndpoint = "jobs"
 
 func createJob(j job.LiveJob) (error, string) {
-	j.Timer_received_by_worker = time.Now()
+	j.Time_received_by_worker = time.Now()
 
 	e := createUpdateJob(j)
 	if e != nil {
