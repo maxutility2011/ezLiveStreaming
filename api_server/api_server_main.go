@@ -125,7 +125,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			b, _ := json.Marshal(jobs[jid])
-			//Log.Println(string(b[:]))
+			//fmt.Println(string(b[:]))
 
 			// Send the new job to job scheduler via SQS
 			jobMsg := string(b[:])
