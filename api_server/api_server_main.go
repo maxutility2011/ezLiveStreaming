@@ -24,7 +24,7 @@ type SqsConfig struct {
 type RedisConfig struct {
 	RedisIp string
 	RedisPort string
-	JobsHash string
+	AllJobs string
 	WaitingSet string
 	PendingSet string
 	DoneSet string
@@ -37,7 +37,7 @@ type ApiServerConfig struct {
 
 var liveJobsEndpoint = "jobs"
 // TODO: use database to store job states
-var jobs = make(map[string]job.LiveJob)
+//var jobs = make(map[string]job.LiveJob)
 
 func assignJobInputStreamId() string {
 	return uuid.New().String()
@@ -78,7 +78,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 }*/
 
 func createUpdateJob(j job.LiveJob) error {
-	err := redis.HSetStruct(server_config.Redis.JobsHash, j.Id, j)
+	err := redis.HSetStruct(server_config.Redis.AllJobs, j.Id, j)
 	if err != nil {
 		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
 	}
@@ -95,7 +95,7 @@ func getJobById(jid string) (job.LiveJob, bool) {
 
 func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
-	v, e := redis.HGet(server_config.Redis.JobsHash, jid)
+	v, e := redis.HGet(server_config.Redis.AllJobs, jid)
 	if e != nil {
 		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
 		return j, false
@@ -108,6 +108,29 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	}
 
 	return j, true
+}
+
+func getAllJobsByTable(htable string) ([]job.LiveJob, bool) {
+	var jobs []job.LiveJob
+	jobsString, e := redis.HGetAll(htable)
+	if e != nil {
+		fmt.Println("Failed to get all jobs. Error: ", e)
+		return jobs, false
+	}
+
+	var j job.LiveJob
+	for _, j_string := range jobsString {
+		e = json.Unmarshal([]byte(j_string), &j)
+		if e != nil {
+			jobs = nil
+			fmt.Println("Failed to unmarshal Redis results (getAllJobsByTable). Error: ", e)
+			return jobs, false
+		}
+
+		jobs = append(jobs, j)
+	}
+
+	return jobs, true
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
@@ -163,18 +186,21 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			/*j2, ok := getJobById(lj.Id) 
-			if !ok {
-				fmt.Println("Error: Failed to find job ID: ", lj.Id)
-				return e, ""
-			}*/
-
-			b, _ := json.Marshal(j)
-			//fmt.Println(string(b[:]))
+			b, e2 := json.Marshal(j)
+			if e2 != nil {
+				fmt.Println("Failed to marshal new job to SQS message. Error: ", e2)
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
 
 			// Send the new job to job scheduler via SQS
 			jobMsg := string(b[:])
-			sqs_sender.SendMsg(jobMsg, j.Id)
+			e2 = sqs_sender.SendMsg(jobMsg, j.Id)
+			if e2 != nil {
+				fmt.Println("Failed to send SQS message. Error: ", e2)
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
 
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
@@ -199,7 +225,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				FileContentType := "application/json"
         		w.Header().Set("Content-Type", FileContentType)
         		w.WriteHeader(http.StatusOK)
-        		json.NewEncoder(w).Encode(jobs)
+
+				jobs, ok := getAllJobsByTable(server_config.Redis.AllJobs)
+				if ok {
+					json.NewEncoder(w).Encode(jobs)
+				} else {
+					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+					return
+				}
 			} else { // Get one job: /jobs/[job_id]
 				jid := UrlLastPart
 				j, ok := getJobById(jid) 

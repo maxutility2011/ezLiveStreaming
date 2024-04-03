@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"encoding/json"
+	//"encoding/json"
 	"ezliveStreaming/redis_client"
 )
 
@@ -16,13 +16,13 @@ type Job struct {
 func testSET(k string, v string) {
 	e1 := redisClient.SetKVString(k, v, 0)
 	if e1 != nil {
-		fmt.Println("Failed to SET in Redis")
+		fmt.Println("Failed to SET in Redis. Error: ", e1)
 		return
 	}
 
 	r, e2 := redisClient.GetKV(k)
 	if e2 != nil {
-		fmt.Println("Failed to GET from Redis")
+		fmt.Println("Failed to GET from Redis. Error: ", e2)
 		return
 	}
 
@@ -32,13 +32,13 @@ func testSET(k string, v string) {
 func testHSETString(htable string, k string, v string) {
 	e1 := redisClient.HSetString(htable, k, v)
 	if e1 != nil {
-		fmt.Println("Failed to HSET in Redis")
+		fmt.Println("Failed to HSET in Redis. Error: ", e1)
 		return
 	}
 
 	r, e2 := redisClient.HGet(htable, k)
 	if e2 != nil {
-		fmt.Println("Failed to HGET from Redis")
+		fmt.Println("Failed to HGET from Redis. Error: ", e2)
 		return
 	}
 
@@ -48,13 +48,13 @@ func testHSETString(htable string, k string, v string) {
 func testHSETStruct(htable string, k string, v any) {
 	e1 := redisClient.HSetStruct(htable, k, v)
 	if e1 != nil {
-		fmt.Println("Failed to HSET in Redis")
+		fmt.Println("Failed to HSET in Redis. Error: ", e1)
 		return
 	}
 
 	r, e2 := redisClient.HGet(htable, k)
 	if e2 != nil {
-		fmt.Println("Failed to HGET from Redis")
+		fmt.Println("Failed to HGET from Redis. Error: ", e2)
 		return
 	}
 
@@ -64,7 +64,7 @@ func testHSETStruct(htable string, k string, v any) {
 func testHScan(htable string) {
 	vals, e1 := redisClient.HScan(htable)
 	if e1 != nil {
-		fmt.Println("Failed to HSCAN in Redis")
+		fmt.Println("Failed to HSCAN in Redis. Error: ", e1)
 		return
 	}
 
@@ -76,7 +76,7 @@ func testHScan(htable string) {
 func testHKeys(htable string) {
 	vals, e1 := redisClient.HKeys(htable)
 	if e1 != nil {
-		fmt.Println("Failed to HKEYS in Redis")
+		fmt.Println("Failed to HKEYS in Redis. Error: ", e1)
 		return
 	}
 
@@ -88,11 +88,23 @@ func testHKeys(htable string) {
 func testHGet(htable string, k string) {
 	v, e := redisClient.HGet(htable, k)
 	if e != nil {
-		fmt.Println("Failed to HGET in Redis")
+		fmt.Println("Failed to HGET in Redis. Error: ", e)
 		return
 	}
 
 	fmt.Println("Value: ", v)
+}
+
+func testHGetAll(htable string) {
+	vals, e := redisClient.HGetAll(htable)
+	if e != nil {
+		fmt.Println("Failed to HGETALL in Redis. Error: ", e)
+		return
+	}
+
+	for _, v := range vals {
+		fmt.Println("Value: ", v)
+	}
 }
 
 func main() {
@@ -100,19 +112,19 @@ func main() {
 	redisClient.RedisPort = "6379"
 	redisClient.Client, redisClient.Ctx = redisClient.CreateClient(redisClient.RedisIp, redisClient.RedisPort)
 
+	/*b, e1 := json.Marshal(j1)
+	if e1 != nil {
+		fmt.Println("Failed to marshal JSON")
+	}
+
+	testSET(j1.Id, string(b))*/
+
+	jobs := "jobs"
 	j1 := Job{
 		Id: "7da9bb1c-c862-4e54-897e-500b3356eb16", 
 		Input: "rtmp://localhost:1935/live/app",
 	}
 
-	b, e1 := json.Marshal(j1)
-	if e1 != nil {
-		fmt.Println("Failed to marshal JSON")
-	}
-
-	testSET(j1.Id, string(b))
-
-	jobs := "jobs"
 	testHSETStruct(jobs, j1.Id, j1)
 
 	j2 := Job{
@@ -121,8 +133,13 @@ func main() {
 	}
 
 	testHSETStruct(jobs, j2.Id, j2)
-	testHKeys(jobs)
-	testHGet(jobs, j2.Id)
+
+	//testHKeys(jobs)
+	testHGetAll(jobs)
+
+	redisClient.HDelAll(jobs)
+
+	//testHGet(jobs, j2.Id)
 	//testHScan(jobs)
 
 	//testHSETString(jobs, j.Id, string(b))

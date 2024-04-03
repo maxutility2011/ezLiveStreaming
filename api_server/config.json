@@ -5,7 +5,7 @@
     "Redis": {
         "RedisIp": "172.17.0.4",
         "RedisPort": "6379",
-        "JobsHash": "jobs",
+        "AllJobs": "jobs",
         "WaitingSet": "waiting_set",
         "PendingSet": "pending_set",
         "DoneSet": "done_set"

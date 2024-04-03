@@ -57,6 +57,29 @@ func (rc RedisClient) HGet(htable string, k string) (string, error) {
 	return v, err
 }
 
+func (rc RedisClient) HGetAll(htable string) ([]string, error) {
+	var allKeys []string
+	var allVals []string
+	allKeys, e := rc.Client.HKeys(rc.Ctx, htable).Result()
+	if e != nil {
+		return allVals, e
+	}
+
+	var err error
+	var v string
+	for _, k := range allKeys {
+		v, err = rc.Client.HGet(rc.Ctx, htable, k).Result()
+		if err != nil {
+			allVals = nil
+			break
+		}
+
+		allVals = append(allVals, v)
+	}
+
+	return allVals, err
+}
+
 // HSCAN
 // htable: the hash table that the k/v is to be got from. 
 // k: HSCAN key 
