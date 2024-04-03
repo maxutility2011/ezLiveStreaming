@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"os"
-	//"os/exec"
 	"log"
 	"io/ioutil"
 	"ezliveStreaming/job"
@@ -37,7 +36,6 @@ type ApiServerConfig struct {
 
 var liveJobsEndpoint = "jobs"
 // TODO: use database to store job states
-//var jobs = make(map[string]job.LiveJob)
 
 func assignJobInputStreamId() string {
 	return uuid.New().String()
@@ -72,11 +70,6 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	return nil, j2
 }
 
-/*func createUpdateJob(j job.LiveJob) error {
-	jobs[j.Id] = j
-	return nil
-}*/
-
 func createUpdateJob(j job.LiveJob) error {
 	err := redis.HSetStruct(server_config.Redis.AllJobs, j.Id, j)
 	if err != nil {
@@ -85,13 +78,6 @@ func createUpdateJob(j job.LiveJob) error {
 
 	return err
 }
-
-/*
-func getJobById(jid string) (job.LiveJob, bool) {
-	job, ok := jobs[jid]
-	return job, ok
-}
-*/
 
 func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
