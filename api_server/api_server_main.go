@@ -20,18 +20,9 @@ type SqsConfig struct {
 	Queue_name string
 }
 
-type RedisConfig struct {
-	RedisIp string
-	RedisPort string
-	AllJobs string
-	WaitingSet string
-	PendingSet string
-	DoneSet string
-}
-
 type ApiServerConfig struct {
 	Sqs SqsConfig
-	Redis RedisConfig
+	Redis redis_client.RedisConfig
 }
 
 var liveJobsEndpoint = "jobs"

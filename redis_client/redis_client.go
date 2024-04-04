@@ -15,6 +15,15 @@ type RedisClient struct {
 	Client *redis.Client
 }
 
+type RedisConfig struct {
+	RedisIp string
+	RedisPort string
+	AllJobs string
+	WaitingSet string
+	PendingSet string
+	DoneSet string
+}
+
 func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.Client, context.Context) {
 	redisAddr := redis_ip + ":" + redis_port
 	fmt.Println("Creating Redis client and connecting to redisAddr: ", redisAddr)

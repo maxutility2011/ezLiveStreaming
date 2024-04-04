@@ -89,7 +89,6 @@ func testHGet(htable string, k string) {
 	v, e := redisClient.HGet(htable, k)
 	if e != nil {
 		fmt.Println("Failed to HGET in Redis. Error: ", e)
-		return
 	}
 
 	fmt.Println("Value: ", v)
@@ -112,14 +111,7 @@ func main() {
 	redisClient.RedisPort = "6379"
 	redisClient.Client, redisClient.Ctx = redisClient.CreateClient(redisClient.RedisIp, redisClient.RedisPort)
 
-	/*b, e1 := json.Marshal(j1)
-	if e1 != nil {
-		fmt.Println("Failed to marshal JSON")
-	}
-
-	testSET(j1.Id, string(b))*/
-
-	jobs := "jobs"
+	jobs := "testjobs"
 	j1 := Job{
 		Id: "7da9bb1c-c862-4e54-897e-500b3356eb16", 
 		Input: "rtmp://localhost:1935/live/app",
@@ -134,8 +126,11 @@ func main() {
 
 	testHSETStruct(jobs, j2.Id, j2)
 
+	j2.Input = "rtmp://localhost:1935/live/app22"
+	testHSETStruct(jobs, j2.Id, j2)
+	
 	//testHKeys(jobs)
-	testHGetAll(jobs)
+	//testHGetAll(jobs)
 
 	redisClient.HDelAll(jobs)
 

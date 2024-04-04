@@ -19,6 +19,7 @@ import (
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
 	"ezliveStreaming/models"
+	"ezliveStreaming/redis_client"
 )
 
 type SqsConfig struct {
@@ -27,25 +28,28 @@ type SqsConfig struct {
 
 type SchedulerConfig struct {
 	Sqs SqsConfig
+	Redis redis_client.RedisConfig
 }
 
 var scheduler_config_file_path = "config.json"
 var sqs_receiver job_sqs.SqsReceiver
 var job_scheduling_interval = "0.2s" // Scheduling timer interval
 var sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when the job scheduling timer fires 
+var redis redis_client.RedisClient
+var scheduler_config SchedulerConfig
 
-func readConfig() SchedulerConfig {
-	var scheduler_config SchedulerConfig
+func readConfig() { //SchedulerConfig {
+	//var scheduler_config SchedulerConfig
 	configFile, err := os.Open(scheduler_config_file_path)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	defer configFile.Close() 
-	scheduler_config_bytes, _ := ioutil.ReadAll(configFile)
-	json.Unmarshal(scheduler_config_bytes, &scheduler_config)
+	config_bytes, _ := ioutil.ReadAll(configFile)
+	json.Unmarshal(config_bytes, &scheduler_config)
 
-	return scheduler_config
+	//return config
 }
 
 func roundRobinAssign(j job.LiveJob) string {
@@ -68,6 +72,18 @@ func assignWorker(j job.LiveJob) string {
 	return roundRobinAssign(j)
 }
 
+func createUpdateJob(j job.LiveJob) error {
+	err := redis.HSetStruct(scheduler_config.Redis.AllJobs, j.Id, j)
+	if err != nil {
+		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
+}
+
+// Poll and fetch new jobs from SQS and add to the pending job queue
+// Currently, the pending job queue is implemented using container/list.
+// TODO: Need to save pending jobs to a Redis List. Scheduler should NOT maintain any jobs or job states.
 func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	msgResult, err := sqs_receiver.ReceiveMsg()
 	if err != nil {
@@ -75,7 +91,6 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 		return err
 	}
 
-	//fmt.Println("Scheduler received ", len(msgResult.Messages), " messages at ", time.Now())
 	for i := range msgResult.Messages {
 		fmt.Println("----------------------------------------")
 		fmt.Println("Message ID:     " + *msgResult.Messages[i].MessageId)
@@ -90,7 +105,8 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
         }
 
 		job.Time_received_by_scheduler = time.Now()
-		pending_jobs.PushBack(job) // https://pkg.go.dev/container/list
+		createUpdateJob(job)
+		queued_jobs.PushBack(job) // https://pkg.go.dev/container/list
 		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
 	}
 
@@ -125,19 +141,18 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 
 	var j2 job.LiveJob
 	json.Unmarshal(bodyBytes, &j2)
-	j.Time_received_by_worker = j2.Time_received_by_worker
+	createUpdateJob(j2)
+
 	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", worker.Id, " at time=", j2.Time_received_by_worker)
-	// TODO: need to update job.Time_received_by_worker in database
 
 	return nil
 }
 
 func scheduleOneJob() {
-	e := pending_jobs.Front()
+	e := queued_jobs.Front()
 	if e != nil {
 		j := job.LiveJob(e.Value.(job.LiveJob))
-		pending_jobs.Remove(e)
-		fmt.Println("Scheduling job id: ", j.Id)
+		queued_jobs.Remove(e)
 		assigned_worker_id := assignWorker(j)
 		sendJobToWorker(j, assigned_worker_id)
 	}
@@ -179,7 +194,7 @@ func createWorker(wkr models.WorkerInfo) (error, string) {
 }
 
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
-var pending_jobs *list.List
+var queued_jobs *list.List
 var server_ip = "0.0.0.0"
 var server_port = "80" 
 var server_addr = server_ip + ":" + server_port
@@ -263,11 +278,16 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	conf := readConfig()
-	sqs_receiver.QueueName = conf.Sqs.Queue_name
+	//scheduler_config := readConfig()
+	readConfig()
+	sqs_receiver.QueueName = scheduler_config.Sqs.Queue_name
 	sqs_receiver.SqsClient = sqs_receiver.CreateClient()
 
-	pending_jobs = list.New()
+	redis.RedisIp = scheduler_config.Redis.RedisIp
+	redis.RedisPort = scheduler_config.Redis.RedisPort
+	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
+
+	queued_jobs = list.New()
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
 	var timer_counter = 0
