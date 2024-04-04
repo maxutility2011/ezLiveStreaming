@@ -18,11 +18,17 @@ type RedisClient struct {
 type RedisConfig struct {
 	RedisIp string
 	RedisPort string
-	AllJobs string
-	WaitingSet string
-	PendingSet string
-	DoneSet string
 }
+
+// The following constants define all the Redis keys including hash tables (accessed by HSET/HGET) 
+// and variables (accessed by SET/GET)
+const REDIS_KEY_ALLJOBS = "jobs"
+const REDIS_KEY_WAITINGSET = "waiting_set"
+const REDIS_KEY_PENDINGSET = "pending_set"
+const REDIS_KEY_DONESET = "done_set"
+const REDIS_KEY_ALLWORKERS = "workers"
+const REDIS_KEY_NUMWORKERS = "num_workers"
+const REDIS_KEY_NUMJOBS = "num_jobs"
 
 func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.Client, context.Context) {
 	redisAddr := redis_ip + ":" + redis_port

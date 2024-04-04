@@ -26,7 +26,6 @@ type ApiServerConfig struct {
 }
 
 var liveJobsEndpoint = "jobs"
-// TODO: use database to store job states
 
 func assignJobInputStreamId() string {
 	return uuid.New().String()
@@ -62,7 +61,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 }
 
 func createUpdateJob(j job.LiveJob) error {
-	err := redis.HSetStruct(server_config.Redis.AllJobs, j.Id, j)
+	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
 		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
 	}
@@ -72,7 +71,7 @@ func createUpdateJob(j job.LiveJob) error {
 
 func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
-	v, e := redis.HGet(server_config.Redis.AllJobs, jid)
+	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
 	if e != nil {
 		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
 		return j, false
@@ -87,7 +86,9 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return j, true
 }
 
-func getAllJobsByTable(htable string) ([]job.LiveJob, bool) {
+// There are 1 all-jobs table, and 3 sub-tables grouped by job state.
+// Please refer to redis_client.go for all the redis key definitions
+func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 	var jobs []job.LiveJob
 	jobsString, e := redis.HGetAll(htable)
 	if e != nil {
@@ -100,7 +101,7 @@ func getAllJobsByTable(htable string) ([]job.LiveJob, bool) {
 		e = json.Unmarshal([]byte(j_string), &j)
 		if e != nil {
 			jobs = nil
-			fmt.Println("Failed to unmarshal Redis results (getAllJobsByTable). Error: ", e)
+			fmt.Println("Failed to unmarshal Redis results (getJobsByTable). Error: ", e)
 			return jobs, false
 		}
 
@@ -203,7 +204,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         		w.Header().Set("Content-Type", FileContentType)
         		w.WriteHeader(http.StatusOK)
 
-				jobs, ok := getAllJobsByTable(server_config.Redis.AllJobs)
+				jobs, ok := getJobsByTable(redis_client.REDIS_KEY_ALLJOBS)
 				if ok {
 					json.NewEncoder(w).Encode(jobs)
 				} else {
@@ -236,8 +237,7 @@ var sqs_sender job_sqs.SqsSender
 var redis redis_client.RedisClient
 var server_config ApiServerConfig
 
-func readConfig() ApiServerConfig {
-	var config ApiServerConfig
+func readConfig() {
 	configFile, err := os.Open(server_config_file_path)
 	if err != nil {
 		fmt.Println(err)
@@ -245,9 +245,7 @@ func readConfig() ApiServerConfig {
 
 	defer configFile.Close() 
 	config_bytes, _ := ioutil.ReadAll(configFile)
-	json.Unmarshal(config_bytes, &config)
-
-	return config
+	json.Unmarshal(config_bytes, &server_config)
 }
 
 func main() {
@@ -256,7 +254,7 @@ func main() {
         panic(err1)
     }
 
-	server_config = readConfig()
+	readConfig()
 	sqs_sender.QueueName = server_config.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
 

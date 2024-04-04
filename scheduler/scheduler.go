@@ -6,9 +6,11 @@ import (
     "os"
 	"net/http"
 	"encoding/json"
+	"errors"
 	"time"
 	"strings"
 	"bytes"
+	"strconv"
     //"os/exec"
 	"io/ioutil"
 	"container/list"
@@ -38,8 +40,7 @@ var sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when
 var redis redis_client.RedisClient
 var scheduler_config SchedulerConfig
 
-func readConfig() { //SchedulerConfig {
-	//var scheduler_config SchedulerConfig
+func readConfig() {
 	configFile, err := os.Open(scheduler_config_file_path)
 	if err != nil {
 		fmt.Println(err)
@@ -48,32 +49,100 @@ func readConfig() { //SchedulerConfig {
 	defer configFile.Close() 
 	config_bytes, _ := ioutil.ReadAll(configFile)
 	json.Unmarshal(config_bytes, &scheduler_config)
-
-	//return config
 }
 
-func roundRobinAssign(j job.LiveJob) string {
-	rd := rand.Intn(len(workers))
+func roundRobinAssign(j job.LiveJob) (string, bool) {
+	num_workers := getNumWorkers()
+	if num_workers < 0 {
+		fmt.Println("Failed to roundRobinAssign: Invalid num_workers (roundRobinAssign): ", num_workers)
+		return "", false
+	} else if num_workers == 0 {
+		fmt.Println("Failed to roundRobinAssign: No worker available. num_workers=", num_workers)
+		return "", false
+	}
+
+	rn := rand.Intn(num_workers)
 	var r string
-	var i = 0
-	for id, _ := range workers {
-		if i == rd {
+	wids, err := getAllWorkerIds()
+	if err != nil {
+		fmt.Println("Failed to roundRobinAssign: Failed to get all worker IDs")
+		return "", false
+	}
+
+	for i, id := range wids {
+		if i == rn {
 			r = id
 		}
-
-		i++
 	}
 
 	fmt.Println("Assign job id=", j.Id, " to worker id=", r)
+	return r, true
+}
+
+func assignWorker(j job.LiveJob) (string, bool) {
+	wid, ok := roundRobinAssign(j)
+	if !ok {
+		return "", false
+	}
+
+	return wid, true
+}
+
+func getAllWorkerIds() ([]string, error) {
+	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get all worker IDs. Error: ", err)
+	}
+
+	return wids, err
+}
+
+func getAllWorkers() ([]string, error) {
+	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get all worker IDs. Error: ", err)
+	}
+
+	var workers []string
+	for _, wid := range wids {
+		w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+		if err != nil {
+			return workers, err
+		}
+
+		workers = append(workers, w)
+	}
+
+	return workers, nil
+}
+
+func updateNumWorkers(n int) error {
+	err := redis.SetKVStruct(redis_client.REDIS_KEY_NUMWORKERS, n, 0)
+	if err != nil {
+		fmt.Println("Failed to update num_workers. Error: ", err)
+	}
+
+	return err
+}
+
+func getNumWorkers() int {
+	n, err := redis.GetKV(redis_client.REDIS_KEY_NUMWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get num_workers. Error: ", err)
+		return -1
+	}
+
+	r, err := strconv.Atoi(n)
+	if err != nil {
+		fmt.Println("Failed to strconv.Atoi (getNumWorkers). Error: ", err)
+		return -1
+	}
+
 	return r
 }
 
-func assignWorker(j job.LiveJob) string {
-	return roundRobinAssign(j)
-}
-
 func createUpdateJob(j job.LiveJob) error {
-	err := redis.HSetStruct(scheduler_config.Redis.AllJobs, j.Id, j)
+	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
 		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
 	}
@@ -114,9 +183,13 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 }
 
 func sendJobToWorker(j job.LiveJob, wid string) error {
-	worker := workers[wid]
+	worker, ok := getWorkerById(wid)
+	if !ok {
+		fmt.Println("Failed to getWorkerById")
+		return errors.New("NoWorker")
+	}
+
 	worker_url := "http://" + worker.Info.ServerIp + ":" + worker.Info.ServerPort + "/" + "jobs"
-	
 	b, _ := json.Marshal(j)
 
 	fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
@@ -153,19 +226,43 @@ func scheduleOneJob() {
 	if e != nil {
 		j := job.LiveJob(e.Value.(job.LiveJob))
 		queued_jobs.Remove(e)
-		assigned_worker_id := assignWorker(j)
-		sendJobToWorker(j, assigned_worker_id)
+		assigned_worker_id, ok := assignWorker(j)
+		if !ok {
+			fmt.Println("Failed to assign job id=", j.Id, " to a worker")
+			return
+		}
+
+		err := sendJobToWorker(j, assigned_worker_id)
+		if err != nil {
+			fmt.Println("Failed to send job to a worker")
+		}
 	}
 }
 
 func createUpdateWorker(w models.LiveWorker) error {
-	workers[w.Id] = w
-	return nil
+	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLWORKERS, w.Id, w)
+	if err != nil {
+		fmt.Println("Failed to update worker id=", w.Id, ". Error: ", err)
+	}
+
+	return err
 }
 
 func getWorkerById(wid string) (models.LiveWorker, bool) {
-	worker, ok := workers[wid]
-	return worker, ok
+	var w models.LiveWorker
+	v, e := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+	if e != nil {
+		fmt.Println("Failed to find worker id=", wid, ". Error: ", e)
+		return w, false
+	}
+
+	e = json.Unmarshal([]byte(v), &w)
+	if e != nil {
+		fmt.Println("Failed to unmarshal Redis result (getWorkerById). Error: ", e)
+		return w, false
+	}
+
+	return w, true
 }
 
 func createWorker(wkr models.WorkerInfo) (error, string) {
@@ -199,7 +296,6 @@ var server_ip = "0.0.0.0"
 var server_port = "80" 
 var server_addr = server_ip + ":" + server_port
 var workersEndpoint = "workers"
-var workers = make(map[string]models.LiveWorker)
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("----------------------------------------")
@@ -248,21 +344,40 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			json.Marshal(workers[wid])
+			// TODO: Race condition can break this logic. Need to implement 
+			// worker-to-scheduler heartbeat.
+			num_workers := getNumWorkers()
+			updateNumWorkers(num_workers + 1)
+
+			worker, ok := getWorkerById(wid)
+			if !ok {
+				fmt.Println("Failed to register worker id=", wid)
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
 
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
-        	json.NewEncoder(w).Encode(workers[wid])
+        	json.NewEncoder(w).Encode(worker)
 		} else if r.Method == "GET" {
 			// Get all workers: /workers/
 			if UrlLastPart == workersEndpoint {
 				FileContentType := "application/json"
         		w.Header().Set("Content-Type", FileContentType)
         		w.WriteHeader(http.StatusOK)
+
+				workers, err := getAllWorkers()
+				if err != nil {
+					fmt.Println("Failed to handle request: GET /workers. Error: ", err)
+					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+					return
+				}
+
         		json.NewEncoder(w).Encode(workers)
 			} else { // Get one worker: /workers/[worker_id]
-				worker, ok := workers[UrlLastPart]
+				wid := UrlLastPart
+				worker, ok := getWorkerById(wid)
 				if ok {
 					FileContentType := "application/json"
         			w.Header().Set("Content-Type", FileContentType)
@@ -278,7 +393,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	//scheduler_config := readConfig()
 	readConfig()
 	sqs_receiver.QueueName = scheduler_config.Sqs.Queue_name
 	sqs_receiver.SqsClient = sqs_receiver.CreateClient()
@@ -288,6 +402,7 @@ func main() {
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
 	queued_jobs = list.New()
+	updateNumWorkers(0) 
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
 	var timer_counter = 0
