@@ -2,5 +2,6 @@
     "ServerIp": "localhost",
     "ServerPort": 80,
     "ComputeCapacity": "5000",
-    "BandwidthCapacity": "100m"
+    "BandwidthCapacity": "100m",
+    "HeartbeatInterval": "1s"
 }

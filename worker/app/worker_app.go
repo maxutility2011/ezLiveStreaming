@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"errors"
 	"os"
 	"time"
 	"net/http"
@@ -148,6 +149,8 @@ var job_scheduler_url string
 var rtmp_port = 1935
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var myWorkerId string
+var scheduler_heartbeat_interval = "1s" 
+var last_confirmed_heartbeat_time time.Time
 
 func getComputeCapacity() string {
 	return "5000"
@@ -155,6 +158,46 @@ func getComputeCapacity() string {
 
 func getBandwidthCapacity() string {
 	return "100m"
+}
+
+func sendHeartbeat() error {
+	var hb models.WorkerHeartbeat
+	hb.Worker_id = myWorkerId
+	hb.LastHeartbeatTime = time.Now()
+	b, _ := json.Marshal(hb)
+
+	fmt.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
+	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
+	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", worker_heartbeat_url)
+		// TODO: Need to retry registering new worker instead of giving up
+        return errors.New("HeartbeatFailure_fail_to_post")
+    }
+	
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        panic(err)
+    }
+	
+    defer resp.Body.Close()
+    bodyBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error: Failed to read response body")
+        return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
+    }
+
+	// TODO: Need to handle error response (other than http code 200)
+	var hb_resp models.WorkerHeartbeat
+	json.Unmarshal(bodyBytes, &hb_resp)
+	 
+	/*if hb_resp.Id == "" {
+		fmt.Println("Failed heartbeat. Worker is NOT registered.")
+		return errors.New("HeartbeatFailure_unknown_worker")
+	}*/
+
+	last_confirmed_heartbeat_time = hb.LastHeartbeatTime
+	return nil
 }
 
 func main() {
@@ -174,6 +217,7 @@ func main() {
 	new_worker_request.ServerPort = conf.WorkerAppPort
 	new_worker_request.ComputeCapacity = getComputeCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
+	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
 	
 	b, _ := json.Marshal(new_worker_request)
 
@@ -200,7 +244,24 @@ func main() {
 	var wkr models.LiveWorker
 	json.Unmarshal(bodyBytes, &wkr)
 	myWorkerId = wkr.Id
-	fmt.Println("Assigned worker ID by scheduler: ", myWorkerId)
+	fmt.Println("Worker registered successfully with worker id =", myWorkerId)
+
+	// Periodic heartbeat
+	d, _ := time.ParseDuration(scheduler_heartbeat_interval)
+	ticker := time.NewTicker(d)
+	quit := make(chan struct{})
+	go func(ticker *time.Ticker) {
+		for {
+		   select {
+			case <-ticker.C: {
+				sendHeartbeat() 
+			}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}(ticker)
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := conf.WorkerAppIp + ":" + conf.WorkerAppPort

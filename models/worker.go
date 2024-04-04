@@ -19,6 +19,7 @@ type LiveWorker struct {
 	State string
 	Info WorkerInfo
 	LastReport WorkerReport
+	LastHeartbeatTime time.Time
 }
 
 // Sent by workers when they register with the job scheduler
@@ -28,6 +29,7 @@ type WorkerInfo struct {
 	ServerPort string
 	ComputeCapacity string
 	BandwidthCapacity string
+	HeartbeatInterval string
 }
 
 // Sent by workers when they report status
@@ -36,4 +38,9 @@ type WorkerReport struct {
 	LiveJobs []job.LiveJob
 	ComputeRemaining string
 	BandwidthRemaining string
+}
+
+type WorkerHeartbeat struct {
+	Worker_id string
+	LastHeartbeatTime time.Time
 }

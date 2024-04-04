@@ -296,6 +296,7 @@ var server_ip = "0.0.0.0"
 var server_port = "80" 
 var server_addr = server_ip + ":" + server_port
 var workersEndpoint = "workers"
+var heartbeatEndpoint = "heartbeat"
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("----------------------------------------")
@@ -389,6 +390,44 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	} else if strings.Contains(r.URL.Path, heartbeatEndpoint) {
+		if !(r.Method == "POST")  {
+            err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+            fmt.Println(err)
+            http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
+            return
+        }
+
+		if r.Body == nil {
+			res := "Error: bad heartbeat received"
+			fmt.Println("Error: bad heartbeat received")
+			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+			return
+		}
+
+		var hb models.WorkerHeartbeat
+		e := json.NewDecoder(r.Body).Decode(&hb)
+		if e != nil {
+			res := "Failed to decode worker heartbeat"
+			fmt.Println("Failed to decode worker heartbeat. Err: %s", e)
+			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+			return
+		}
+
+		worker, ok := getWorkerById(hb.Worker_id)
+		if !ok {
+			fmt.Println("Heartbeart worker id =", hb.Worker_id, " does not match any worker in Redis")
+			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+			return
+		}
+
+		worker.LastHeartbeatTime = hb.LastHeartbeatTime
+		createUpdateWorker(worker)
+		
+		FileContentType := "application/json"
+		w.Header().Set("Content-Type", FileContentType)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(hb)
 	}
 }
 
