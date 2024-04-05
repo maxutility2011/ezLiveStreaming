@@ -202,6 +202,45 @@ func sendHeartbeat() error {
 	return nil
 }
 
+func registerWorker(conf WorkerAppConfig) error {
+	register_new_worker_url := job_scheduler_url + "/" + "workers"
+	var new_worker_request models.WorkerInfo
+	new_worker_request.ServerIp = conf.WorkerAppIp
+	new_worker_request.ServerPort = conf.WorkerAppPort
+	new_worker_request.ComputeCapacity = getComputeCapacity()
+	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
+	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
+	
+	b, _ := json.Marshal(new_worker_request)
+
+	fmt.Println("Registering new worker at: ", register_new_worker_url) 
+	req, err := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", register_new_worker_url)
+		// TODO: Need to retry registering new worker instead of giving up
+        return errors.New("http_post_request_creation_failure")
+    }
+	
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", register_new_worker_url)
+        return errors.New("http_post_request_send_failure")
+    }
+	
+    defer resp.Body.Close()
+    bodyBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error: Failed to read response body")
+        return errors.New("http_post_response_parsing_failure")
+    }
+
+	var wkr models.LiveWorker
+	json.Unmarshal(bodyBytes, &wkr)
+	myWorkerId = wkr.Id
+	fmt.Println("Worker registered successfully with worker id =", myWorkerId)
+	return nil
+}
+
 func main() {
 	var logfile, err1 = os.Create("/tmp/worker_app.log")
     if err1 != nil {
@@ -220,40 +259,10 @@ func main() {
 	job_scheduler_url = conf.SchedulerUrl
 
 	// Worker app also acts as a client to the job scheduler when registering itself (worker) and report states/stats
-	register_new_worker_url := job_scheduler_url + "/" + "workers"
-	var new_worker_request models.WorkerInfo
-	new_worker_request.ServerIp = conf.WorkerAppIp
-	new_worker_request.ServerPort = conf.WorkerAppPort
-	new_worker_request.ComputeCapacity = getComputeCapacity()
-	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
-	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
-	
-	b, _ := json.Marshal(new_worker_request)
-
-	fmt.Println("Registering new worker at: ", register_new_worker_url) 
-	req, err := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
-    if err != nil {
-        fmt.Println("Error: Failed to POST to: ", register_new_worker_url)
-		// TODO: Need to retry registering new worker instead of giving up
-        return
-    }
-	
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        panic(err)
-    }
-	
-    defer resp.Body.Close()
-    bodyBytes, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Println("Error: Failed to read response body")
-        return
-    }
-
-	var wkr models.LiveWorker
-	json.Unmarshal(bodyBytes, &wkr)
-	myWorkerId = wkr.Id
-	fmt.Println("Worker registered successfully with worker id =", myWorkerId)
+	err1 = registerWorker(conf)
+	if err1 != nil {
+		fmt.Println("Failed to register worker. Try again later.")
+	}
 
 	// Periodic heartbeat
 	d, _ := time.ParseDuration(scheduler_heartbeat_interval)
@@ -263,7 +272,15 @@ func main() {
 		for {
 		   select {
 			case <-ticker.C: {
-				sendHeartbeat() 
+				// Worker ID is assigned by scheduler only when worker registration succeeded.
+				if myWorkerId == "" {
+					err1 = registerWorker(conf)
+					if err1 != nil {
+						fmt.Println("Failed to register worker. Try again later.")
+					}
+				} else {
+					sendHeartbeat() 
+				}
 			}
 			case <-quit:
 				ticker.Stop()
