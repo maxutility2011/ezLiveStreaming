@@ -33,10 +33,14 @@ type SchedulerConfig struct {
 	Redis redis_client.RedisConfig
 }
 
-var scheduler_config_file_path = "config.json"
+const scheduler_config_file_path = "config.json"
+const job_scheduling_interval = "0.2s" // Scheduling timer interval
+const sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when the job scheduling timer fires 
+const check_worker_heartbeat_interval_multiplier = 25 
+const max_missing_heartbeats_before_suspension = 3
+const max_missing_heartbeats_before_removal = 10
+
 var sqs_receiver job_sqs.SqsReceiver
-var job_scheduling_interval = "0.2s" // Scheduling timer interval
-var sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when the job scheduling timer fires 
 var redis redis_client.RedisClient
 var scheduler_config SchedulerConfig
 
@@ -52,7 +56,14 @@ func readConfig() {
 }
 
 func roundRobinAssign(j job.LiveJob) (string, bool) {
-	num_workers := getNumWorkers()
+	var r string
+	workers, err := getAllAvailableWorkers()
+	if err != nil {
+		fmt.Println("Failed to getAllAvailableWorkers. Error: ", err)
+		return r, false
+	}
+
+	num_workers := len(workers)
 	if num_workers < 0 {
 		fmt.Println("Failed to roundRobinAssign: Invalid num_workers (roundRobinAssign): ", num_workers)
 		return "", false
@@ -62,16 +73,9 @@ func roundRobinAssign(j job.LiveJob) (string, bool) {
 	}
 
 	rn := rand.Intn(num_workers)
-	var r string
-	wids, err := getAllWorkerIds()
-	if err != nil {
-		fmt.Println("Failed to roundRobinAssign: Failed to get all worker IDs")
-		return "", false
-	}
-
-	for i, id := range wids {
+	for i, w := range workers {
 		if i == rn {
-			r = id
+			r = w.Id
 		}
 	}
 
@@ -86,59 +90,6 @@ func assignWorker(j job.LiveJob) (string, bool) {
 	}
 
 	return wid, true
-}
-
-func getAllWorkerIds() ([]string, error) {
-	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
-	if err != nil {
-		fmt.Println("Failed to get all worker IDs. Error: ", err)
-	}
-
-	return wids, err
-}
-
-func getAllWorkers() ([]string, error) {
-	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
-	if err != nil {
-		fmt.Println("Failed to get all worker IDs. Error: ", err)
-	}
-
-	var workers []string
-	for _, wid := range wids {
-		w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
-		if err != nil {
-			return workers, err
-		}
-
-		workers = append(workers, w)
-	}
-
-	return workers, nil
-}
-
-func updateNumWorkers(n int) error {
-	err := redis.SetKVStruct(redis_client.REDIS_KEY_NUMWORKERS, n, 0)
-	if err != nil {
-		fmt.Println("Failed to update num_workers. Error: ", err)
-	}
-
-	return err
-}
-
-func getNumWorkers() int {
-	n, err := redis.GetKV(redis_client.REDIS_KEY_NUMWORKERS)
-	if err != nil {
-		fmt.Println("Failed to get num_workers. Error: ", err)
-		return -1
-	}
-
-	r, err := strconv.Atoi(n)
-	if err != nil {
-		fmt.Println("Failed to strconv.Atoi (getNumWorkers). Error: ", err)
-		return -1
-	}
-
-	return r
 }
 
 func createUpdateJob(j job.LiveJob) error {
@@ -248,6 +199,96 @@ func createUpdateWorker(w models.LiveWorker) error {
 	return err
 }
 
+func createWorker(wkr models.WorkerInfo) (error, string) {
+	var w models.LiveWorker
+	w.Id = uuid.New().String()
+	fmt.Println("Generating a random worker ID: ", w.Id)
+
+	w.Registered_at = time.Now()
+	w.Info = wkr
+	w.State = models.WORKER_STATE_IDLE
+
+	e := createUpdateWorker(w)
+	if e != nil {
+		fmt.Println("Error: Failed to create/update worker ID: ", w.Id)
+		return e, ""
+	}
+
+	w2, ok := getWorkerById(w.Id) 
+	if !ok {
+		fmt.Println("Error: Failed to find worker ID: ", w.Id)
+		return e, ""
+	} 
+
+	fmt.Printf("New worker created: %+v\n", w2)
+	return nil, w2.Id
+}
+
+func removeWorker(wid string) (error, string) {
+	err := redis.HDelOne(redis_client.REDIS_KEY_ALLWORKERS, wid)
+	if err != nil {
+		fmt.Println("Failed to delete worker id=", wid, ". Error: ", err)
+	}
+
+	return err, wid
+}
+
+func getAllWorkerIds() ([]string, error) {
+	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get all worker IDs. Error: ", err)
+	}
+
+	return wids, err
+}
+
+func getAllWorkers() ([]string, error) {
+	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get all worker IDs. Error: ", err)
+	}
+
+	var workers []string
+	for _, wid := range wids {
+		w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+		if err != nil {
+			return workers, err
+		}
+
+		workers = append(workers, w)
+	}
+
+	return workers, nil
+}
+
+func getAllAvailableWorkers() ([]models.LiveWorker, error) {
+	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get all worker IDs. Error: ", err)
+	}
+
+	var workers []models.LiveWorker
+	for _, wid := range wids {
+		w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+		if err != nil {
+			return workers, err
+		}
+
+		var worker models.LiveWorker
+		err = json.Unmarshal([]byte(w), &worker)
+		if err != nil {
+			fmt.Println("Failed to unmarshal worker (getAllAvailableWorkers). Error: ", err)
+			return workers, err
+		}
+
+		if (worker.State == models.WORKER_STATE_IDLE || worker.State == models.WORKER_STATE_LOADED) {
+			workers = append(workers, worker)
+		}
+	}
+
+	return workers, nil
+}
+
 func getWorkerById(wid string) (models.LiveWorker, bool) {
 	var w models.LiveWorker
 	v, e := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
@@ -265,29 +306,71 @@ func getWorkerById(wid string) (models.LiveWorker, bool) {
 	return w, true
 }
 
-func createWorker(wkr models.WorkerInfo) (error, string) {
-	var w models.LiveWorker
-	w.Id = uuid.New().String()
-	fmt.Println("Generating a random worker ID: ", w.Id)
-
-	w.Registered_at = time.Now()
-	w.Info = wkr
-	w.State = "Ready"
-
-	e := createUpdateWorker(w)
-	if e != nil {
-		fmt.Println("Error: Failed to create/update worker ID: ", w.Id)
-		return e, ""
+func updateNumWorkers(n int) error {
+	err := redis.SetKVStruct(redis_client.REDIS_KEY_NUMWORKERS, n, 0)
+	if err != nil {
+		fmt.Println("Failed to update num_workers. Error: ", err)
 	}
 
-	w2, ok := getWorkerById(w.Id) 
-	if !ok {
-		fmt.Println("Error: Failed to find worker ID: ", w.Id)
-		return e, ""
-	} 
+	return err
+}
 
-	fmt.Printf("New worker created: %+v\n", w2)
-	return nil, w2.Id
+func getNumWorkers() int {
+	n, err := redis.GetKV(redis_client.REDIS_KEY_NUMWORKERS)
+	if err != nil {
+		fmt.Println("Failed to get num_workers. Error: ", err)
+		return -1
+	}
+
+	r, err := strconv.Atoi(n)
+	if err != nil {
+		fmt.Println("Failed to strconv.Atoi (getNumWorkers). Error: ", err)
+		return -1
+	}
+
+	return r
+}
+
+// Check heartbeat from all the workers 
+func check_worker_heartbeat() error {
+	workers, err := getAllWorkers()
+	if err != nil {
+		fmt.Println("Failed to check worker heartbeat. Error: Failed to getAllWorkers: ", err)
+		return err
+	}
+
+	for _, e := range workers {
+		var w models.LiveWorker
+		err = json.Unmarshal([]byte(e), &w)
+		if err != nil {
+			fmt.Println("Failed to check worker heartbeat. Error: Failed to unmarshal workers: ", err)
+			return err
+		}
+
+		hbinterval, _ := time.ParseDuration(w.Info.HeartbeatInterval)
+		time_now := time.Now().UnixMilli()
+		time_lastHeartbeat := w.LastHeartbeatTime.UnixMilli()
+
+		//fmt.Println("time elapsed since last heartbeat: ", time_now - time_lastHeartbeat)
+		//fmt.Println("max time allowed no heartbeat: ", int64(max_missing_heartbeats_before_suspension * hbinterval / 1000000))
+		if (time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_suspension * hbinterval * 1000)) {
+			w.State = models.WORKER_STATE_NOTAVAILABLE
+		} 
+		
+		if (time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
+			e, wid := removeWorker(w.Id)
+			if e != nil {
+				// Worker removal failed. Let's try again in the next event. 
+				// Meanwhile, let's reassure it is set as "not available" so no job is assigned to it.
+				fmt.Println("Failed to remove worker id = ", wid, ". Error: ", err)
+				w.State = models.WORKER_STATE_NOTAVAILABLE
+			} else {
+				fmt.Println("Removed worker id = ", wid, " due to missing heartbeat")
+			}
+		}
+	}
+
+	return nil
 }
 
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
@@ -441,10 +524,11 @@ func main() {
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
 	queued_jobs = list.New()
-	updateNumWorkers(0) 
+	//updateNumWorkers(0) 
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
-	var timer_counter = 0
+	var sqs_poll_timer_counter = 0
+	var worker_heartbeat_timer_counter = 0
 	ticker := time.NewTicker(d)
 	quit := make(chan struct{})
 	go func(ticker *time.Ticker) {
@@ -452,10 +536,16 @@ func main() {
 		   select {
 			case <-ticker.C: {
 				scheduleOneJob() // Schedule jobs when timer fires
-				timer_counter += 1 
-				if timer_counter == sqs_poll_interval_multiplier { // Poll job queue to get new jobs every "sqs_poll_interval_multiplier" times when the timer fires
-					timer_counter = 0
+				sqs_poll_timer_counter += 1 
+				if sqs_poll_timer_counter == sqs_poll_interval_multiplier { // Poll job queue to get new jobs every "sqs_poll_interval_multiplier" times when the timer fires
+					sqs_poll_timer_counter = 0
 					pollJobQueue(sqs_receiver)
+				}
+
+				worker_heartbeat_timer_counter += 1
+				if worker_heartbeat_timer_counter == check_worker_heartbeat_interval_multiplier {
+					worker_heartbeat_timer_counter = 0
+					check_worker_heartbeat()
 				}
 			}
 			case <-quit:

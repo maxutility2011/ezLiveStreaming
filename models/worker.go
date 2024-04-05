@@ -12,6 +12,19 @@ import (
 	Video_resolution_height string
 }*/
 
+const WORKER_STATE_IDLE = "idle"
+const WORKER_STATE_LOADED = "loaded"
+const WORKER_STATE_NOTAVAILABLE = "notavailable"
+
+// When a worker is in "idle" or "loaded" (but not fully loaded),
+// it is eligible for new job assignment.
+
+// When a worker is fully loaded or in a bad state (e.g., missing heartbeats), 
+// it is marked as "notavailable"
+
+// When a worker fails to report heartbeats too many times, it is removed from Redis completely.
+// However, it can be re-registered later when its heartbeat comes back.
+
 // Worker records maintained by the job scheduler
 type LiveWorker struct {
 	Id string
