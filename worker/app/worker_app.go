@@ -7,6 +7,7 @@ import (
 	"time"
 	"net/http"
 	"bytes"
+	"flag"
 	"strings"
 	"log"
 	"io/ioutil"
@@ -166,7 +167,7 @@ func sendHeartbeat() error {
 	hb.LastHeartbeatTime = time.Now()
 	b, _ := json.Marshal(hb)
 
-	fmt.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
+	Log.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
 	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
 	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
     if err != nil {
@@ -177,7 +178,8 @@ func sendHeartbeat() error {
 	
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        panic(err)
+        fmt.Println("Failed to POST heartbeat: ", worker_heartbeat_url)
+		return err
     }
 	
     defer resp.Body.Close()
@@ -205,6 +207,13 @@ func main() {
     if err1 != nil {
         panic(err1)
     }
+
+    configPtr := flag.String("config", "", "config file path")
+    flag.Parse()
+
+	if *configPtr != "" {
+		worker_app_config_file_path = *configPtr
+	}
 
     Log = log.New(logfile, "", log.LstdFlags)
 	conf := readConfig()

@@ -519,7 +519,6 @@ func main() {
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
 	queued_jobs = list.New()
-	//updateNumWorkers(0) 
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
 	var sqs_poll_timer_counter = 0
