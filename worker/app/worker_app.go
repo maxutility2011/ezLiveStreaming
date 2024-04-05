@@ -10,8 +10,10 @@ import (
 	"flag"
 	"strings"
 	"log"
+	"strconv"
 	"io/ioutil"
 	"encoding/json"
+	"container/list"
 	"ezliveStreaming/models"
 	"ezliveStreaming/job"
 )
@@ -103,6 +105,15 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			ingestUrl, e2 := createIngestUrl()
+			if e2 != nil {
+				fmt.Println("Failed to allocate ingest url", e2)
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				return
+			}
+
+			fmt.Println("Ingest URL: ", ingestUrl)
+
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
@@ -130,18 +141,15 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readConfig() WorkerAppConfig {
-	var worker_app_config WorkerAppConfig
+func readConfig() {
 	configFile, err := os.Open(worker_app_config_file_path)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	defer configFile.Close() 
-	worker_app_config_bytes, _ := ioutil.ReadAll(configFile)
-	json.Unmarshal(worker_app_config_bytes, &worker_app_config)
-
-	return worker_app_config
+	config_bytes, _ := ioutil.ReadAll(configFile)
+	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
 var rtmp_port_base = 1935 // TODO: Make this onfigurable
@@ -151,9 +159,13 @@ var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
 // TODO: Need to move "jobs" to Redis or find a way to recover jobs when worker_app crashes
+// TODO: Need to constantly monitor job health. Need to re-assign a job to a new worker
+//       when the existing worker crashes.
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var myWorkerId string
 var last_confirmed_heartbeat_time time.Time
+var available_rtmp_ports *list.List
+var worker_app_config WorkerAppConfig
 
 func getComputeCapacity() string {
 	return "5000"
@@ -161,6 +173,42 @@ func getComputeCapacity() string {
 
 func getBandwidthCapacity() string {
 	return "100m"
+}
+
+func allocateRtmpIngestPort() int {
+	var port int
+	e := available_rtmp_ports.Front()
+	if e != nil {
+		port = int(e.Value.(int))
+		available_rtmp_ports.Remove(e)
+	} else {
+		port = -1
+	}
+
+	return port
+}
+
+func allocateIngestPort() int {
+	return allocateRtmpIngestPort()
+}
+
+// Need to release RTMP port when a job is done
+func releaseRtmpPort(port int) {
+	available_rtmp_ports.PushBack(port)
+}
+
+func createIngestUrl() (string, error) {
+	ingestPort := allocateIngestPort()
+	var ingestUrl string
+	var err error
+	err = nil
+	if ingestPort < 0 {
+		err = errors.New("NotEnoughIngestPort")
+	} else {
+		ingestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(ingestPort)
+	}
+
+	return ingestUrl, err
 }
 
 func sendHeartbeat() error {
@@ -219,7 +267,6 @@ func registerWorker(conf WorkerAppConfig) error {
 	req, err := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
     if err != nil {
         fmt.Println("Error: Failed to POST to: ", register_new_worker_url)
-		// TODO: Need to retry registering new worker instead of giving up
         return errors.New("http_post_request_creation_failure")
     }
 	
@@ -257,13 +304,24 @@ func main() {
 	}
 
     Log = log.New(logfile, "", log.LstdFlags)
-	conf := readConfig()
-	job_scheduler_url = conf.SchedulerUrl
+	readConfig()
+	job_scheduler_url = worker_app_config.SchedulerUrl
 
 	// Worker app also acts as a client to the job scheduler when registering itself (worker) and report states/stats
-	err1 = registerWorker(conf)
+	err1 = registerWorker(worker_app_config)
 	if err1 != nil {
 		fmt.Println("Failed to register worker. Try again later.")
+	}
+
+	/*
+	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
+		available_rtmp_ports = append(available_rtmp_ports, p)	
+	}
+	*/
+
+	available_rtmp_ports = list.New()
+	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
+		available_rtmp_ports.PushBack(p)
 	}
 
 	// Periodic heartbeat
@@ -276,7 +334,7 @@ func main() {
 			case <-ticker.C: {
 				// Worker ID is assigned by scheduler only when worker registration succeeded.
 				if myWorkerId == "" {
-					err1 = registerWorker(conf)
+					err1 = registerWorker(worker_app_config)
 					if err1 != nil {
 						fmt.Println("Failed to register worker. Try again later.")
 					}
@@ -292,7 +350,7 @@ func main() {
 	}(ticker)
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
-	worker_app_addr := conf.WorkerAppIp + ":" + conf.WorkerAppPort
+	worker_app_addr := worker_app_config.WorkerAppIp + ":" + worker_app_config.WorkerAppPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
     http.ListenAndServe(worker_app_addr, nil)
