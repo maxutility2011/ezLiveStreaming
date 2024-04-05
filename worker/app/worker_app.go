@@ -144,13 +144,15 @@ func readConfig() WorkerAppConfig {
 	return worker_app_config
 }
 
+var rtmp_port_base = 1935 // TODO: Make this onfigurable
+var max_rtmp_ports = 15 // TODO: Make this configurable
+var scheduler_heartbeat_interval = "1s" 
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
-var rtmp_port = 1935
+// TODO: Need to move "jobs" to Redis or find a way to recover jobs when worker_app crashes
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var myWorkerId string
-var scheduler_heartbeat_interval = "1s" 
 var last_confirmed_heartbeat_time time.Time
 
 func getComputeCapacity() string {

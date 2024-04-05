@@ -55,7 +55,7 @@ func readConfig() {
 	json.Unmarshal(config_bytes, &scheduler_config)
 }
 
-func roundRobinAssign(j job.LiveJob) (string, bool) {
+func randomAssign(j job.LiveJob) (string, bool) {
 	var r string
 	workers, err := getAllAvailableWorkers()
 	if err != nil {
@@ -84,7 +84,7 @@ func roundRobinAssign(j job.LiveJob) (string, bool) {
 }
 
 func assignWorker(j job.LiveJob) (string, bool) {
-	wid, ok := roundRobinAssign(j)
+	wid, ok := randomAssign(j)
 	if !ok {
 		return "", false
 	}
@@ -165,9 +165,10 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 
 	var j2 job.LiveJob
 	json.Unmarshal(bodyBytes, &j2)
+	j2.Assigned_worker_id = wid
 	createUpdateJob(j2)
 
-	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", worker.Id, " at time=", j2.Time_received_by_worker)
+	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", wid, " at time=", j2.Time_received_by_worker)
 
 	return nil
 }
