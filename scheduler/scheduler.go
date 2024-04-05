@@ -428,11 +428,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// TODO: Race condition can break this logic. Need to implement 
-			// worker-to-scheduler heartbeat.
-			num_workers := getNumWorkers()
-			updateNumWorkers(num_workers + 1)
-
 			worker, ok := getWorkerById(wid)
 			if !ok {
 				fmt.Println("Failed to register worker id=", wid)
