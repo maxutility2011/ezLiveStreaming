@@ -34,6 +34,7 @@ type SchedulerConfig struct {
 }
 
 const scheduler_config_file_path = "config.json"
+const update_worker_load_interval = "1s" // update worker load when the previous one failed.  
 const job_scheduling_interval = "0.2s" // Scheduling timer interval
 const sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when the job scheduling timer fires 
 const check_worker_heartbeat_interval_multiplier = 25 
@@ -134,6 +135,24 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	return nil
 }
 
+func updateWorkerLoad(w models.LiveWorker, j job.LiveJob) error {
+	w.Load.Id = w.Id
+	w.Load.LiveJobs = append(w.Load.LiveJobs, j)
+	// TODO: update ComputeRemaining
+	// TODO: update BandwidthRemaining
+	e := createUpdateWorker(w)
+	//time_sec := time.Now().UnixMilli()/1000
+	//fmt.Println("time_sec: ", time_sec)
+	if e != nil {
+	//if time_sec % 5 != 1 {
+		fmt.Println("Failed to update worker load: worker id = ", w.Id, ", job id = ", j.Id, e)
+		return e
+		//return errors.New("fakeError")
+	}
+
+	return nil
+}
+
 func sendJobToWorker(j job.LiveJob, wid string) error {
 	worker, ok := getWorkerById(wid)
 	if !ok {
@@ -168,9 +187,32 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	json.Unmarshal(bodyBytes, &j2)
 	j2.Assigned_worker_id = wid
 	createUpdateJob(j2)
+	e := updateWorkerLoad(worker, j2)
+
+	if e != nil {
+		d, _ := time.ParseDuration(update_worker_load_interval)
+		ticker := time.NewTicker(d)
+		quit := make(chan bool)
+		go func(ticker *time.Ticker) {
+			for {
+			   select {
+				case <-ticker.C: {
+					e := updateWorkerLoad(worker, j2) 
+					fmt.Println("Retrying worker load update...")
+					if e == nil {
+						fmt.Println("Worker load update retried and succeeded.")
+						quit <- true
+					}
+				}
+				case <-quit:
+					ticker.Stop()
+					return
+				}
+			}
+		}(ticker)
+	}
 
 	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", wid, " at time=", j2.Time_received_by_worker)
-
 	return nil
 }
 

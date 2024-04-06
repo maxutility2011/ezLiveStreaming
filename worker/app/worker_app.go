@@ -199,13 +199,13 @@ func releaseRtmpPort(port int) {
 }
 
 func createIngestUrl(job job.LiveJob) error {
-	rtmp_ingest_port := allocateRtmpIngestPort()
+	rtmp_ingest_port := allocateRtmpIngestPort() // TODO: need to support RTMPS
 	// srt_ingest_port := allocateSrtIngestPort() // TODO
 	// srt_ingest_port := allocateRtpIngestPort() // TODO
 	var err error
 	err = nil
 	if rtmp_ingest_port < 0 {
-		err = errors.New("NotEnoughIngestPort")
+		err = errors.New("NotEnoughRtmpIngestPort")
 	} else {
 		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey + "/"
 		// job.SrtIngestUrl = ...

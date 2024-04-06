@@ -31,7 +31,7 @@ type LiveWorker struct {
 	Registered_at time.Time
 	State string
 	Info WorkerInfo
-	LastReport WorkerReport
+	Load WorkerLoad
 	LastHeartbeatTime time.Time
 }
 
@@ -45,9 +45,9 @@ type WorkerInfo struct {
 	HeartbeatInterval string
 }
 
-// Sent by workers when they report status
-type WorkerReport struct {
+type WorkerLoad struct {
 	Id string
+	UpdateFailed bool
 	LiveJobs []job.LiveJob
 	ComputeRemaining string
 	BandwidthRemaining string
