@@ -105,19 +105,24 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			ingestUrl, e2 := createIngestUrl()
+			e2 := createIngestUrl(job)
 			if e2 != nil {
 				fmt.Println("Failed to allocate ingest url", e2)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
 
-			fmt.Println("Ingest URL: ", ingestUrl)
-
-			FileContentType := "application/json"
-        	w.Header().Set("Content-Type", FileContentType)
-        	w.WriteHeader(http.StatusCreated)
-        	json.NewEncoder(w).Encode(jobs[jid])
+			j, ok := getJobById(jid)
+			if ok {
+				fmt.Println("Ingest URL of job id = ", jid, ": ", j.RtmpIngestUrl)
+				FileContentType := "application/json"
+				w.Header().Set("Content-Type", FileContentType)
+				w.WriteHeader(http.StatusCreated)
+				json.NewEncoder(w).Encode(j)
+			} else {
+				fmt.Println("Failed to get job id = ", jid, " (worker_app.main_server_handler)")
+				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+			}
 		} else if r.Method == "GET" {
 			// Get all jobs: /jobs/
 			if UrlLastPart == liveJobsEndpoint {
@@ -188,27 +193,27 @@ func allocateRtmpIngestPort() int {
 	return port
 }
 
-func allocateIngestPort() int {
-	return allocateRtmpIngestPort()
-}
-
 // Need to release RTMP port when a job is done
 func releaseRtmpPort(port int) {
 	available_rtmp_ports.PushBack(port)
 }
 
-func createIngestUrl() (string, error) {
-	ingestPort := allocateIngestPort()
-	var ingestUrl string
+func createIngestUrl(job job.LiveJob) error {
+	rtmp_ingest_port := allocateRtmpIngestPort()
+	// srt_ingest_port := allocateSrtIngestPort() // TODO
+	// srt_ingest_port := allocateRtpIngestPort() // TODO
 	var err error
 	err = nil
-	if ingestPort < 0 {
+	if rtmp_ingest_port < 0 {
 		err = errors.New("NotEnoughIngestPort")
 	} else {
-		ingestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(ingestPort)
+		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey + "/"
+		// job.SrtIngestUrl = ...
+		// job.RtpIngestUrl = ...
 	}
 
-	return ingestUrl, err
+	createUpdateJob(job)
+	return err
 }
 
 func sendHeartbeat() error {

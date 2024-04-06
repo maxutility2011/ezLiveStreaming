@@ -72,6 +72,7 @@ func randomAssign(j job.LiveJob) (string, bool) {
 		return "", false
 	}
 
+	fmt.Println("Number of available workers: ", num_workers)
 	rn := rand.Intn(num_workers)
 	for i, w := range workers {
 		if i == rn {
@@ -354,11 +355,11 @@ func check_worker_heartbeat() error {
 
 		//fmt.Println("time elapsed since last heartbeat: ", time_now - time_lastHeartbeat)
 		//fmt.Println("max time allowed no heartbeat: ", int64(max_missing_heartbeats_before_suspension * hbinterval / 1000000))
-		if (time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_suspension * hbinterval * 1000)) {
+		if (time_lastHeartbeat != 0 && time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_suspension * hbinterval * 1000)) {
 			w.State = models.WORKER_STATE_NOTAVAILABLE
 		} 
 		
-		if (time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
+		if (time_lastHeartbeat != 0 && time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
 			e, wid := removeWorker(w.Id)
 			if e != nil {
 				// Worker removal failed. Let's try again in the next event. 

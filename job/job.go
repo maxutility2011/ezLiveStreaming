@@ -46,6 +46,7 @@ type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
 	StreamKey string
+	RtmpIngestUrl string
 	Time_created time.Time
 	Time_received_by_scheduler time.Time
 	Time_received_by_worker time.Time
