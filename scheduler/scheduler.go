@@ -174,9 +174,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
         return err1
     }
 	
-	// StatusServiceUnavailable: Insufficient worker resource (e.g, runs out of compute/bandwidth capacoty, or ingest ports)
 	if resp.StatusCode == http.StatusInternalServerError {
-		return errors.New("InsufficientResource")
+		fmt.Println("Job id=", j2.Id, " failed to launch on worker id=", wid, " at time=", j2.Time_received_by_worker)
+		return errors.New("WorkerJobExecutionError")
 	}
 
     defer resp.Body.Close()
@@ -216,7 +216,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		}(ticker)
 	}
 
-	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", wid, " at time=", j2.Time_received_by_worker)
+	fmt.Println("Job id=", j2.Id, " successfully launched on worker id=", wid, " at time=", j2.Time_received_by_worker)
 	return e
 }
 

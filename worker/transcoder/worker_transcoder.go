@@ -24,14 +24,11 @@ func main() {
     }
 
     Log = log.New(logfile, "", log.LstdFlags)
-
     jobSpecPathPtr := flag.String("file", "", "input job spec file")
     jobSpecStringPtr := flag.String("param", "", "input job spec string")
-
     flag.Parse()
 
     var j job.LiveJobSpec
-
     if *jobSpecStringPtr != "" {
         Log.Println("Reading job spec from command line argument: ", *jobSpecStringPtr)
         bytesJobSpec := []byte(*jobSpecStringPtr)
@@ -51,12 +48,11 @@ func main() {
         return
     }
 
-    Log.Println("Input Url: ", j.Input.Url)
-
+    fmt.Println("Input Url: ", j.Input.Url)
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
     out, err2 := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput()
     if err2 != nil {
         // error case : status code of command is different from 0
-        log.Fatal("ffmpeg error: %v", err2, string(out))
+        fmt.Println("ffmpeg error: %v", err2, string(out))
     }
 }

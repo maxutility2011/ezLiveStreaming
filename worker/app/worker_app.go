@@ -225,16 +225,7 @@ func createIngestUrl(job job.LiveJob) error {
 }
 
 func launchJob(j job.LiveJob) error {
-	/*var input job.LiveJobInputSpec
-	input.Url = j.RtmpIngestUrl
-	b1, err1 := json.Marshal(input)
-	if err1 != nil {
-		fmt.Println("Failed to marshal job input (launchJob). Error: ", err1)
-		return err1
-	}*/
-
 	j.Spec.Input.Url = j.RtmpIngestUrl
-
 	b, err := json.Marshal(j.Spec)
 	if err != nil {
 		fmt.Println("Failed to marshal job output (launchJob). Error: ", err)
@@ -247,11 +238,19 @@ func launchJob(j job.LiveJob) error {
 	transcoderArgs = append(transcoderArgs, paramArg)
 
 	fmt.Println("Worker arguments: ", strings.Join(transcoderArgs, " "))
-	out, err2 := exec.Command("worker_transcoder", transcoderArgs...).CombinedOutput()
-    if err2 != nil {
-        fmt.Println("Failed to launch worker transcoder: %v ", string(out))
-    }
+	ffmpegCmd := exec.Command("worker_transcoder", transcoderArgs...)
 
+	var err2 error
+	var out []byte
+	go func() {
+		out, err2 = ffmpegCmd.CombinedOutput()
+		if err2 != nil {
+        	fmt.Println("Failed to launch worker transcoder: %v ", string(out))
+		}
+	}()
+
+	fmt.Println("Transcoder log: ", string(out))
+	//out, err2 := exec.Command("worker_transcoder", transcoderArgs...).CombinedOutput()
 	return err2
 }
 
