@@ -23,17 +23,17 @@ func main() {
     jobSpecStringPtr := flag.String("param", "", "input job spec string")
     flag.Parse()
 
-    if *jobIdPtr != "" {
-        Log.Println("Job id = ", *jobIdPtr)
+    if jobIdPtr != nil {
+        fmt.Println("Job id = ", *jobIdPtr)
     }
 
     var j job.LiveJobSpec
     if *jobSpecStringPtr != "" {
-        Log.Println("Reading job spec from command line argument: ", *jobSpecStringPtr)
+        fmt.Println("Reading job spec from command line argument: ", *jobSpecStringPtr)
         bytesJobSpec := []byte(*jobSpecStringPtr)
         json.Unmarshal(bytesJobSpec, &j)
     } else if *jobSpecPathPtr != "" {
-        Log.Println("Reading job spec from: ", *jobSpecPathPtr)
+        fmt.Println("Reading job spec from: ", *jobSpecPathPtr)
         jobSpecFile, err := os.Open(*jobSpecPathPtr)
         if err != nil {
             fmt.Println(err)
@@ -50,18 +50,19 @@ func main() {
     logName := "/tmp/worker_transcoder_" + *jobIdPtr + ".log"
     var logfile, err1 = os.Create(logName)
     if err1 != nil {
-        panic(err1)
+        fmt.Println("Exiting... Failed to create log file (worker_transcoder)")
+        return
     }
 
     Log = log.New(logfile, "", log.LstdFlags)
 
-    fmt.Println("Input Url: ", j.Input.Url)
+    Log.Println("Input Url: ", j.Input.Url)
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
     out, err2 := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput()
     if err2 != nil {
         // error case : status code of command is different from 0
-        fmt.Println("ffmpeg error: %v", err2, string(out))
+        Log.Println("ffmpeg error: %v", err2, string(out))
     }
 
-    fmt.Println("FFmpeg log: ", string(out))
+    Log.Println("FFmpeg log: ", string(out))
 }
