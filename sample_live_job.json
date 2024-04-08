@@ -1,6 +1,6 @@
 {
         "Input": {
-            "Url": "rtmp://127.0.0.1:1935/live/app"
+            "Url": "rtmp://172.17.0.3:1935/live/app"
         },
         "Output": {
             "Stream_type": "dash",

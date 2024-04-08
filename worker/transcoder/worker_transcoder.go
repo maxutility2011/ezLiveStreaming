@@ -15,18 +15,17 @@ import (
 
 var Log *log.Logger
 
-// live_worker -file job.json 
-// live_worker -param [job_json] 
+// worker_transcoder -file job.json 
+// worker_transcoder -param [job_json] 
 func main() {
-    var logfile, err1 = os.Create("/tmp/worker.log")
-    if err1 != nil {
-        panic(err1)
-    }
-
-    Log = log.New(logfile, "", log.LstdFlags)
+    jobIdPtr := flag.String("job_id", "", "input job id")
     jobSpecPathPtr := flag.String("file", "", "input job spec file")
     jobSpecStringPtr := flag.String("param", "", "input job spec string")
     flag.Parse()
+
+    if *jobIdPtr != "" {
+        Log.Println("Job id = ", *jobIdPtr)
+    }
 
     var j job.LiveJobSpec
     if *jobSpecStringPtr != "" {
@@ -48,6 +47,14 @@ func main() {
         return
     }
 
+    logName := "/tmp/worker_transcoder_" + *jobIdPtr + ".log"
+    var logfile, err1 = os.Create(logName)
+    if err1 != nil {
+        panic(err1)
+    }
+
+    Log = log.New(logfile, "", log.LstdFlags)
+
     fmt.Println("Input Url: ", j.Input.Url)
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
     out, err2 := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput()
@@ -55,4 +62,6 @@ func main() {
         // error case : status code of command is different from 0
         fmt.Println("ffmpeg error: %v", err2, string(out))
     }
+
+    fmt.Println("FFmpeg log: ", string(out))
 }

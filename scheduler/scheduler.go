@@ -175,7 +175,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
     }
 	
 	if resp.StatusCode == http.StatusInternalServerError {
-		fmt.Println("Job id=", j2.Id, " failed to launch on worker id=", wid, " at time=", j2.Time_received_by_worker)
+		fmt.Println("Job id=", j.Id, " failed to launch on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
 		return errors.New("WorkerJobExecutionError")
 	}
 

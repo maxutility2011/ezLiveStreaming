@@ -25,6 +25,11 @@ type WorkerAppConfig struct {
 	WorkerAppPort string
 }
 
+type RunningJob struct {
+	Job job.LiveJob
+	Command *exec.Cmd
+}
+
 var liveJobsEndpoint = "jobs"
 
 func createJob(j job.LiveJob) (error, string) {
@@ -168,6 +173,7 @@ func readConfig() {
 var rtmp_port_base = 1935 // TODO: Make this onfigurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var scheduler_heartbeat_interval = "1s" 
+var job_status_check_interval = "2s"
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
@@ -175,6 +181,7 @@ var job_scheduler_url string
 // TODO: Need to constantly monitor job health. Need to re-assign a job to a new worker
 //       when the existing worker crashes.
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
+var running_jobs *list.List // Live jobs actively running on this worker
 var myWorkerId string
 var last_confirmed_heartbeat_time time.Time
 var available_rtmp_ports *list.List
@@ -233,6 +240,11 @@ func launchJob(j job.LiveJob) error {
 	}
 	
 	var transcoderArgs []string
+
+	jobIdArg := "-job_id="
+	jobIdArg += j.Id
+	transcoderArgs = append(transcoderArgs, jobIdArg)
+
 	paramArg := "-param="
 	paramArg += string(b[:])
 	transcoderArgs = append(transcoderArgs, paramArg)
@@ -240,18 +252,35 @@ func launchJob(j job.LiveJob) error {
 	fmt.Println("Worker arguments: ", strings.Join(transcoderArgs, " "))
 	ffmpegCmd := exec.Command("worker_transcoder", transcoderArgs...)
 
+	var rj RunningJob
+	rj.Job = j
+	rj.Command = ffmpegCmd
+	running_jobs.PushBack(rj)
+
 	var err2 error
 	var out []byte
 	go func() {
 		out, err2 = ffmpegCmd.CombinedOutput()
 		if err2 != nil {
-        	fmt.Println("Failed to launch worker transcoder: %v ", string(out))
+        	fmt.Println("Errors running worker transcoder: %v ", string(out))
 		}
 	}()
 
-	fmt.Println("Transcoder log: ", string(out))
+	fmt.Println("Transcoder launch log: ", string(out))
 	//out, err2 := exec.Command("worker_transcoder", transcoderArgs...).CombinedOutput()
 	return err2
+}
+
+func checkJobStatus() error {
+	fmt.Println("Checking job status... # of running jobs = ", running_jobs.Len())
+	for e := running_jobs.Front(); e != nil; e = e.Next() {
+		j := RunningJob(e.Value.(RunningJob))
+		fmt.Println("Checking status of job id = ", j.Job.Id)
+		out, _ := j.Command.CombinedOutput()
+		fmt.Println("Transcoder log: ", string(out))
+	}
+
+	return nil
 }
 
 func sendHeartbeat() error {
@@ -361,6 +390,8 @@ func main() {
 		available_rtmp_ports.PushBack(p)
 	}
 
+	running_jobs = list.New()
+
 	// Periodic heartbeat
 	d, _ := time.ParseDuration(scheduler_heartbeat_interval)
 	ticker := time.NewTicker(d)
@@ -385,6 +416,26 @@ func main() {
 			}
 		}
 	}(ticker)
+
+	// Periodic status check of running jobs
+	d2, _ := time.ParseDuration(job_status_check_interval)
+	ticker1 := time.NewTicker(d2)
+	quit1 := make(chan struct{})
+	go func(ticker1 *time.Ticker) {
+		for {
+		   select {
+			case <-ticker1.C: {
+				err1 = checkJobStatus()
+				if err1 != nil {
+					fmt.Println("Failed to check job status. Try again later.")
+				}
+			}
+			case <-quit1:
+				ticker1.Stop()
+				return
+			}
+		}
+	}(ticker1)
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := worker_app_config.WorkerAppIp + ":" + worker_app_config.WorkerAppPort
