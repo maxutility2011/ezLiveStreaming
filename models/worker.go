@@ -47,7 +47,6 @@ type WorkerInfo struct {
 
 type WorkerLoad struct {
 	Id string
-	UpdateFailed bool
 	LiveJobs []job.LiveJob
 	ComputeRemaining string
 	BandwidthRemaining string

@@ -138,16 +138,14 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 func updateWorkerLoad(w models.LiveWorker, j job.LiveJob) error {
 	w.Load.Id = w.Id
 	w.Load.LiveJobs = append(w.Load.LiveJobs, j)
+	w.State = models.WORKER_STATE_LOADED
+
 	// TODO: update ComputeRemaining
 	// TODO: update BandwidthRemaining
 	e := createUpdateWorker(w)
-	//time_sec := time.Now().UnixMilli()/1000
-	//fmt.Println("time_sec: ", time_sec)
 	if e != nil {
-	//if time_sec % 5 != 1 {
 		fmt.Println("Failed to update worker load: worker id = ", w.Id, ", job id = ", j.Id, e)
 		return e
-		//return errors.New("fakeError")
 	}
 
 	return nil
@@ -176,6 +174,11 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
         return err1
     }
 	
+	// StatusServiceUnavailable: Insufficient worker resource (e.g, runs out of compute/bandwidth capacoty, or ingest ports)
+	if resp.StatusCode == http.StatusInternalServerError {
+		return errors.New("InsufficientResource")
+	}
+
     defer resp.Body.Close()
     bodyBytes, err2 := ioutil.ReadAll(resp.Body)
     if err2 != nil {
@@ -189,6 +192,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	createUpdateJob(j2)
 	e := updateWorkerLoad(worker, j2)
 
+	// Do we need to keep retrying updateWorkerLoad?
 	if e != nil {
 		d, _ := time.ParseDuration(update_worker_load_interval)
 		ticker := time.NewTicker(d)
@@ -200,7 +204,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 					e := updateWorkerLoad(worker, j2) 
 					fmt.Println("Retrying worker load update...")
 					if e == nil {
-						fmt.Println("Worker load update retried and succeeded.")
+						fmt.Println("Worker load update retried and succeeded!")
 						quit <- true
 					}
 				}
@@ -213,7 +217,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	}
 
 	fmt.Println("Job id=", j2.Id, " successfully assigned to worker id=", wid, " at time=", j2.Time_received_by_worker)
-	return nil
+	return e
 }
 
 func scheduleOneJob() {
@@ -224,12 +228,14 @@ func scheduleOneJob() {
 		assigned_worker_id, ok := assignWorker(j)
 		if !ok {
 			fmt.Println("Failed to assign job id=", j.Id, " to a worker")
+			queued_jobs.PushBack(j) // Add failed jobs back to the queue and retry later
 			return
 		}
 
 		err := sendJobToWorker(j, assigned_worker_id)
 		if err != nil {
 			fmt.Println("Failed to send job to a worker")
+			queued_jobs.PushBack(j) 
 		}
 	}
 }

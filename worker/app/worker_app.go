@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"errors"
 	"os"
+	"os/exec"
 	"time"
 	"net/http"
 	"bytes"
@@ -107,17 +108,24 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 			e2 := createIngestUrl(job)
 			if e2 != nil {
-				fmt.Println("Failed to allocate ingest url", e2)
-				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				fmt.Println("Failed to allocate ingest url. Error: ", e2)
+				http.Error(w, "500 Internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
 
 			j, ok := getJobById(jid)
 			if ok {
 				fmt.Println("Ingest URL of job id = ", jid, ": ", j.RtmpIngestUrl)
+				e3 := launchJob(j)
+				if e3 != nil {
+					fmt.Println("Failed to launch job id =", jid, " Error: ", e3)
+					http.Error(w, "500 Internal serve error\n  Error: ", http.StatusInternalServerError)
+					return
+				}
+
 				FileContentType := "application/json"
 				w.Header().Set("Content-Type", FileContentType)
-				w.WriteHeader(http.StatusCreated)
+				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(j)
 			} else {
 				fmt.Println("Failed to get job id = ", jid, " (worker_app.main_server_handler)")
@@ -207,13 +215,44 @@ func createIngestUrl(job job.LiveJob) error {
 	if rtmp_ingest_port < 0 {
 		err = errors.New("NotEnoughRtmpIngestPort")
 	} else {
-		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey + "/"
+		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
 		// job.SrtIngestUrl = ...
 		// job.RtpIngestUrl = ...
 	}
 
 	createUpdateJob(job)
 	return err
+}
+
+func launchJob(j job.LiveJob) error {
+	/*var input job.LiveJobInputSpec
+	input.Url = j.RtmpIngestUrl
+	b1, err1 := json.Marshal(input)
+	if err1 != nil {
+		fmt.Println("Failed to marshal job input (launchJob). Error: ", err1)
+		return err1
+	}*/
+
+	j.Spec.Input.Url = j.RtmpIngestUrl
+
+	b, err := json.Marshal(j.Spec)
+	if err != nil {
+		fmt.Println("Failed to marshal job output (launchJob). Error: ", err)
+		return err
+	}
+	
+	var transcoderArgs []string
+	paramArg := "-param="
+	paramArg += string(b[:])
+	transcoderArgs = append(transcoderArgs, paramArg)
+
+	fmt.Println("Worker arguments: ", strings.Join(transcoderArgs, " "))
+	out, err2 := exec.Command("worker_transcoder", transcoderArgs...).CombinedOutput()
+    if err2 != nil {
+        fmt.Println("Failed to launch worker transcoder: %v ", string(out))
+    }
+
+	return err2
 }
 
 func sendHeartbeat() error {
@@ -317,12 +356,6 @@ func main() {
 	if err1 != nil {
 		fmt.Println("Failed to register worker. Try again later.")
 	}
-
-	/*
-	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
-		available_rtmp_ports = append(available_rtmp_ports, p)	
-	}
-	*/
 
 	available_rtmp_ports = list.New()
 	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {

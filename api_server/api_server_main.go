@@ -184,19 +184,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
         	json.NewEncoder(w).Encode(j)
-
-			/*
-			var workerArgs []string
-			paramArg := "-param="
-			paramArg += string(b[:])
-			workerArgs = append(workerArgs, paramArg)
-
-			Log.Println("Worker arguments: ", strings.Join(workerArgs, " "))
-			out, err2 := exec.Command("worker", workerArgs...).CombinedOutput()
-    		if err2 != nil {
-        		log.Fatal("Failed to launch worker: %v ", string(out))
-    		}
-			*/
 		} else if r.Method == "GET" {
 			// Get all jobs: /jobs/
 			if UrlLastPart == liveJobsEndpoint {
