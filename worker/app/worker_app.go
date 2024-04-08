@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 	"net/http"
 	"bytes"
@@ -266,18 +267,27 @@ func launchJob(j job.LiveJob) error {
 		}
 	}()
 
-	fmt.Println("Transcoder launch log: ", string(out))
-	//out, err2 := exec.Command("worker_transcoder", transcoderArgs...).CombinedOutput()
 	return err2
+}
+
+func reportJobStatus() error {
+
 }
 
 func checkJobStatus() error {
 	fmt.Println("Checking job status... # of running jobs = ", running_jobs.Len())
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j := RunningJob(e.Value.(RunningJob))
-		fmt.Println("Checking status of job id = ", j.Job.Id)
-		out, _ := j.Command.CombinedOutput()
-		fmt.Println("Transcoder log: ", string(out))
+		//out, _ := j.Command.CombinedOutput()
+		process, err := os.FindProcess(int(j.Command.Process.Pid))
+		if err != nil {
+            fmt.Printf("Failed to find process id = %d\n", j.Command.Process.Pid)
+			return err
+        } else {
+            err = process.Signal(syscall.Signal(0))
+			fmt.Printf("process.Signal on pid %d returned: %v\n", j.Command.Process.Pid, err)
+			//reportJobStatus(err)
+        }
 	}
 
 	return nil

@@ -36,7 +36,8 @@ func main() {
         fmt.Println("Reading job spec from: ", *jobSpecPathPtr)
         jobSpecFile, err := os.Open(*jobSpecPathPtr)
         if err != nil {
-            fmt.Println(err)
+            fmt.Println("Failed to open worker_transcoder log file. Error: ", err)
+            return
         }
 
         defer jobSpecFile.Close() 
