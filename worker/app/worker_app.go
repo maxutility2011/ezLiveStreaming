@@ -271,7 +271,6 @@ func launchJob(j job.LiveJob) error {
 }
 
 func reportJobStatus(processFound bool, processRunning bool, err error) error {
-	fmt.Println("reportJobStatus...")
 	if !processFound {
 		fmt.Printf("Process not found")
 	} else if !processRunning {
