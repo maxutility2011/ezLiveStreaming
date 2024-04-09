@@ -188,7 +188,7 @@ var last_confirmed_heartbeat_time time.Time
 var available_rtmp_ports *list.List
 var worker_app_config WorkerAppConfig
 
-func getComputeCapacity() string {
+func getCpuCapacity() string {
 	return "5000"
 }
 
@@ -270,38 +270,92 @@ func launchJob(j job.LiveJob) error {
 	return err2
 }
 
-func reportJobStatus(processFound bool, processRunning bool, err error) error {
-	if !processFound {
-		fmt.Printf("Process not found")
-	} else if !processRunning {
-		fmt.Printf("Process not running because: ", err)
+func reportJobStatus(report models.WorkerJobReport) error {
+	Log.Println("Sending job status report at time =", time.Now())
+	job_status_url := job_scheduler_url + "/" + "jobstatus"
+
+	b, _ := json.Marshal(report)
+	req, err := http.NewRequest(http.MethodPost, job_status_url, bytes.NewReader(b))
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", job_status_url)
+		// TODO: Need to retry registering new worker instead of giving up
+        return errors.New("StatusReportFailure_fail_to_post")
+    }
+	
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        fmt.Println("Failed to POST job status: ", job_status_url)
+		return err
+    }
+	
+	/*
+    defer resp.Body.Close()
+    bodyBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error: Failed to read response body (reportJobStatus)")
+        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
+    }
+
+	var hb_resp models.WorkerHeartbeat
+	json.Unmarshal(bodyBytes, &hb_resp)
+	*/
+
+	// TODO: Need to handle error response (other than http code 200)
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Bad response from scheduler (reportJobStatus)")
+        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
 	}
 
 	return nil
 }
 
 func checkJobStatus() {
-	fmt.Println("Checking job status... # of running jobs = ", running_jobs.Len())
+	fmt.Println("Checking job status... Number of running jobs = ", running_jobs.Len())
+	var job_report models.WorkerJobReport
+	var prev_e *list.Element
+	var jobProcessFound bool
+	var jobProcessRunning bool
+
+	job_report.WorkerId = myWorkerId
+	prev_e = nil
+	jobProcessFound = false
+	jobProcessRunning = false
+	var j RunningJob
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
-		j := RunningJob(e.Value.(RunningJob))
-		//out, _ := j.Command.CombinedOutput()
-		processFound := true
-		processRunning := true
+		// Remove stopped jobs and update scheduler
+		if (prev_e != nil && (!jobProcessFound || !jobProcessRunning)) {
+			j = RunningJob(prev_e.Value.(RunningJob))
+			job_report.StoppedJobs = append(job_report.StoppedJobs, j.Job.Id)
+			running_jobs.Remove(prev_e)
+		}
+
+		j = RunningJob(e.Value.(RunningJob))
+		jobProcessFound = true
+		jobProcessRunning = true
 		var err2 error
+
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {
-            fmt.Printf("Failed to find process id = %d (Job id = %s). Error: %s\n", j.Command.Process.Pid, j.Job.Id, err1)
-			processFound = false
+            fmt.Printf("Process id = %d (Job id = %s) not found. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
+			jobProcessFound = false
         } else {
 			err2 = process.Signal(syscall.Signal(0))
 			fmt.Printf("process.Signal on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 != nil {
-				processRunning = false
+				jobProcessRunning = false
 			}
         }
 
-		reportJobStatus(processFound, processRunning, err2)
+		prev_e = e
 	}
+
+	if (prev_e != nil && (!jobProcessFound || !jobProcessRunning)) {
+		j = RunningJob(prev_e.Value.(RunningJob))
+		job_report.StoppedJobs = append(job_report.StoppedJobs, j.Job.Id)
+		running_jobs.Remove(prev_e)
+	}
+
+	reportJobStatus(job_report)
 }
 
 func sendHeartbeat() error {
@@ -325,21 +379,23 @@ func sendHeartbeat() error {
 		return err
     }
 	
+	/*
     defer resp.Body.Close()
     bodyBytes, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        fmt.Println("Error: Failed to read response body")
+        fmt.Println("Error: Failed to read response body (sendHeartbeat)")
         return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
     }
 
-	// TODO: Need to handle error response (other than http code 200)
 	var hb_resp models.WorkerHeartbeat
 	json.Unmarshal(bodyBytes, &hb_resp)
-	 
-	/*if hb_resp.Id == "" {
-		fmt.Println("Failed heartbeat. Worker is NOT registered.")
-		return errors.New("HeartbeatFailure_unknown_worker")
-	}*/
+	*/
+
+	// TODO: Need to handle error response (other than http code 200)
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Bad response from scheduler (sendHeartbeat)")
+        return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
+	}
 
 	last_confirmed_heartbeat_time = hb.LastHeartbeatTime
 	return nil
@@ -350,7 +406,7 @@ func registerWorker(conf WorkerAppConfig) error {
 	var new_worker_request models.WorkerInfo
 	new_worker_request.ServerIp = conf.WorkerAppIp
 	new_worker_request.ServerPort = conf.WorkerAppPort
-	new_worker_request.ComputeCapacity = getComputeCapacity()
+	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
 	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
 	

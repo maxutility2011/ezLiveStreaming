@@ -12,6 +12,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/redis/go-redis/v9 v9.5.1 // indirect
+	github.com/searKing/golang/go v1.2.115 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )

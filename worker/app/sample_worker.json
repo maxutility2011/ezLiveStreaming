@@ -1,7 +1,7 @@
 {
     "ServerIp": "localhost",
     "ServerPort": 80,
-    "ComputeCapacity": "5000",
-    "BandwidthCapacity": "100m",
+    "CpuCapacity": 5000,
+    "BandwidthCapacity": 100000, 
     "HeartbeatInterval": "1s"
 }

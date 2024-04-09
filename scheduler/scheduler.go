@@ -33,6 +33,10 @@ type SchedulerConfig struct {
 	Redis redis_client.RedisConfig
 }
 
+const workersEndpoint = "workers"
+const heartbeatEndpoint = "heartbeat"
+const jobStatusEndpoint = "jobstatus"
+
 const scheduler_config_file_path = "config.json"
 const update_worker_load_interval = "1s" // update worker load when the previous one failed.  
 const job_scheduling_interval = "0.2s" // Scheduling timer interval
@@ -44,6 +48,12 @@ const max_missing_heartbeats_before_removal = 10
 var sqs_receiver job_sqs.SqsReceiver
 var redis redis_client.RedisClient
 var scheduler_config SchedulerConfig
+// A local table keeping load of all the jobs per each worker. 
+// Function addNewJobLoad() adds new jobs to the table after they are successfully launched on the assigned workers.
+// Function updateWorkerStatus() updates load of workers upon reception of worker reports.
+// Worker_app periodically check the status of all the running jobs and report any stopped jobs to the scheduler.
+// The scheduler updates worker_loads table by subtracting the load of the stopped jobs.
+var worker_loads = make(map[string]models.WorkerLoad)
 
 func readConfig() {
 	configFile, err := os.Open(scheduler_config_file_path)
@@ -135,19 +145,71 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	return nil
 }
 
-func updateWorkerLoad(w models.LiveWorker, j job.LiveJob) error {
-	w.Load.Id = w.Id
-	w.Load.LiveJobs = append(w.Load.LiveJobs, j)
-	w.State = models.WORKER_STATE_LOADED
+func estimateJobLoad(j job.LiveJob) (int, int) {
+	cpu_load := 1000 
+	bandwidth_load := 20000 // kbps
+	return cpu_load, bandwidth_load
+}
 
-	// TODO: update ComputeRemaining
-	// TODO: update BandwidthRemaining
+func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
+	var w_load models.WorkerLoad
+	w_load, ok := worker_loads[w.Id]
+	if !ok {
+		fmt.Println("Creating new WorkerLoad entry, id = ", w.Id)
+		w_load.Jobs = make(map[string]models.JobLoad)
+	}
+
+	var j_load models.JobLoad
+	j_load.CpuLoad, j_load.BandwidthLoad = estimateJobLoad(j)
+	fmt.Println("Previous Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
+	fmt.Println("CPU load: ", w_load.CpuLoad)
+	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+
+	w_load.CpuLoad += j_load.CpuLoad
+	w_load.BandwidthLoad += j_load.BandwidthLoad
+	fmt.Println("New Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
+	fmt.Println("CPU load: ", w_load.CpuLoad)
+	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+
+	w_load.Jobs[j.Id] = j_load
+	worker_loads[w.Id] = w_load
+
+	w.State = models.WORKER_STATE_LOADED
 	e := createUpdateWorker(w)
 	if e != nil {
 		fmt.Println("Failed to update worker load: worker id = ", w.Id, ", job id = ", j.Id, e)
 		return e
 	}
 
+	return nil
+}
+
+func updateWorkerStatus(wid string, a_stopped_job_id string) error {
+	w_load, ok := worker_loads[wid]
+	if !ok {
+		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
+		return errors.New("WorkerNotFound")
+	}
+
+	j_load, ok1 := w_load.Jobs[a_stopped_job_id]
+	if !ok1 {
+		fmt.Println("Job id = ", a_stopped_job_id, " not found in updateWorkerStatus")
+		return errors.New("JobNotFound")
+	}
+
+	fmt.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerStatus: ")
+	fmt.Println("CPU load: ", w_load.CpuLoad)
+	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+
+	w_load.CpuLoad -= j_load.CpuLoad
+	w_load.BandwidthLoad -= j_load.BandwidthLoad
+
+	fmt.Println("New Worker Load (worker id = ", wid, ") in updateWorkerStatus: ")
+	fmt.Println("CPU load: ", w_load.CpuLoad)
+	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+
+	delete(w_load.Jobs, a_stopped_job_id)
+	worker_loads[wid] = w_load
 	return nil
 }
 
@@ -174,8 +236,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
         return err1
     }
 	
-	if resp.StatusCode == http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusOK {
 		fmt.Println("Job id=", j.Id, " failed to launch on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		fmt.Println("Worker response status code: ", resp.StatusCode)
 		return errors.New("WorkerJobExecutionError")
 	}
 
@@ -190,9 +253,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	json.Unmarshal(bodyBytes, &j2)
 	j2.Assigned_worker_id = wid
 	createUpdateJob(j2)
-	e := updateWorkerLoad(worker, j2)
+	e := addNewJobLoad(worker, j2)
 
-	// Do we need to keep retrying updateWorkerLoad?
+	// Do we need to keep retrying addNewJobLoad?
 	if e != nil {
 		d, _ := time.ParseDuration(update_worker_load_interval)
 		ticker := time.NewTicker(d)
@@ -201,7 +264,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 			for {
 			   select {
 				case <-ticker.C: {
-					e := updateWorkerLoad(worker, j2) 
+					e := addNewJobLoad(worker, j2) 
 					fmt.Println("Retrying worker load update...")
 					if e == nil {
 						fmt.Println("Worker load update retried and succeeded!")
@@ -428,8 +491,6 @@ var queued_jobs *list.List
 var server_ip = "0.0.0.0"
 var server_port = "80" 
 var server_addr = server_ip + ":" + server_port
-var workersEndpoint = "workers"
-var heartbeatEndpoint = "heartbeat"
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("----------------------------------------")
@@ -556,6 +617,40 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", FileContentType)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(hb)
+	} else if strings.Contains(r.URL.Path, jobStatusEndpoint) {
+		if !(r.Method == "POST")  {
+            err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+            fmt.Println(err)
+            http.Error(w, "405 method not allowed\n Error: " + err, http.StatusMethodNotAllowed)
+            return
+        }
+
+		if r.Body == nil {
+			res := "Error: bad job status report received"
+			fmt.Println(res)
+			http.Error(w, "400 bad request\n Error: " + res, http.StatusBadRequest)
+			return
+		}
+
+		var report models.WorkerJobReport
+		e := json.NewDecoder(r.Body).Decode(&report)
+		if e != nil {
+			res := "Failed to decode worker job report"
+			fmt.Println("Failed to decode worker job report. Err: %s", e)
+			http.Error(w, "400 bad request\n Error: " + res, http.StatusBadRequest)
+			return
+		}
+
+		for _, j := range report.StoppedJobs {
+			e := updateWorkerStatus(report.WorkerId, j)
+			if e == nil {
+				fmt.Println("Successfully deleted stopped job id = ", j, " and updated load of worker id = ", report.WorkerId)
+			} else {
+				fmt.Println("Failed to delete stopped job id = ", j, " or failed to update load of worker id = ", report.WorkerId, " Error: ", e)
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
 	}
 }
 

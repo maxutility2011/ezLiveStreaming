@@ -2,15 +2,8 @@ package models
 
 import (
 	"time"
-	"ezliveStreaming/job"
+	//"ezliveStreaming/job"
 )
-
-/*type WorkerJob struct {
-	InputUrl string
-	Bitrate string
-	Video_codec string
-	Video_resolution_height string
-}*/
 
 const WORKER_STATE_IDLE = "idle"
 const WORKER_STATE_LOADED = "loaded"
@@ -40,16 +33,26 @@ type LiveWorker struct {
 type WorkerInfo struct {
 	ServerIp string
 	ServerPort string
-	ComputeCapacity string
+	CpuCapacity string
 	BandwidthCapacity string
 	HeartbeatInterval string
 }
 
+type WorkerJobReport struct {
+	WorkerId string
+	StoppedJobs []string
+}
+
+type JobLoad struct {
+	CpuLoad int
+	BandwidthLoad int
+}
+
+// Local table, NOT in Redis
 type WorkerLoad struct {
-	Id string
-	LiveJobs []job.LiveJob
-	ComputeRemaining string
-	BandwidthRemaining string
+	Jobs map[string]JobLoad
+	CpuLoad int
+	BandwidthLoad int
 }
 
 type WorkerHeartbeat struct {
