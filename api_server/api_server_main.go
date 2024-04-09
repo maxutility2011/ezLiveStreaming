@@ -42,6 +42,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 
 	lj.Spec = j
 	lj.Time_created = time.Now()
+	lj.Delete = false // Set to true when the client wants to delete this job
 	fmt.Println("Generating a random job ID: ", lj.Id)
 
 	e := createUpdateJob(lj)
@@ -64,6 +65,18 @@ func createUpdateJob(j job.LiveJob) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
 		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
+}
+
+func deleteJob(j job.LiveJob) error {
+	// Set job.Delete to true, so next time the assigned worker reports status, 
+	// it is deleted from Redis, scheduler and worker.
+	j.Delete = true
+	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
+	if err != nil {
+		fmt.Println("Failed to delete job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -127,7 +140,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
     } 
 
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
-		if !(r.Method == "POST" || r.Method == "GET") {
+		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "DELETE") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
@@ -150,7 +163,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			e := json.NewDecoder(r.Body).Decode(&job)
 			if e != nil {
             	res := "Failed to decode job request"
-            	fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            	fmt.Println("Error happened in JSON marshal. Err: ", e)
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -194,6 +207,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				jobs, ok := getJobsByTable(redis_client.REDIS_KEY_ALLJOBS)
 				if ok {
 					json.NewEncoder(w).Encode(jobs)
+					return
 				} else {
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 					return
@@ -206,9 +220,31 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         			w.Header().Set("Content-Type", FileContentType)
         			w.WriteHeader(http.StatusOK)
         			json.NewEncoder(w).Encode(j)
+					return
 				} else {
 					fmt.Println("Non-existent job id: ", jid)
                     http.Error(w, "Non-existent job id: " + jid, http.StatusNotFound)
+					return
+				}
+			}
+		} else if r.Method == "DELETE" {
+			if UrlLastPart == liveJobsEndpoint {
+				res := "A job id must be provided when deleting a job. "
+				fmt.Println(res, "Err: ", res)
+            	http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
+            	return
+			} else {
+				jid := UrlLastPart
+				j, ok := getJobById(jid) 
+				if ok {
+        			w.WriteHeader(http.StatusAccepted)
+        			deleteJob(j)
+					return
+				} else {
+					res := "Trying to delete a non-existent job id: " + jid
+					fmt.Println(res)
+                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
+					return
 				}
 			}
 		}
