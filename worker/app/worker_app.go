@@ -270,27 +270,39 @@ func launchJob(j job.LiveJob) error {
 	return err2
 }
 
-func reportJobStatus() error {
+func reportJobStatus(processFound bool, processRunning bool, err error) error {
+	fmt.Println("reportJobStatus...")
+	if !processFound {
+		fmt.Printf("Process not found")
+	} else if !processRunning {
+		fmt.Printf("Process not running because: ", err)
+	}
 
+	return nil
 }
 
-func checkJobStatus() error {
+func checkJobStatus() {
 	fmt.Println("Checking job status... # of running jobs = ", running_jobs.Len())
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j := RunningJob(e.Value.(RunningJob))
 		//out, _ := j.Command.CombinedOutput()
-		process, err := os.FindProcess(int(j.Command.Process.Pid))
-		if err != nil {
-            fmt.Printf("Failed to find process id = %d\n", j.Command.Process.Pid)
-			return err
+		processFound := true
+		processRunning := true
+		var err2 error
+		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
+		if err1 != nil {
+            fmt.Printf("Failed to find process id = %d (Job id = %s). Error: %s\n", j.Command.Process.Pid, j.Job.Id, err1)
+			processFound = false
         } else {
-            err = process.Signal(syscall.Signal(0))
-			fmt.Printf("process.Signal on pid %d returned: %v\n", j.Command.Process.Pid, err)
-			//reportJobStatus(err)
+			err2 = process.Signal(syscall.Signal(0))
+			fmt.Printf("process.Signal on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
+			if err2 != nil {
+				processRunning = false
+			}
         }
-	}
 
-	return nil
+		reportJobStatus(processFound, processRunning, err2)
+	}
 }
 
 func sendHeartbeat() error {
@@ -435,10 +447,7 @@ func main() {
 		for {
 		   select {
 			case <-ticker1.C: {
-				err1 = checkJobStatus()
-				if err1 != nil {
-					fmt.Println("Failed to check job status. Try again later.")
-				}
+				checkJobStatus()
 			}
 			case <-quit1:
 				ticker1.Stop()
