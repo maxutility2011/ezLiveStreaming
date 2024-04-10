@@ -136,8 +136,13 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
             return e
         }
 
-		job.Time_received_by_scheduler = time.Now()
-		createUpdateJob(job)
+		// Create_job and delete_job share the same job queue.
+		// When job.Delete flag is set, the job is to be deleted. Otherwise, it is to be created.
+		if !job.Delete {
+			job.Time_received_by_scheduler = time.Now()
+			createUpdateJob(job)
+		}
+
 		queued_jobs.PushBack(job) // https://pkg.go.dev/container/list
 		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
 	}
@@ -217,69 +222,97 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	worker, ok := getWorkerById(wid)
 	if !ok {
 		fmt.Println("Failed to getWorkerById")
-		return errors.New("NoWorker")
+		return errors.New("WorkerNotFound")
 	}
 
 	worker_url := "http://" + worker.Info.ServerIp + ":" + worker.Info.ServerPort + "/" + "jobs"
-	b, _ := json.Marshal(j)
-
-	fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
-	req, err := http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
-    if err != nil {
-        fmt.Println("Error: Failed to POST to: ", worker_url)
-		// TODO: Need to retry registering new worker instead of giving up
-        return err
-    }
+	var req *http.Request
+	var err error
+	if !j.Delete {
+		b, _ := json.Marshal(j)
+		fmt.Println("Sending create_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		req, err = http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
+    	if err != nil {
+        	fmt.Println("Error: Failed to POST to: ", worker_url)
+			// TODO: Need to retry registering new worker instead of giving up
+        	return err
+    	}
+	} else {
+		worker_url += "/"
+		worker_url += j.Id
+		b, _ := json.Marshal(j)
+		fmt.Println("Sending delete_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		req, err = http.NewRequest(http.MethodDelete, worker_url, bytes.NewReader(b))
+    	if err != nil {
+        	fmt.Println("Error: Failed to POST to: ", worker_url)
+			// TODO: Need to retry registering new worker instead of giving up
+        	return err
+    	}
+	}
 	
     resp, err1 := http.DefaultClient.Do(req)
     if err1 != nil {
         return err1
     }
 	
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Job id=", j.Id, " failed to launch on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+	if !((!j.Delete && resp.StatusCode == http.StatusCreated) || (j.Delete && resp.StatusCode == http.StatusAccepted)) {
+		if !j.Delete {
+			fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		} else {
+			fmt.Println("Job id=", j.Id, " failed to be deleted on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		}
+
 		fmt.Println("Worker response status code: ", resp.StatusCode)
 		return errors.New("WorkerJobExecutionError")
 	}
 
-    defer resp.Body.Close()
-    bodyBytes, err2 := ioutil.ReadAll(resp.Body)
-    if err2 != nil {
-        fmt.Println("Error: Failed to read response body")
-        return err2
-    }
+	var e error
+	if !j.Delete { // The assigned worker confirmed the success of job launch. Now, let's update load.
+    	defer resp.Body.Close()
+    	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
+    	if err2 != nil {
+        	fmt.Println("Error: Failed to read response body")
+        	return err2
+    	}
 
-	var j2 job.LiveJob
-	json.Unmarshal(bodyBytes, &j2)
-	j2.Assigned_worker_id = wid
-	createUpdateJob(j2)
-	e := addNewJobLoad(worker, j2)
+		var j2 job.LiveJob
+		json.Unmarshal(bodyBytes, &j2)
+		j2.Assigned_worker_id = wid
+		createUpdateJob(j2)
+		e = addNewJobLoad(worker, j2)
 
-	// Do we need to keep retrying addNewJobLoad?
-	if e != nil {
-		d, _ := time.ParseDuration(update_worker_load_interval)
-		ticker := time.NewTicker(d)
-		quit := make(chan bool)
-		go func(ticker *time.Ticker) {
-			for {
-			   select {
-				case <-ticker.C: {
-					e := addNewJobLoad(worker, j2) 
-					fmt.Println("Retrying worker load update...")
-					if e == nil {
-						fmt.Println("Worker load update retried and succeeded!")
-						quit <- true
+		// Do we need to keep retrying addNewJobLoad?
+		/*
+		if e != nil {
+			d, _ := time.ParseDuration(update_worker_load_interval)
+			ticker := time.NewTicker(d)
+			quit := make(chan bool)
+			go func(ticker *time.Ticker) {
+				for {
+			   		select {
+						case <-ticker.C: {
+							e = addNewJobLoad(worker, j2) 
+							fmt.Println("Retrying worker load update...")
+							if e == nil {
+								fmt.Println("Worker load update retried and succeeded!")
+								quit <- true
+							}
+						}
+						case <-quit:
+							ticker.Stop()
+							return
+						}
 					}
-				}
-				case <-quit:
-					ticker.Stop()
-					return
-				}
+				}(ticker)
 			}
-		}(ticker)
+		}
+		*/
+
+		fmt.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
+	} else { // The assigned worker confirmedt the success of job deletion, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
+		fmt.Println("Job id=", j.Id, " is successfully terminated on worker id = ", wid)
 	}
 
-	fmt.Println("Job id=", j2.Id, " successfully launched on worker id=", wid, " at time=", j2.Time_received_by_worker)
 	return e
 }
 
@@ -288,17 +321,26 @@ func scheduleOneJob() {
 	if e != nil {
 		j := job.LiveJob(e.Value.(job.LiveJob))
 		queued_jobs.Remove(e)
-		assigned_worker_id, ok := assignWorker(j)
-		if !ok {
-			fmt.Println("Failed to assign job id=", j.Id, " to a worker")
-			queued_jobs.PushBack(j) // Add failed jobs back to the queue and retry later
-			return
-		}
+		if !j.Delete {
+			assigned_worker_id, ok := assignWorker(j)
+			if !ok {
+				fmt.Println("Failed to assign job id=", j.Id, " to a worker")
+				queued_jobs.PushBack(j) // Add failed jobs back to the queue and retry later
+				return
+			}
 
-		err := sendJobToWorker(j, assigned_worker_id)
-		if err != nil {
-			fmt.Println("Failed to send job to a worker")
-			queued_jobs.PushBack(j) 
+			err := sendJobToWorker(j, assigned_worker_id)
+			if err != nil {
+				fmt.Println("Failed to send job to a worker")
+				queued_jobs.PushBack(j) 
+			}
+		} else {
+			assigned_worker_id := j.Assigned_worker_id
+			err := sendJobToWorker(j, assigned_worker_id)
+			if err != nil {
+				fmt.Println("Failed to send job to a worker")
+				queued_jobs.PushBack(j) 
+			}
 		}
 	}
 }

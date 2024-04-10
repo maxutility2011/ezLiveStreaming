@@ -78,7 +78,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
     } 
 
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
-		if !(r.Method == "POST" || r.Method == "GET") {
+		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "DELETE") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
@@ -131,7 +131,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				FileContentType := "application/json"
 				w.Header().Set("Content-Type", FileContentType)
-				w.WriteHeader(http.StatusOK)
+				w.WriteHeader(http.StatusCreated)
 				json.NewEncoder(w).Encode(j)
 			} else {
 				fmt.Println("Failed to get job id = ", jid, " (worker_app.main_server_handler)")
@@ -144,6 +144,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         		w.Header().Set("Content-Type", FileContentType)
         		w.WriteHeader(http.StatusOK)
         		json.NewEncoder(w).Encode(jobs)
+				return
 			} else { // Get one job: /jobs/[job_id]
 				job, ok := jobs[UrlLastPart]
 				if ok {
@@ -155,7 +156,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					fmt.Println("Non-existent job id: ", UrlLastPart)
                     http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
 				}
+
+				return
 			}
+		} else if r.Method == "DELETE" && UrlLastPart != liveJobsEndpoint {
+			jid := UrlLastPart
+			w.WriteHeader(http.StatusAccepted)
+			fmt.Println("Job id = ", jid, " is successfully deleted")
+			return
 		}
 	}
 }

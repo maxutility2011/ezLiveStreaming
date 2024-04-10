@@ -188,7 +188,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			jobMsg := string(b[:])
 			e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 			if e2 != nil {
-				fmt.Println("Failed to send SQS message. Error: ", e2)
+				fmt.Println("Failed to send SQS message (New job). Error: ", e2)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
@@ -238,7 +238,29 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				j, ok := getJobById(jid) 
 				if ok {
         			w.WriteHeader(http.StatusAccepted)
-        			deleteJob(j)
+        			e1 := deleteJob(j) // Update Redis
+					j.Delete = true // Set Delete to true for the local variable
+
+					if e1 != nil {
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
+		
+					b, e2 := json.Marshal(j)
+					if e2 != nil {
+						fmt.Println("Failed to marshal delete_job to SQS message. Error: ", e2)
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
+		
+					// Send the new job to job scheduler via SQS
+					jobMsg := string(b[:])
+					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
+					if e2 != nil {
+						fmt.Println("Failed to send SQS message (Delete job). Error: ", e2)
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
 					return
 				} else {
 					res := "Trying to delete a non-existent job id: " + jid
