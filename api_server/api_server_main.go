@@ -81,6 +81,16 @@ func stopJob(j job.LiveJob) error {
 	return err
 }
 
+func resumeJob(j job.LiveJob) error {
+	j.Stop = false
+	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
+	if err != nil {
+		fmt.Println("Failed to stop job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
+}
+
 func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
 	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
@@ -268,10 +278,50 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
-					
+
 					return
 				} else {
 					res := "Trying to stop a non-existent job id: " + jid
+					fmt.Println(res)
+                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
+					return
+				}
+			} else if strings.Contains(r.URL.Path, "resume") {
+				begin := strings.Index(r.URL.Path, liveJobsEndpoint) + len(liveJobsEndpoint) + 1
+				end := strings.Index(r.URL.Path, "resume") - 1
+				jid := r.URL.Path[begin:end]
+				fmt.Println(jid)
+
+				j, ok := getJobById(jid) 
+				if ok {
+					w.WriteHeader(http.StatusAccepted)
+					e1 := resumeJob(j) // Update Redis
+					j.Stop = false // Set Stop flag to false for the local variable
+
+					if e1 != nil {
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
+
+					b, e2 := json.Marshal(j)
+					if e2 != nil {
+						fmt.Println("Failed to marshal resume_job to SQS message. Error: ", e2)
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
+		
+					// Send resume_job to job scheduler via SQS
+					jobMsg := string(b[:])
+					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
+					if e2 != nil {
+						fmt.Println("Failed to send SQS message (Stop job). Error: ", e2)
+						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+						return
+					}
+
+					return
+				} else {
+					res := "Trying to resume a non-existent job id: " + jid
 					fmt.Println(res)
                     http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
 					return

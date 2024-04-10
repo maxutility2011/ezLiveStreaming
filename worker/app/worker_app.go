@@ -62,8 +62,14 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return job, ok
 }
 
-func stopJob(jid string) {
+func deleteJob(jid string) error {
+	delete(jobs, jid) 
+	return nil
+}
+
+func stopJob(jid string) error {
 	jobFound := false
+	stopped := false
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j := RunningJob(e.Value.(RunningJob))
 		if j.Job.Id != jid {
@@ -77,7 +83,11 @@ func stopJob(jid string) {
     	} else {
 			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
 			fmt.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
-    	}
+			if err2 == nil {
+				deleteJob(jid) // Need to delete the job from this worker. The job could be reassigned to another worker when it resumes.
+				stopped = true
+			}
+		}
 
 		break
 	}
@@ -85,6 +95,15 @@ func stopJob(jid string) {
 	if !jobFound {
 		fmt.Println("Cannot stop the job. Job id = ", jid, " was not found.")
 	}
+
+	var e error
+	if stopped {
+		e = nil
+	} else {
+		e = errors.New("StopJobFailed")
+	}
+
+	return e
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
@@ -184,15 +203,21 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				return
 			}
-		} else if r.Method == "PUT" {//&& UrlLastPart != liveJobsEndpoint {
+		} else if r.Method == "PUT" {
 			if strings.Contains(r.URL.Path, "stop") {
 				begin := strings.Index(r.URL.Path, "jobs") + len("jobs") + 1
 				end := strings.Index(r.URL.Path, "stop") - 1
 				jid := r.URL.Path[begin:end]
 
-				w.WriteHeader(http.StatusAccepted)
-				stopJob(jid)
-				fmt.Println("Job id = ", jid, " is successfully stopped")
+				e := stopJob(jid)
+				if e == nil {
+					fmt.Println("Job id = ", jid, " is successfully stopped")
+					w.WriteHeader(http.StatusOK)
+				} else {
+					fmt.Println("Job id = ", jid, " failed to stop")
+					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+				}
+
 				return
 			}
 		}
@@ -210,7 +235,7 @@ func readConfig() {
 	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
-var rtmp_port_base = 1935 // TODO: Make this onfigurable
+var rtmp_port_base = 1935 // TODO: Make this configurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var scheduler_heartbeat_interval = "1s" 
 var job_status_check_interval = "2s"

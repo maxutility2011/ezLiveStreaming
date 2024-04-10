@@ -136,8 +136,8 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
             return e
         }
 
-		// Create_job and stop_job share the same job queue.
-		// When job.Stop flag is set, the job is to be stopped. Otherwise, it is to be created.
+		// Create_job, stop_job and resume_job share the same job queue.
+		// When job.Stop flag is set, the job is to be stopped. Otherwise, it is to be created or resumed.
 		if !job.Stop {
 			job.Time_received_by_scheduler = time.Now()
 			createUpdateJob(job)
@@ -228,9 +228,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	worker_url := "http://" + worker.Info.ServerIp + ":" + worker.Info.ServerPort + "/" + "jobs"
 	var req *http.Request
 	var err error
-	if !(j.Stop || j.Delete) {
+	if !(j.Stop || j.Delete) { // create_job or resume_job
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending create_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
 		req, err = http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
     	if err != nil {
         	fmt.Println("Error: Failed to POST to: ", worker_url)
@@ -257,8 +257,8 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
         return err1
     }
 	
-	if !(((!(j.Stop || j.Delete) && resp.StatusCode == http.StatusCreated) || (j.Stop && resp.StatusCode == http.StatusAccepted) || (j.Delete && resp.StatusCode == http.StatusAccepted))) {
-		if !(j.Stop || j.Delete) { // Create_job
+	if !(((!(j.Stop || j.Delete) && resp.StatusCode == http.StatusCreated) || (j.Stop && resp.StatusCode == http.StatusOK) || (j.Delete && resp.StatusCode == http.StatusAccepted))) {
+		if !(j.Stop || j.Delete) { // Create_job or resume_job
 			fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
 		} else if j.Stop { // Stop_job
 			fmt.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
@@ -269,7 +269,8 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	}
 
 	var e error
-	if !(j.Stop || j.Delete) { // The assigned worker confirmed the success of job launch. Now, let's update load.
+	// create_job or resume_job
+	if !(j.Stop || j.Delete) { // The assigned worker confirmed the success of job launch. Now, let's update worker load.
     	defer resp.Body.Close()
     	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
     	if err2 != nil {
@@ -311,12 +312,14 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		}
 		*/
 
-
 		fmt.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
 	} else if j.Stop { // The assigned worker confirmed the success of job stop, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
 		j.State = job.JOB_STATE_STOPPED
+		j.Assigned_worker_id = "" // A different worker will be assigned when the job is resumed later on
+		j.RtmpIngestUrl = "" // RtmpIngestUrl will change when the job is resumed and a new worker is assigned 
+		// j.Id and j.StreamKey will remain the same when the job is resumed
 		createUpdateJob(j)
-		fmt.Println("Job id=", j.Id, " is successfully stopped on worker id = ", wid)
+		fmt.Println("Job id = ", j.Id, " is successfully stopped on worker id = ", wid)
 	} // else if j.Delete {
 	//}
 
