@@ -1,5 +1,5 @@
 {
     "SchedulerUrl": "http://172.17.0.2:80",
-    "WorkerAppIp": "172.17.0.5",
+    "WorkerAppIp": "172.17.0.4",
     "WorkerAppPort": "2081"
 }

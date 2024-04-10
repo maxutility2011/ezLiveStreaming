@@ -184,7 +184,11 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Send the new job to job scheduler via SQS
+			// Send the create_job to job scheduler via SQS
+			// create_job and delete_job share the same job queue.
+			// A job "j" with "j.Delete" flag set to true indicates the job is to be deleted.
+			// When "j" is added to the job queue and received by scheduler, the latter checks 
+			// the "j.Delete" flag to distinguish between a create_job and delete_job.
 			jobMsg := string(b[:])
 			e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 			if e2 != nil {
@@ -253,7 +257,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 		
-					// Send the new job to job scheduler via SQS
+					// Send delete_job to job scheduler via SQS
 					jobMsg := string(b[:])
 					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 					if e2 != nil {

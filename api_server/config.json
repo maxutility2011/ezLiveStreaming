@@ -3,7 +3,7 @@
         "Queue_name": "ezlive_job_queue.fifo"
     },
     "Redis": {
-        "RedisIp": "172.17.0.4",
+        "RedisIp": "172.17.0.5",
         "RedisPort": "6379"
     }
 }

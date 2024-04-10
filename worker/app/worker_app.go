@@ -62,6 +62,31 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return job, ok
 }
 
+func stopJob(jid string) {
+	jobFound := false
+	for e := running_jobs.Front(); e != nil; e = e.Next() {
+		j := RunningJob(e.Value.(RunningJob))
+		if j.Job.Id != jid {
+			continue
+		}
+
+		jobFound = true
+		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
+		if err1 != nil {
+        	fmt.Printf("Process id = %d (Job id = %s) not found in stopJob. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
+    	} else {
+			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
+			fmt.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
+    	}
+
+		break
+	}
+
+	if !jobFound {
+		fmt.Println("Cannot stop the job. Job id = ", jid, " was not found.")
+	}
+}
+
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("----------------------------------------")
     fmt.Println("Received new request:")
@@ -162,6 +187,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		} else if r.Method == "DELETE" && UrlLastPart != liveJobsEndpoint {
 			jid := UrlLastPart
 			w.WriteHeader(http.StatusAccepted)
+			stopJob(jid)
 			fmt.Println("Job id = ", jid, " is successfully deleted")
 			return
 		}
@@ -271,7 +297,7 @@ func launchJob(j job.LiveJob) error {
 	go func() {
 		out, err2 = ffmpegCmd.CombinedOutput()
 		if err2 != nil {
-        	fmt.Println("Errors running worker transcoder: %v ", string(out))
+        	fmt.Println("Errors running worker transcoder: ", string(out))
 		}
 	}()
 
@@ -341,6 +367,12 @@ func checkJobStatus() {
 		jobProcessFound = true
 		jobProcessRunning = true
 		var err2 error
+
+		if j.Command == nil {
+			fmt.Println("Skip checking partially launched job!")
+			prev_e = e
+			continue
+		}
 
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {
@@ -523,5 +555,8 @@ func main() {
 	worker_app_addr := worker_app_config.WorkerAppIp + ":" + worker_app_config.WorkerAppPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
-    http.ListenAndServe(worker_app_addr, nil)
+    err := http.ListenAndServe(worker_app_addr, nil)
+	if err != nil {
+		fmt.Println("Server failed to start. Error: ", err)
+	}
 }

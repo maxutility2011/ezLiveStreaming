@@ -7,6 +7,8 @@ import (
 	//"strings"
 	"encoding/json"
     "os/exec"
+    "os/signal"
+    "syscall"
     "ezliveStreaming/job"
 	"io/ioutil"
     "log"
@@ -57,9 +59,30 @@ func main() {
 
     Log = log.New(logfile, "", log.LstdFlags)
 
-    Log.Println("Input Url: ", j.Input.Url)
     ffmpegArgs := job.JobSpecToEncoderArgs(j)
-    out, err2 := exec.Command("ffmpeg", ffmpegArgs...).CombinedOutput()
+    ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
+
+    shutdown := make(chan os.Signal, 1)
+    signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+    go func() {
+        <-shutdown
+        Log.Println("Shut down!")
+
+        // Received signal from worker_app:
+        // - stop ffmpeg
+        // - exit myself
+        process, err1 := os.FindProcess(int(ffmpegCmd.Process.Pid))
+		if err1 != nil {
+        	Log.Printf("Process id = %d (ffmpeg) not found. Error: %v\n", ffmpegCmd.Process.Pid, err1)
+    	} else {
+			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
+			Log.Printf("process.Signal.SIGTERM on pid %d (ffmpeg) returned: %v\n", ffmpegCmd.Process.Pid, err2)
+    	}
+
+        os.Exit(0)
+    }()
+
+    out, err2 := ffmpegCmd.CombinedOutput()
     if err2 != nil {
         // error case : status code of command is different from 0
         Log.Println("ffmpeg error: %v", err2, string(out))
