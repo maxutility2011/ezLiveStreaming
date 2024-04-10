@@ -103,7 +103,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
     } 
 
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
-		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "DELETE") {
+		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "PUT" || r.Method == "DELETE") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
@@ -184,12 +184,17 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				return
 			}
-		} else if r.Method == "DELETE" && UrlLastPart != liveJobsEndpoint {
-			jid := UrlLastPart
-			w.WriteHeader(http.StatusAccepted)
-			stopJob(jid)
-			fmt.Println("Job id = ", jid, " is successfully deleted")
-			return
+		} else if r.Method == "PUT" {//&& UrlLastPart != liveJobsEndpoint {
+			if strings.Contains(r.URL.Path, "stop") {
+				begin := strings.Index(r.URL.Path, "jobs") + len("jobs") + 1
+				end := strings.Index(r.URL.Path, "stop") - 1
+				jid := r.URL.Path[begin:end]
+
+				w.WriteHeader(http.StatusAccepted)
+				stopJob(jid)
+				fmt.Println("Job id = ", jid, " is successfully stopped")
+				return
+			}
 		}
 	}
 }

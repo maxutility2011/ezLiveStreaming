@@ -42,6 +42,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 
 	lj.Spec = j
 	lj.Time_created = time.Now()
+	lj.Stop = false // Set to true when the client wants to stop this job
 	lj.Delete = false // Set to true when the client wants to delete this job
 	fmt.Println("Generating a random job ID: ", lj.Id)
 
@@ -70,13 +71,11 @@ func createUpdateJob(j job.LiveJob) error {
 	return err
 }
 
-func deleteJob(j job.LiveJob) error {
-	// Set job.Delete to true, so next time the assigned worker reports status, 
-	// it is deleted from Redis, scheduler and worker.
-	j.Delete = true
+func stopJob(j job.LiveJob) error {
+	j.Stop = true
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to delete job id=", j.Id, ". Error: ", err)
+		fmt.Println("Failed to stop job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -140,7 +139,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
     } 
 
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
-		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "DELETE") {
+		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "PUT" || r.Method == "DELETE") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
             fmt.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
@@ -185,10 +184,10 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Send the create_job to job scheduler via SQS
-			// create_job and delete_job share the same job queue.
-			// A job "j" with "j.Delete" flag set to true indicates the job is to be deleted.
+			// create_job and stop_job share the same job queue.
+			// A job "j" with "j.Stop" flag set to true indicates the job is to be stopped.
 			// When "j" is added to the job queue and received by scheduler, the latter checks 
-			// the "j.Delete" flag to distinguish between a create_job and delete_job.
+			// the "j.Stop" flag to distinguish between a create_job and stop_job.
 			jobMsg := string(b[:])
 			e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 			if e2 != nil {
@@ -231,19 +230,23 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-		} else if r.Method == "DELETE" {
+		} else if r.Method == "PUT" {
 			if UrlLastPart == liveJobsEndpoint {
-				res := "A job id must be provided when deleting a job. "
+				res := "A job id must be provided when updating a job. "
 				fmt.Println(res, "Err: ", res)
             	http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
             	return
-			} else {
-				jid := UrlLastPart
+			} else if strings.Contains(r.URL.Path, "stop") {
+				begin := strings.Index(r.URL.Path, liveJobsEndpoint) + len(liveJobsEndpoint) + 1
+				end := strings.Index(r.URL.Path, "stop") - 1
+				jid := r.URL.Path[begin:end]
+				fmt.Println(jid)
+
 				j, ok := getJobById(jid) 
 				if ok {
         			w.WriteHeader(http.StatusAccepted)
-        			e1 := deleteJob(j) // Update Redis
-					j.Delete = true // Set Delete to true for the local variable
+        			e1 := stopJob(j) // Update Redis
+					j.Stop = true // Set Stop flag to true for the local variable
 
 					if e1 != nil {
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -252,22 +255,23 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		
 					b, e2 := json.Marshal(j)
 					if e2 != nil {
-						fmt.Println("Failed to marshal delete_job to SQS message. Error: ", e2)
+						fmt.Println("Failed to marshal stop_job to SQS message. Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
 		
-					// Send delete_job to job scheduler via SQS
+					// Send stop_job to job scheduler via SQS
 					jobMsg := string(b[:])
 					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 					if e2 != nil {
-						fmt.Println("Failed to send SQS message (Delete job). Error: ", e2)
+						fmt.Println("Failed to send SQS message (Stop job). Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
+					
 					return
 				} else {
-					res := "Trying to delete a non-existent job id: " + jid
+					res := "Trying to stop a non-existent job id: " + jid
 					fmt.Println(res)
                     http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
 					return

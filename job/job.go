@@ -51,5 +51,6 @@ type LiveJob struct {
 	Time_received_by_scheduler time.Time
 	Time_received_by_worker time.Time
 	Assigned_worker_id string
+	Stop bool
 	Delete bool // A flag indicating the job is to be deleted, rather than be created
 }

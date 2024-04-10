@@ -69,8 +69,8 @@ func main() {
         Log.Println("Shut down!")
 
         // Received signal from worker_app:
-        // - stop ffmpeg
-        // - exit myself
+        // - first, stop ffmpeg
+        // - then, exit myself
         process, err1 := os.FindProcess(int(ffmpegCmd.Process.Pid))
 		if err1 != nil {
         	Log.Printf("Process id = %d (ffmpeg) not found. Error: %v\n", ffmpegCmd.Process.Pid, err1)

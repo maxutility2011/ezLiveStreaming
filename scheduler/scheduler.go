@@ -136,9 +136,9 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
             return e
         }
 
-		// Create_job and delete_job share the same job queue.
-		// When job.Delete flag is set, the job is to be deleted. Otherwise, it is to be created.
-		if !job.Delete {
+		// Create_job and stop_job share the same job queue.
+		// When job.Stop flag is set, the job is to be stopped. Otherwise, it is to be created.
+		if !job.Stop {
 			job.Time_received_by_scheduler = time.Now()
 			createUpdateJob(job)
 		}
@@ -228,7 +228,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	worker_url := "http://" + worker.Info.ServerIp + ":" + worker.Info.ServerPort + "/" + "jobs"
 	var req *http.Request
 	var err error
-	if !j.Delete {
+	if !(j.Stop || j.Delete) {
 		b, _ := json.Marshal(j)
 		fmt.Println("Sending create_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
 		req, err = http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
@@ -237,29 +237,31 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 			// TODO: Need to retry registering new worker instead of giving up
         	return err
     	}
-	} else {
+	} else if j.Stop {
 		worker_url += "/"
 		worker_url += j.Id
+		worker_url += "/stop"
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending delete_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
-		req, err = http.NewRequest(http.MethodDelete, worker_url, bytes.NewReader(b))
+		fmt.Println("Sending stop_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		req, err = http.NewRequest(http.MethodPut, worker_url, bytes.NewReader(b))
     	if err != nil {
-        	fmt.Println("Error: Failed to POST to: ", worker_url)
+        	fmt.Println("Error: Failed to PUT to: ", worker_url)
 			// TODO: Need to retry registering new worker instead of giving up
         	return err
     	}
-	}
+	} //else if j.Delete {
+	//}
 	
     resp, err1 := http.DefaultClient.Do(req)
     if err1 != nil {
         return err1
     }
 	
-	if !((!j.Delete && resp.StatusCode == http.StatusCreated) || (j.Delete && resp.StatusCode == http.StatusAccepted)) {
-		if !j.Delete {
+	if !(((!(j.Stop || j.Delete) && resp.StatusCode == http.StatusCreated) || (j.Stop && resp.StatusCode == http.StatusAccepted) || (j.Delete && resp.StatusCode == http.StatusAccepted))) {
+		if !(j.Stop || j.Delete) { // Create_job
 			fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
-		} else {
-			fmt.Println("Job id=", j.Id, " failed to be deleted on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		} else if j.Stop { // Stop_job
+			fmt.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
 		}
 
 		fmt.Println("Worker response status code: ", resp.StatusCode)
@@ -267,7 +269,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	}
 
 	var e error
-	if !j.Delete { // The assigned worker confirmed the success of job launch. Now, let's update load.
+	if !(j.Stop || j.Delete) { // The assigned worker confirmed the success of job launch. Now, let's update load.
     	defer resp.Body.Close()
     	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
     	if err2 != nil {
@@ -309,9 +311,10 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		*/
 
 		fmt.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
-	} else { // The assigned worker confirmedt the success of job deletion, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
-		fmt.Println("Job id=", j.Id, " is successfully terminated on worker id = ", wid)
-	}
+	} else if j.Stop { // The assigned worker confirmed the success of job stop, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
+		fmt.Println("Job id=", j.Id, " is successfully stopped on worker id = ", wid)
+	} // else if j.Delete {
+	//}
 
 	return e
 }
@@ -321,7 +324,7 @@ func scheduleOneJob() {
 	if e != nil {
 		j := job.LiveJob(e.Value.(job.LiveJob))
 		queued_jobs.Remove(e)
-		if !j.Delete {
+		if !(j.Stop || j.Delete) {
 			assigned_worker_id, ok := assignWorker(j)
 			if !ok {
 				fmt.Println("Failed to assign job id=", j.Id, " to a worker")
@@ -334,14 +337,15 @@ func scheduleOneJob() {
 				fmt.Println("Failed to send job to a worker")
 				queued_jobs.PushBack(j) 
 			}
-		} else {
+		} else if j.Stop {
 			assigned_worker_id := j.Assigned_worker_id
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
 				fmt.Println("Failed to send job to a worker")
 				queued_jobs.PushBack(j) 
 			}
-		}
+		} // else if j.Delete {
+		//}
 	}
 }
 
