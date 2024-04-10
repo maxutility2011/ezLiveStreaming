@@ -42,6 +42,10 @@ type LiveJobSpec struct {
     Output LiveJobOutputSpec 
 }
 
+const JOB_STATE_RUNNING = "running"
+const JOB_STATE_STREAMING = "streaming"
+const JOB_STATE_STOPPED = "stopped"
+
 type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
@@ -51,6 +55,7 @@ type LiveJob struct {
 	Time_received_by_scheduler time.Time
 	Time_received_by_worker time.Time
 	Assigned_worker_id string
-	Stop bool
-	Delete bool // A flag indicating the job is to be deleted, rather than be created
+	State string
+	Stop bool // A flag indicating the job is to be stopped
+	Delete bool // A flag indicating the job is to be deleted
 }

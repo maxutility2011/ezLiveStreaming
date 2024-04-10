@@ -280,6 +280,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		var j2 job.LiveJob
 		json.Unmarshal(bodyBytes, &j2)
 		j2.Assigned_worker_id = wid
+		j2.State = job.JOB_STATE_RUNNING
 		createUpdateJob(j2)
 		e = addNewJobLoad(worker, j2)
 
@@ -310,8 +311,11 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		}
 		*/
 
+
 		fmt.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
 	} else if j.Stop { // The assigned worker confirmed the success of job stop, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
+		j.State = job.JOB_STATE_STOPPED
+		createUpdateJob(j)
 		fmt.Println("Job id=", j.Id, " is successfully stopped on worker id = ", wid)
 	} // else if j.Delete {
 	//}
