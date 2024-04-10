@@ -235,8 +235,7 @@ func readConfig() {
 	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
-var rtmp_port_base = 1935 // TODO: Make this configurable
-var max_rtmp_ports = 15 // TODO: Make this configurable
+var rtmp_ingest_port = 1935
 var scheduler_heartbeat_interval = "1s" 
 var job_status_check_interval = "2s"
 var worker_app_config_file_path = "worker_app_config.json"
@@ -260,40 +259,14 @@ func getBandwidthCapacity() string {
 	return "100m"
 }
 
-func allocateRtmpIngestPort() int {
-	var port int
-	e := available_rtmp_ports.Front()
-	if e != nil {
-		port = int(e.Value.(int))
-		available_rtmp_ports.Remove(e)
-	} else {
-		port = -1
-	}
-
-	return port
-}
-
-// Need to release RTMP port when a job is done
-func releaseRtmpPort(port int) {
-	available_rtmp_ports.PushBack(port)
-}
-
 func createIngestUrl(job job.LiveJob) error {
-	rtmp_ingest_port := allocateRtmpIngestPort() // TODO: need to support RTMPS
-	// srt_ingest_port := allocateSrtIngestPort() // TODO
-	// srt_ingest_port := allocateRtpIngestPort() // TODO
-	var err error
-	err = nil
-	if rtmp_ingest_port < 0 {
-		err = errors.New("NotEnoughRtmpIngestPort")
-	} else {
-		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
-		// job.SrtIngestUrl = ...
-		// job.RtpIngestUrl = ...
-	}
+
+	job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+	// job.SrtIngestUrl = ...
+	// job.RtpIngestUrl = ...
 
 	createUpdateJob(job)
-	return err
+	return nil
 }
 
 func launchJob(j job.LiveJob) error {
@@ -448,18 +421,6 @@ func sendHeartbeat() error {
         fmt.Println("Failed to POST heartbeat: ", worker_heartbeat_url)
 		return err
     }
-	
-	/*
-    defer resp.Body.Close()
-    bodyBytes, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Println("Error: Failed to read response body (sendHeartbeat)")
-        return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
-    }
-
-	var hb_resp models.WorkerHeartbeat
-	json.Unmarshal(bodyBytes, &hb_resp)
-	*/
 
 	// TODO: Need to handle error response (other than http code 200)
 	if resp.StatusCode != http.StatusOK {
@@ -530,11 +491,6 @@ func main() {
 	err1 = registerWorker(worker_app_config)
 	if err1 != nil {
 		fmt.Println("Failed to register worker. Try again later.")
-	}
-
-	available_rtmp_ports = list.New()
-	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
-		available_rtmp_ports.PushBack(p)
 	}
 
 	running_jobs = list.New()
