@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* {
+  box-sizing: border-box;
+}
+
+/* Create two equal columns that floats next to each other */
+.columnleft {
+  float: left;
+  width: 30%;
+  padding: 10px;
+  height: 350px; /* Should be removed. Only for demonstration */
+}
+
+.columnright {
+  float: left;
+  width: 70%;
+  padding: 10px;
+  height: 350px; /* Should be removed. Only for demonstration */
+}
+
+.bottom {
+  float: left;
+  width: 100%;
+  padding: 10px;
+  height: 150px; /* Should be removed. Only for demonstration */
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+</style>
+</head>
+<body>
+
+<h2>Two Equal Columns</h2>
+
+<div class="row">
+  <div class="columnleft" style="background-color:#aaa;">
+    <h2>Column 1</h2>
+    <p>Some text..</p>
+  </div>
+  <div class="columnright" style="background-color:#bbb;">
+    <h2>Column 2</h2>
+    <p>Some text..</p>
+  </div>
+  <div class="bottom" style="background-color:#bbb;">
+    <h2>Bottom</h2>
+    <p>Some text..</p>
+  </div>
+</div>
+
+</body>
+</html>
