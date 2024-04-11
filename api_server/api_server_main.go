@@ -44,6 +44,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Time_created = time.Now()
 	lj.Stop = false // Set to true when the client wants to stop this job
 	lj.Delete = false // Set to true when the client wants to delete this job
+	lj.State = job.JOB_STATE_CREATED
 	fmt.Println("Generating a random job ID: ", lj.Id)
 
 	e := createUpdateJob(lj)

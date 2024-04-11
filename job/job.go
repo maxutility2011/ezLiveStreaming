@@ -42,9 +42,10 @@ type LiveJobSpec struct {
     Output LiveJobOutputSpec 
 }
 
-const JOB_STATE_RUNNING = "running"
-const JOB_STATE_STREAMING = "streaming"
-const JOB_STATE_STOPPED = "stopped"
+const JOB_STATE_CREATED = "created" // Created
+const JOB_STATE_RUNNING = "running" // worker_transcoder running but not ingesting
+const JOB_STATE_STREAMING = "streaming" // Ingesting and transcoding
+const JOB_STATE_STOPPED = "stopped" // Stopped
 
 type LiveJob struct {
 	Id string
