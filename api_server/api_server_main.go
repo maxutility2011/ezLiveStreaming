@@ -255,7 +255,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				j, ok := getJobById(jid) 
 				if ok {
-        			w.WriteHeader(http.StatusAccepted)
+					if j.State == job.JOB_STATE_STOPPED {
+						res := "Trying to stop a already stopped job id: " + jid
+						fmt.Println(res)
+						http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
+						return
+					}
+
+					w.WriteHeader(http.StatusAccepted)
         			e1 := stopJob(j) // Update Redis
 					j.Stop = true // Set Stop flag to true for the local variable
 
@@ -284,7 +291,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					res := "Trying to stop a non-existent job id: " + jid
 					fmt.Println(res)
-                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
+                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 					return
 				}
 			} else if strings.Contains(r.URL.Path, "resume") {
@@ -295,6 +302,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				j, ok := getJobById(jid) 
 				if ok {
+					if j.State == job.JOB_STATE_RUNNING || j.State == job.JOB_STATE_STREAMING {
+						res := "Trying to resume an active job id: " + jid
+						fmt.Println(res)
+						http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
+						return
+					}
+
 					w.WriteHeader(http.StatusAccepted)
 					e1 := resumeJob(j) // Update Redis
 					j.Stop = false // Set Stop flag to false for the local variable
@@ -324,7 +338,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					res := "Trying to resume a non-existent job id: " + jid
 					fmt.Println(res)
-                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusNotFound)
+                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 					return
 				}
 			}

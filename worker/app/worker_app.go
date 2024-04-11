@@ -35,7 +35,6 @@ var liveJobsEndpoint = "jobs"
 
 func createJob(j job.LiveJob) (error, string) {
 	j.Time_received_by_worker = time.Now()
-
 	e := createUpdateJob(j)
 	if e != nil {
 		fmt.Println("Error: Failed to create/update job ID: ", j.Id)
@@ -68,6 +67,12 @@ func deleteJob(jid string) error {
 }
 
 func stopJob(jid string) error {
+	_, ok := getJobById(jid)
+	if !ok {
+		fmt.Println("Cannot stop non-existent job id = ", jid)
+		return errors.New("jobNotFound") // return error and return "404 not found" to scheduler. Do not retry in this case
+	}
+
 	jobFound := false
 	stopped := false
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
@@ -92,15 +97,17 @@ func stopJob(jid string) error {
 		break
 	}
 
+	// Can't stop a non-existent or already stopped job
 	if !jobFound {
-		fmt.Println("Cannot stop the job. Job id = ", jid, " was not found.")
+		fmt.Println("Cannot stop the job. Is job id = ", jid, " running?")
+		return errors.New("jobNotFound") // return error and return "404 not found" to scheduler. Do not retry in this case
 	}
 
 	var e error
 	if stopped {
 		e = nil
 	} else {
-		e = errors.New("StopJobFailed")
+		e = errors.New("StopJobFailed") // return error and let scheduler retry
 	}
 
 	return e
@@ -152,23 +159,18 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 			e1, jid := createJob(job)
 			if e1 != nil {
+				deleteJob(jid)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
 
-			e2 := createIngestUrl(job)
-			if e2 != nil {
-				fmt.Println("Failed to allocate ingest url. Error: ", e2)
-				http.Error(w, "500 Internal server error\n  Error: ", http.StatusInternalServerError)
-				return
-			}
-
+			createIngestUrl(job)
 			j, ok := getJobById(jid)
 			if ok {
-				fmt.Println("Ingest URL of job id = ", jid, ": ", j.RtmpIngestUrl)
 				e3 := launchJob(j)
 				if e3 != nil {
 					fmt.Println("Failed to launch job id =", jid, " Error: ", e3)
+					deleteJob(jid)
 					http.Error(w, "500 Internal serve error\n  Error: ", http.StatusInternalServerError)
 					return
 				}
@@ -179,6 +181,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(j)
 			} else {
 				fmt.Println("Failed to get job id = ", jid, " (worker_app.main_server_handler)")
+				deleteJob(jid)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 			}
 		} else if r.Method == "GET" {
@@ -213,7 +216,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				if e == nil {
 					fmt.Println("Job id = ", jid, " is successfully stopped")
 					w.WriteHeader(http.StatusOK)
-				} else {
+				} else if e.Error() == "jobNotFound" {
+					http.Error(w, "404 internal server error\n  Error: ", http.StatusNotFound)
+				}else {
 					fmt.Println("Job id = ", jid, " failed to stop")
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				}
@@ -259,14 +264,11 @@ func getBandwidthCapacity() string {
 	return "100m"
 }
 
-func createIngestUrl(job job.LiveJob) error {
-
+func createIngestUrl(job job.LiveJob) {
 	job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
 	// job.SrtIngestUrl = ...
 	// job.RtpIngestUrl = ...
-
-	createUpdateJob(job)
-	return nil
+	createUpdateJob(job) // Update local jobs table
 }
 
 func launchJob(j job.LiveJob) error {
@@ -293,17 +295,29 @@ func launchJob(j job.LiveJob) error {
 	var rj RunningJob
 	rj.Job = j
 	rj.Command = ffmpegCmd
-	running_jobs.PushBack(rj)
+	je := running_jobs.PushBack(rj)
 
-	var err2 error
 	var out []byte
+	var err2 error
+	err2 = nil
 	go func() {
-		out, err2 = ffmpegCmd.CombinedOutput()
+		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
 		if err2 != nil {
+			running_jobs.Remove(je) // Cleanup if ffmpegCmd fails
         	fmt.Println("Errors running worker transcoder: ", string(out))
 		}
 	}()
 
+	// Wait 100ms to get ffmpegCmd (which runs in its own go routine) result (err2). 
+
+	// If we don't wait, err2=nil (its initial value) will always be returned before 
+	// ffmpegCmd.CombinedOutput() finishes and returns the real result. This will cause inconsistency
+	// when launchJob() returns nil (success) but ffmpegCmd.CombinedOutput() actually fails. 
+
+	// On the other hand, if ffmpegCmd succeeds, the go routine (ffmpegCmd.CombinedOutput) blocks until 
+	// ffmpeg stops (e.g., when the user issues a stop_job request). In this case, err2 will not be 
+	// updated when the sleep ends thus err2=nil will be returned (which is valid). 
+	time.Sleep(100 * time.Millisecond)
 	return err2
 }
 
@@ -376,6 +390,14 @@ func checkJobStatus() {
 			prev_e = e
 			continue
 		}
+
+		/*
+		if j.Command.Process == nil {
+			jobProcessFound = false
+			prev_e = e
+			continue
+		}
+		*/
 
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {

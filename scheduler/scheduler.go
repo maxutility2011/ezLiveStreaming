@@ -230,7 +230,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	var err error
 	if !(j.Stop || j.Delete) { // create_job or resume_job
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
 		req, err = http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
     	if err != nil {
         	fmt.Println("Error: Failed to POST to: ", worker_url)
@@ -242,7 +242,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		worker_url += j.Id
 		worker_url += "/stop"
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending stop_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url) 
+		fmt.Println("Sending stop_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
 		req, err = http.NewRequest(http.MethodPut, worker_url, bytes.NewReader(b))
     	if err != nil {
         	fmt.Println("Error: Failed to PUT to: ", worker_url)
@@ -252,21 +252,29 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	} //else if j.Delete {
 	//}
 	
-    resp, err1 := http.DefaultClient.Do(req)
+	resp, err1 := http.DefaultClient.Do(req)
     if err1 != nil {
+		fmt.Println("Failed to send job request to worker. Error: ", err1)
         return err1
     }
 	
-	if !(((!(j.Stop || j.Delete) && resp.StatusCode == http.StatusCreated) || (j.Stop && resp.StatusCode == http.StatusOK) || (j.Delete && resp.StatusCode == http.StatusAccepted))) {
-		if !(j.Stop || j.Delete) { // Create_job or resume_job
-			fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
-		} else if j.Stop { // Stop_job
-			fmt.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
-		}
-
-		fmt.Println("Worker response status code: ", resp.StatusCode)
+	// Case 1: Create_job or resume_job: response status code isn't 202. Return error then retry 
+	//         (the job will be put back into "queue_jobs" and be retried later on)
+	// Case 2: Stop_job: response status code isn't 200. Return error then retry
+	if !(j.Stop || j.Delete) && resp.StatusCode != http.StatusCreated {
+		fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		fmt.Println("Bad worker response status code: ", resp.StatusCode)
 		return errors.New("WorkerJobExecutionError")
-	}
+	} else if (j.Stop && resp.StatusCode != http.StatusOK) {
+		fmt.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
+		fmt.Println("Bad worker response status code: ", resp.StatusCode)
+		if resp.StatusCode == http.StatusNotFound {
+			return errors.New("jobNotFound")
+		} else {
+			return errors.New("WorkerJobExecutionError")
+		}
+	} //else if (j.Delete && resp.StatusCode != http.StatusAccepted) {
+	//}
 
 	var e error
 	// create_job or resume_job
@@ -274,7 +282,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
     	defer resp.Body.Close()
     	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
     	if err2 != nil {
-        	fmt.Println("Error: Failed to read response body")
+        	fmt.Println("Error: Failed to read response body. Error: ", err2)
         	return err2
     	}
 
@@ -282,6 +290,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		json.Unmarshal(bodyBytes, &j2)
 		j2.Assigned_worker_id = wid
 		j2.State = job.JOB_STATE_RUNNING
+		// job.RtmpIngestUrl is set by and returned from worker_app
 		createUpdateJob(j2)
 		e = addNewJobLoad(worker, j2)
 
@@ -317,6 +326,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		j.State = job.JOB_STATE_STOPPED
 		j.Assigned_worker_id = "" // A different worker will be assigned when the job is resumed later on
 		j.RtmpIngestUrl = "" // RtmpIngestUrl will change when the job is resumed and a new worker is assigned 
+		j.Stop = false // Reset the flag
 		// j.Id and j.StreamKey will remain the same when the job is resumed
 		createUpdateJob(j)
 		fmt.Println("Job id = ", j.Id, " is successfully stopped on worker id = ", wid)
@@ -331,7 +341,7 @@ func scheduleOneJob() {
 	if e != nil {
 		j := job.LiveJob(e.Value.(job.LiveJob))
 		queued_jobs.Remove(e)
-		if !(j.Stop || j.Delete) {
+		if !(j.Stop || j.Delete) { // create_job or resume_job
 			assigned_worker_id, ok := assignWorker(j)
 			if !ok {
 				fmt.Println("Failed to assign job id=", j.Id, " to a worker")
@@ -342,9 +352,17 @@ func scheduleOneJob() {
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
 				fmt.Println("Failed to send job to a worker")
-				queued_jobs.PushBack(j) 
+				if err.Error() != "jobNotFound" {
+					queued_jobs.PushBack(j)
+				} 
 			}
 		} else if j.Stop {
+			// When a job was already stopped, j.Assigned_worker_id was cleared. 
+			if (j.Assigned_worker_id == "") {
+				fmt.Println("Cannot stop Job id = ", j.Id, " because it has no assigned worker. Is it already stopped?")
+				return 
+			}
+
 			assigned_worker_id := j.Assigned_worker_id
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
