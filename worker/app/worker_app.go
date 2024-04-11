@@ -89,6 +89,7 @@ func stopJob(jid string) error {
 			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
 			fmt.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 == nil {
+				releaseRtmpPort(j.Job.RtmpIngestPort)
 				deleteJob(jid) // Need to delete the job from this worker. The job could be reassigned to another worker when it resumes.
 				stopped = true
 			}
@@ -240,7 +241,10 @@ func readConfig() {
 	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
-var rtmp_ingest_port = 1935
+//var rtmp_ingest_port = 1935
+var rtmp_port_base = 1935 // TODO: Make this configurable
+var max_rtmp_ports = 15 // TODO: Make this configurable
+var available_rtmp_ports *list.List
 var scheduler_heartbeat_interval = "1s" 
 var job_status_check_interval = "2s"
 var worker_app_config_file_path = "worker_app_config.json"
@@ -253,7 +257,6 @@ var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var running_jobs *list.List // Live jobs actively running on this worker
 var myWorkerId string
 var last_confirmed_heartbeat_time time.Time
-var available_rtmp_ports *list.List
 var worker_app_config WorkerAppConfig
 
 func getCpuCapacity() string {
@@ -264,11 +267,42 @@ func getBandwidthCapacity() string {
 	return "100m"
 }
 
-func createIngestUrl(job job.LiveJob) {
-	job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
-	// job.SrtIngestUrl = ...
-	// job.RtpIngestUrl = ...
-	createUpdateJob(job) // Update local jobs table
+func allocateRtmpIngestPort() int {
+	var port int
+	e := available_rtmp_ports.Front()
+	if e != nil {
+		port = int(e.Value.(int))
+		available_rtmp_ports.Remove(e)
+	} else {
+		port = -1
+	}
+
+	return port
+}
+
+// Need to release RTMP port when a job is done
+func releaseRtmpPort(port int) {
+	fmt.Println("Releasing RTMP port: ", port)
+	available_rtmp_ports.PushBack(port)
+}
+
+func createIngestUrl(job job.LiveJob) error {
+	rtmp_ingest_port := allocateRtmpIngestPort() // TODO: need to support RTMPS
+	// srt_ingest_port := allocateSrtIngestPort() // TODO
+	// srt_ingest_port := allocateRtpIngestPort() // TODO
+	var err error
+	err = nil
+	if rtmp_ingest_port < 0 {
+		err = errors.New("NotEnoughRtmpIngestPort")
+	} else {
+		job.RtmpIngestPort = rtmp_ingest_port
+		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+		// job.SrtIngestUrl = ...
+		// job.RtpIngestUrl = ...
+	}
+
+	createUpdateJob(job)
+	return err
 }
 
 func launchJob(j job.LiveJob) error {
@@ -391,14 +425,6 @@ func checkJobStatus() {
 			continue
 		}
 
-		/*
-		if j.Command.Process == nil {
-			jobProcessFound = false
-			prev_e = e
-			continue
-		}
-		*/
-
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {
             fmt.Printf("Process id = %d (Job id = %s) not found. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
@@ -513,6 +539,11 @@ func main() {
 	err1 = registerWorker(worker_app_config)
 	if err1 != nil {
 		fmt.Println("Failed to register worker. Try again later.")
+	}
+
+	available_rtmp_ports = list.New()
+	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
+		available_rtmp_ports.PushBack(p)
 	}
 
 	running_jobs = list.New()
