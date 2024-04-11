@@ -135,6 +135,14 @@ func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=ascii")
+  	w.Header().Set("Access-Control-Allow-Origin", "*")
+  	w.Header().Set("Access-Control-Allow-Headers","Content-Type,access-control-allow-origin, access-control-allow-headers")
+
+	if (*r).Method == "OPTIONS" {
+        return
+    }
+
     fmt.Println("----------------------------------------")
     fmt.Println("Received new request:")
     fmt.Println(r.Method, r.URL.Path)

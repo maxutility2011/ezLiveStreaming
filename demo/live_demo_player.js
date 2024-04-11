@@ -1,17 +1,30 @@
-var manifestUri_aurora_stats = "";
-var streamCreationTime = 0;
+var playback_url = "http://localhost:4080/ezliveStreaming/1.mp4";
+var create_button;
+var stop_button;
+var resume_button;
+var job_request;
+var video;
 
-var loadButton11 = document.getElementById('load-url-11');
-loadButton11.addEventListener('click', (event) => {
-    reloadAuroraStream();
+window.addEventListener("DOMContentLoaded", (event) => {
+    create_button = document.getElementById('create');
+    create_button.addEventListener('click', (event) => {
+        createJob();
+    });
+    
+    stop_button = document.getElementById('stop');
+    stop_button.addEventListener('click', (event) => {
+        stopJob();
+    });
+    
+    resume_button = document.getElementById('resume');
+    resume_button.addEventListener('click', (event) => {
+        resumeJob();
+    });
+    
+    job_request = document.getElementById('job_request');
+    
+    video = document.getElementById('video');
 });
-
-var createButton11 = document.getElementById('create-url-11');
-createButton11.addEventListener('click', (event) => {
-    createStream();
-});
-
-var video11 = document.getElementById('video11');
     
 var cfg = 
 {
@@ -26,19 +39,41 @@ var cfg =
 
 if (Hls.isSupported()) {
     var aurora_stats_hls = new Hls(cfg);
-
-    aurora_stats_hls.attachMedia(video11);
-    aurora_stats_hls.loadSource(manifestUri_aurora_stats);
+    aurora_stats_hls.attachMedia(video);
+    aurora_stats_hls.loadSource(playback_url);
+} else {
+    window.alert("HLS not supported");
 }
 
-function reloadAuroraStream() {
-    let currentTime = Date.now();
-    if (currentTime - streamCreationTime > 15000) {
-        console.log(manifestUri_aurora_stats);
-        aurora_stats_hls.loadSource(manifestUri_aurora_stats);
-    } else {
-        window.alert("Stream not ready to play. Please wait up to 15 seconds");
+function createJob() {
+    let create_job_url = "http://localhost:1080/jobs";
+    let create_job_req = new XMLHttpRequest();
+    create_job_req.open("POST", create_job_url, true);
+    create_job_req.setRequestHeader("Content-Type", "application/json");
+
+    create_job_req.onload = function (e) {
+        if (create_job_req.readyState === create_job_req.DONE) {
+          if (create_job_req.status === 201) {
+            let job_resp = this.response;
+            window.alert(job_resp);
+          } else {
+            console.log("create new live job failed: " + create_job_req.status);
+          }
+        }
     }
+
+    let job_body = ""
+    if (job_request.value != "") {
+        job_body = job_request.value;
+    }
+    
+    //let data = JSON.stringify(job_body);
+    //window.alert(job_body);
+    create_job_req.send(job_body);
+    //console.log(manifestUri_aurora_stats);
+    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
+
+    //window.alert("Stream not ready to play. Please wait up to 15 seconds");
 }
 
 function createStream() {

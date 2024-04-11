@@ -10,23 +10,30 @@
 /* Create two equal columns that floats next to each other */
 .columnleft {
   float: left;
-  width: 30%;
-  padding: 10px;
-  height: 350px; /* Should be removed. Only for demonstration */
+  width: 47%;
+  padding: 5px;
+  height: 360px; /* Should be removed. Only for demonstration */
 }
 
 .columnright {
   float: left;
-  width: 70%;
-  padding: 10px;
-  height: 350px; /* Should be removed. Only for demonstration */
+  width: 53%;
+  padding: 1px;
+  height: 360px; /* Should be removed. Only for demonstration */
 }
 
-.bottom {
+.bottomleft {
   float: left;
-  width: 100%;
-  padding: 10px;
-  height: 150px; /* Should be removed. Only for demonstration */
+  width: 47%;
+  padding: 2px;
+  height: 200px; /* Should be removed. Only for demonstration */
+}
+
+.bottomright {
+  float: left;
+  width: 53%;
+  padding: 2px;
+  height: 200px; /* Should be removed. Only for demonstration */
 }
 
 /* Clear floats after the columns */
@@ -39,18 +46,35 @@
 </head>
 <body>
 
-<h2>Two Equal Columns</h2>
+<head>
+	<script src="dist/hls.js"></script>
+	<script src="live_demo_player.js"></script>
+</head>
 
 <div class="row">
-  <div class="columnleft" style="background-color:#aaa;">
-    <h2>Column 1</h2>
+  <div class="columnleft" style="background-color:#042d2ea0;">
+    <form>
+		<label id=livestream style="font-size: 20px; display: block; text-align: center">Live job request</label>
+		<br>
+		<textarea id="job_request" name="job_request" rows="18" cols="73"></textarea>
+		<br>
+		<button id=create type=button>Create</button>
+		<button id=stop type=button>Stop</button>
+		<button id=resume type=button>Resume</button>
+		<label id=response_code style="background-color:#3305e8a0;">response code</label>
+	</form>
+  </div>
+  <div class="columnright" style="background-color:#d4baba;">
+	<center> 
+		<video id="video" autoplay="true" muted="true" width="640" height="360" controls playsinline></video>
+	</center>
     <p>Some text..</p>
   </div>
-  <div class="columnright" style="background-color:#bbb;">
-    <h2>Column 2</h2>
+  <div class="bottomleft" style="background-color:#042d2ea0;">
+    <h2>Bottom</h2>
     <p>Some text..</p>
   </div>
-  <div class="bottom" style="background-color:#bbb;">
+  <div class="bottomright" style="background-color:#d4baba;">
     <h2>Bottom</h2>
     <p>Some text..</p>
   </div>
