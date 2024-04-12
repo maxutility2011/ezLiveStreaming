@@ -592,10 +592,11 @@ func main() {
 	}(ticker1)
 
 	shutdown := make(chan os.Signal, 1)
-    signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	// syscall.SIGKILL cannot be handled
+    signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
     go func() {
         <-shutdown
-        Log.Println("Shutting down!")
+        fmt.Println("Shutting down!")
 
 		for e := running_jobs.Front(); e != nil; e = e.Next() {
 			j := RunningJob(e.Value.(RunningJob))

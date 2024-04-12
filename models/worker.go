@@ -24,7 +24,7 @@ type LiveWorker struct {
 	Registered_at time.Time
 	State string
 	Info WorkerInfo
-	Load WorkerLoad
+	//Load WorkerLoad
 	LastHeartbeatTime time.Time
 }
 
@@ -51,7 +51,9 @@ type JobLoad struct {
 
 // Local table, NOT in Redis
 type WorkerLoad struct {
-	Jobs map[string]JobLoad
+	Id string
+	//Jobs map[string]JobLoad
+	Jobs []JobLoad
 	CpuLoad int
 	BandwidthLoad int
 }

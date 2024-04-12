@@ -45,12 +45,7 @@ const max_missing_heartbeats_before_removal = 10
 var sqs_receiver job_sqs.SqsReceiver
 var redis redis_client.RedisClient
 var scheduler_config SchedulerConfig
-// A local table keeping load of all the jobs per each worker. 
-// Function addNewJobLoad() adds new jobs to the table after they are successfully launched on the assigned workers.
-// Function updateWorkerStatus() updates load of workers upon reception of worker reports.
-// Worker_app periodically check the status of all the running jobs and report any stopped jobs to the scheduler.
-// The scheduler updates worker_loads table by subtracting the load of the stopped jobs.
-var worker_loads = make(map[string]models.WorkerLoad)
+//var worker_loads = make(map[string]models.WorkerLoad)
 
 func readConfig() {
 	configFile, err := os.Open(scheduler_config_file_path)
@@ -151,14 +146,53 @@ func estimateJobLoad(j job.LiveJob) (int, int) {
 	return cpu_load, bandwidth_load
 }
 
+func getWorkerLoadById(wid string) string {
+	v, e := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
+	var r string
+	if e != nil {
+		fmt.Println("Warning: Load of worker id=", wid, " NOT found")
+	} else {
+		r = v
+	}
+
+	return r
+}
+
+func createUpdateWorkerLoad(wid string, load models.WorkerLoad) error {
+	err := redis.HSetStruct(redis_client.REDIS_KEY_WORKER_LOADS, wid, load)
+	if err != nil {
+		fmt.Println("Failed to add load for worker id = ", wid, ". Error: ", err)
+	}
+
+	return err
+}
+
+// Function addNewJobLoad() adds new jobs to the table after they are successfully launched on the assigned workers.
+// Function updateWorkerStatus() updates load of workers upon reception of worker reports.
+// Worker_app periodically check the status of all the running jobs and report any stopped jobs to the scheduler.
+// The scheduler updates the "worker_loads" hash table in Redis by subtracting the load of the stopped jobs.
 func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	var w_load models.WorkerLoad
+	v := getWorkerLoadById(w.Id)
+	if v != "" {
+		err := json.Unmarshal([]byte(v), &w_load)
+		if err != nil {
+			fmt.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
+			return err // Found worker load in Redis but got bad data
+		}
+	}
+
+	// It is fine if worker load is NOT found since this could be the first job for the worker
+	// in which case worker_load is yet to be created for the worker.
+
+/*
 	w_load, ok := worker_loads[w.Id]
 	// Load of this worker is yet to be created.
 	if !ok {
 		fmt.Println("Creating new WorkerLoad entry, id = ", w.Id)
 		w_load.Jobs = make(map[string]models.JobLoad)
 	}
+*/
 
 	var j_load models.JobLoad
 	j_load.Id = j.Id
@@ -167,14 +201,17 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
+	w_load.Id = w.Id
 	w_load.CpuLoad += j_load.CpuLoad
 	w_load.BandwidthLoad += j_load.BandwidthLoad
 	fmt.Println("New Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
-	w_load.Jobs[j.Id] = j_load
-	worker_loads[w.Id] = w_load
+	//w_load.Jobs[j.Id] = j_load
+	//worker_loads[w.Id] = w_load
+	w_load.Jobs = append(w_load.Jobs, j_load)
+	createUpdateWorkerLoad(w.Id, w_load)
 
 	w.State = models.WORKER_STATE_LOADED
 	e := createUpdateWorker(w)
@@ -187,16 +224,50 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 }
 
 func updateWorkerStatus(wid string, a_stopped_job_id string) error {
+	/*
 	w_load, ok := worker_loads[wid]
 	if !ok {
 		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
 		return errors.New("WorkerNotFound")
 	}
+	*/
 
+	var w_load models.WorkerLoad
+	v := getWorkerLoadById(wid)
+	if v != "" {
+		err := json.Unmarshal([]byte(v), &w_load)
+		if err != nil {
+			fmt.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
+			return err // Found worker load in Redis but got bad data
+		}
+	} else {
+		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
+		return errors.New("WorkerNotFound")
+	}
+
+	/*
 	j_load, ok1 := w_load.Jobs[a_stopped_job_id]
 	if !ok1 {
 		fmt.Println("Job id = ", a_stopped_job_id, " not found in updateWorkerStatus")
 		return errors.New("JobNotFound")
+	}
+	*/
+
+	var j_load models.JobLoad
+	j_load_found := false
+	var index int
+	var j models.JobLoad
+	for index, j = range w_load.Jobs {
+		if j.Id == a_stopped_job_id {
+			j_load = j
+			j_load_found = true
+			break
+		}
+	}
+
+	if !j_load_found {
+		fmt.Println("Load of job id = ", a_stopped_job_id, " was NOT found assigned to worker id = ", wid)
+		return errors.New("JobLoadNotFound")
 	}
 
 	fmt.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerStatus: ")
@@ -210,8 +281,12 @@ func updateWorkerStatus(wid string, a_stopped_job_id string) error {
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
-	delete(w_load.Jobs, a_stopped_job_id)
-	worker_loads[wid] = w_load
+	// Delete job "a_stopped_job_id" from w_load.Jobs
+	w_load.Jobs = append(w_load.Jobs[:index], w_load.Jobs[index+1:]...)
+
+	//delete(w_load.Jobs, a_stopped_job_id)
+	//worker_loads[wid] = w_load
+	createUpdateWorkerLoad(wid, w_load)
 	return nil
 }
 
@@ -479,27 +554,28 @@ func getJobById(jid string) (job.LiveJob, bool) {
 
 // This function ONLY set job state to "stopped". It does not stop the jobs
 func stopWorkerJobs(wid string) error {
-	w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+	w, err := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
 	if err != nil {
-		fmt.Println("Failed to get worker id = ", wid, " in stopWorkerJobs")
+		fmt.Println("Failed to get worker id = ", wid, " in Redis (stopWorkerJobs)")
 		return err
 	}
 
-	var worker models.LiveWorker
-	err = json.Unmarshal([]byte(w), &worker)
+	var w_load models.WorkerLoad
+	err = json.Unmarshal([]byte(w), &w_load)
 	if err != nil {
-		fmt.Println("Failed to unmarshal worker id = ", wid, " in stopWorkerJobs")
+		fmt.Println("Failed to unmarshal load of worker id = ", wid, " in stopWorkerJobs")
 		return err
 	}
 
 	stopped_jobs_count := 0
-	for jid := range worker.Load.Jobs {
-		j, ok := getJobById(jid)
+	for _, j_load := range w_load.Jobs {
+		j, ok := getJobById(j_load.Id)
 		if ok {
 			j.State = job.JOB_STATE_STOPPED
 			createUpdateJob(j)
+			stopped_jobs_count++
 		} else {
-			fmt.Println("Failed to get job id = ", jid, " in stopWorkerJobs")
+			fmt.Println("Failed to get job id = ", j_load.Id, " in stopWorkerJobs")
 		}
 	}
 

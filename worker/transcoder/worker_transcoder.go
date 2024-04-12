@@ -63,7 +63,8 @@ func main() {
     ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
 
     shutdown := make(chan os.Signal, 1)
-    signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+    // syscall.SIGKILL cannot be handled
+    signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
     go func() {
         <-shutdown
         Log.Println("Shutting down!")
