@@ -2,8 +2,14 @@ var playback_url = "http://localhost:4080/ezliveStreaming/1.mp4";
 var create_button;
 var stop_button;
 var resume_button;
+var show_button;
+var response_code;
+var response_body;
 var job_request;
 var video;
+var job_id;
+var listJobsTimer = null;
+var listJobsInterval = 2000
 
 window.addEventListener("DOMContentLoaded", (event) => {
     create_button = document.getElementById('create');
@@ -20,6 +26,15 @@ window.addEventListener("DOMContentLoaded", (event) => {
     resume_button.addEventListener('click', (event) => {
         resumeJob();
     });
+
+    show_button = document.getElementById('show');
+    show_button.addEventListener('click', (event) => {
+        showJob();
+    });
+
+    response_code = document.getElementById('response_code');
+
+    response_body = document.getElementById('response_body');
     
     job_request = document.getElementById('job_request');
     
@@ -45,6 +60,70 @@ if (Hls.isSupported()) {
     window.alert("HLS not supported");
 }
 
+/*
+function startListJobsTimer() {
+    if (!listJobsTimer) {
+        listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval); 
+    } else {
+        clearTimeout(listJobsTimer);
+        listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval);
+    }
+}
+
+function listJobsPeriodic() {
+    listJobs()
+    listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval);
+}
+
+function listJobs() {
+    let list_jobs_url = "http://localhost:1080/jobs";
+    let list_jobs_req = new XMLHttpRequest();
+    list_jobs_req.open("GET", list_jobs_url, true);
+
+    list_jobs_req.onload = function (e) {
+        if (list_jobs_req.readyState === list_jobs_req.DONE) {
+          if (list_jobs_req.status === 200) {
+            let job_resp = this.response;
+            let j = JSON.parse(job_resp)
+            job_id = j.Id
+            response_code.innerHTML = "status code=" + list_jobs_req.status
+            response_body.innerHTML = JSON.stringify(j, null, 2)
+            //window.alert(job_resp);
+          } else {
+            console.log("get new live job failed. Status code:" + list_jobs_req.status);
+          }
+        }
+    }
+
+    list_jobs_req.send();
+}
+*/
+
+function showJob() {
+    let show_job_url = "http://localhost:1080/jobs";
+    show_job_url += job_id;
+    let show_job_req = new XMLHttpRequest();
+    show_job_req.open("GET", show_job_url, true);
+
+    show_job_req.onload = function (e) {
+        if (show_job_req.readyState === show_job_req.DONE) {
+          if (show_job_req.status === 200) {
+            let job_resp = show_job_req.response;
+            let j = JSON.parse(job_resp)
+            job_id = j.Id
+            response_code.innerHTML = "status code=" + show_job_req.status
+            response_body.innerHTML = JSON.stringify(j, null, 2)
+            //window.alert(job_resp);
+          } else {
+            console.log("Show live job failed. Status code:" + show_job_req.status);
+          }
+        }
+    }
+    
+    //let data = JSON.stringify(job_body);
+    show_job_req.send();
+}
+
 function createJob() {
     let create_job_url = "http://localhost:1080/jobs";
     let create_job_req = new XMLHttpRequest();
@@ -55,9 +134,14 @@ function createJob() {
         if (create_job_req.readyState === create_job_req.DONE) {
           if (create_job_req.status === 201) {
             let job_resp = this.response;
-            window.alert(job_resp);
+            let j = JSON.parse(job_resp)
+            job_id = j.Id
+            response_code.innerHTML = "status code=" + create_job_req.status
+            response_body.innerHTML = JSON.stringify(j, null, 2)
+            create_button.disabled = true
+            //window.alert(job_resp);
           } else {
-            console.log("create new live job failed: " + create_job_req.status);
+            console.log("create new live job failed. Status code:" + create_job_req.status);
           }
         }
     }
@@ -68,12 +152,58 @@ function createJob() {
     }
     
     //let data = JSON.stringify(job_body);
-    //window.alert(job_body);
     create_job_req.send(job_body);
-    //console.log(manifestUri_aurora_stats);
     //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
+}
 
-    //window.alert("Stream not ready to play. Please wait up to 15 seconds");
+function stopJob() {
+    let stop_job_url = "http://localhost:1080/jobs/";
+    stop_job_url += job_id
+    stop_job_url += "/stop"
+
+    let stop_job_req = new XMLHttpRequest();
+    stop_job_req.open("PUT", stop_job_url, true);
+
+    stop_job_req.onload = function (e) {
+        if (stop_job_req.readyState === stop_job_req.DONE) {
+          if (stop_job_req.status === 202) {
+            let job_resp = this.response;
+            response_code.innerHTML = "status code=" + stop_job_req.status
+            response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
+            //window.alert(job_resp);
+          } else {
+            console.log("stop new live job failed. Status code:" + stop_job_req.status);
+          }
+        }
+    }
+    
+    stop_job_req.send();
+    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
+}
+
+function resumeJob() {
+    let resume_job_url = "http://localhost:1080/jobs/";
+    resume_job_url += job_id
+    resume_job_url += "/resume"
+
+    let resume_job_req = new XMLHttpRequest();
+    resume_job_req.open("PUT", resume_job_url, true);
+
+    resume_job_req.onload = function (e) {
+        if (resume_job_req.readyState === resume_job_req.DONE) {
+          if (resume_job_req.status === 202) {
+            let job_resp = this.response;
+            response_code.innerHTML = "status code=" + resume_job_req.status
+            response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
+            //window.alert(job_resp);
+          } else {
+            console.log("stop new live job failed. Status code:" + resume_job_req.status);
+          }
+        }
+    }
+    
+    resume_job_req.send();
+    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
 }
 
 function createStream() {
