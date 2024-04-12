@@ -29,6 +29,7 @@ const REDIS_KEY_DONESET = "done_set"
 const REDIS_KEY_ALLWORKERS = "workers"
 const REDIS_KEY_NUMWORKERS = "num_workers"
 const REDIS_KEY_NUMJOBS = "num_jobs"
+const REDIS_KEY_SCHEDULER_QUEUED_JOBS = "queued_jobs"
 
 func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.Client, context.Context) {
 	redisAddr := redis_ip + ":" + redis_port
@@ -152,7 +153,18 @@ func (rc RedisClient) HDelAll(htable string) error {
 	return err
 }
 
-func (rc RedisClient) QPush(qname string, v string) error {
+func (rc RedisClient) QPushStruct(qname string, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON in redis client")
+		return err
+	}
+
+	_, err = rc.Client.LPush(rc.Ctx, qname, string(b)).Result()
+	return err
+}
+
+func (rc RedisClient) QPushString(qname string, v string) error {
 	_, err := rc.Client.LPush(rc.Ctx, qname, v).Result()
 	return err
 }

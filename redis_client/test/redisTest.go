@@ -109,12 +109,12 @@ func testHGetAll(htable string) {
 func testQueue() {
 	fmt.Println("testQueue starts............................")
 	var err error
-	err = redisClient.QPush("testQueue", "e1")
-	err = redisClient.QPush("testQueue", "e2")
-	err = redisClient.QPush("testQueue", "e3")
-	err = redisClient.QPush("testQueue", "e4")
+	err = redisClient.QPushStruct("testQueue", "e1")
+	err = redisClient.QPushStruct("testQueue", "e2")
+	err = redisClient.QPushStruct("testQueue", "e3")
+	err = redisClient.QPushStruct("testQueue", "e4")
 	if err != nil {
-		fmt.Println("Failed to QPush in Redis. Error: ", err)
+		fmt.Println("Failed to QPushStruct in Redis. Error: ", err)
 		return
 	} 
 

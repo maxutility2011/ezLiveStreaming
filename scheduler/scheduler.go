@@ -11,13 +11,10 @@ import (
 	"strings"
 	"bytes"
 	"strconv"
-    //"os/exec"
 	"io/ioutil"
-	"container/list"
 	"math/rand"
 	"github.com/google/uuid"
     //"log"
-    //"flag"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
 	"ezliveStreaming/models"
@@ -114,8 +111,6 @@ func createUpdateJob(j job.LiveJob) error {
 }
 
 // Poll and fetch new jobs from SQS and add to the pending job queue
-// Currently, the pending job queue is implemented using container/list.
-// TODO: Need to save pending jobs to a Redis List. Scheduler should NOT maintain any jobs or job states.
 func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	msgResult, err := sqs_receiver.ReceiveMsg()
 	if err != nil {
@@ -143,7 +138,7 @@ func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 			createUpdateJob(job)
 		}
 
-		queued_jobs.PushBack(job) // https://pkg.go.dev/container/list
+		bufferJob(job) 
 		sqs_receiver.DeleteMsg(msgResult.Messages[i].ReceiptHandle)
 	}
 
@@ -337,15 +332,27 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 }
 
 func scheduleOneJob() {
-	e := queued_jobs.Front()
-	if e != nil {
-		j := job.LiveJob(e.Value.(job.LiveJob))
-		queued_jobs.Remove(e)
+	count := getBufferedJobCount()
+	if count <= 0 { // redis error (count < 0) or empty queue (count == 0)
+		return
+	}
+
+	e, err := getJobBufferFront()
+	if err == nil {
+		var j job.LiveJob
+		err = json.Unmarshal([]byte(e), &j)
+		if err != nil {
+			fmt.Println("Failed to unmarshal job (scheduleOneJob). Error: ", err)
+			return
+		}
+
+		popBufferedJob()
+
 		if !(j.Stop || j.Delete) { // create_job or resume_job
 			assigned_worker_id, ok := assignWorker(j)
 			if !ok {
 				fmt.Println("Failed to assign job id=", j.Id, " to a worker")
-				queued_jobs.PushBack(j) // Add failed jobs back to the queue and retry later
+				bufferJob(j) // Add failed jobs back to the queue and retry later
 				return
 			}
 
@@ -353,7 +360,7 @@ func scheduleOneJob() {
 			if err != nil {
 				fmt.Println("Failed to send job to a worker")
 				if err.Error() != "jobNotFound" {
-					queued_jobs.PushBack(j)
+					bufferJob(j)
 				} 
 			}
 		} else if j.Stop {
@@ -367,11 +374,54 @@ func scheduleOneJob() {
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
 				fmt.Println("Failed to send job to a worker")
-				queued_jobs.PushBack(j) 
+				bufferJob(j) 
 			}
 		} // else if j.Delete {
 		//}
 	}
+}
+
+func bufferJob(j job.LiveJob) error {
+	err := redis.QPushStruct(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, j)
+	if err != nil {
+		fmt.Println("Failed to buffer job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
+}
+
+func popBufferedJob() (string, error) {
+	j, err := redis.QPop(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
+	var r string
+	if err != nil {
+		fmt.Println("Failed to pop from ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
+	} else {
+		r = j
+	}
+
+	return r, err
+}
+
+func getJobBufferFront() (string, error) {
+	j, err := redis.QFront(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
+	var r string
+	if err != nil {
+		fmt.Println("Failed to get front job in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
+	} else {
+		r = j
+	}
+
+	return r, err
+}
+
+// redis.QLen() returns count = -1 on errors
+func getBufferedJobCount() int {
+	count, err := redis.QLen(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
+	if err != nil {
+		fmt.Println("Failed to get buffered job count in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
+	}
+
+	return count
 }
 
 func createUpdateWorker(w models.LiveWorker) error {
@@ -558,7 +608,6 @@ func check_worker_heartbeat() error {
 }
 
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
-var queued_jobs *list.List
 var server_ip = "0.0.0.0"
 var server_port = "80" 
 var server_addr = server_ip + ":" + server_port
@@ -733,8 +782,6 @@ func main() {
 	redis.RedisIp = scheduler_config.Redis.RedisIp
 	redis.RedisPort = scheduler_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
-
-	queued_jobs = list.New()
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
 	var sqs_poll_timer_counter = 0
