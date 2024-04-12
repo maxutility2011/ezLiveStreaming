@@ -1,4 +1,5 @@
 var playback_url = "http://localhost:4080/ezliveStreaming/1.mp4";
+var ingest_url = ""
 var create_button;
 var stop_button;
 var resume_button;
@@ -11,7 +12,88 @@ var job_id;
 var listJobsTimer = null;
 var listJobsInterval = 2000
 
+async function initPlayer() {
+    //var urlInput = document.getElementById('url');
+  
+    // Create a Player instance.
+    const video = document.getElementById('video');
+  
+    /*video.addEventListener('loadstart', (event) => {
+        loadStartTime = Date.now();
+    });
+  
+    video.addEventListener('loadeddata', (event) => {
+        loadEndTime = Date.now();
+    });
+  
+    video.addEventListener('waiting', (event) => {
+      ++waitingEvents;
+    });*/
+  
+    const player = new shaka.Player(video);
+  
+    player.configure('streaming.lowLatencyMode', true);
+    player.configure('streaming.autoLowLatencyMode', true);
+  
+    // Attach player to the window to make it easy to access in the JS console.
+    window.player = player;
+  
+    // Listen for error events.
+    player.addEventListener('error', onErrorEvent);
+  
+    // Try to load a manifest.
+    // This is an asynchronous process.
+    try {
+      await player.load(playback_url);
+      // This runs if the asynchronous load is successful.
+      console.log('The video has now been loaded!');
+    } catch (e) {
+      // onError is executed if the asynchronous load fails.
+      onError(e);
+    }
+  
+    //startStatsTimer(); 
+}
+
+async function reloadPlayer()
+{
+  try {
+    await window.player.load(playback_url);
+    // This runs if the asynchronous load is successful.
+    console.log('The video has now been loaded!');
+  } catch (e) {
+    // onError is executed if the asynchronous load fails.
+    onError(e);
+  }
+}
+
+function initApp() {
+    // Install built-in polyfills to patch browser incompatibilities.
+    shaka.polyfill.installAll();
+  
+    // Check to see if the browser supports the basic APIs Shaka needs.
+    if (shaka.Player.isBrowserSupported()) {
+      // Everything looks good!
+      initPlayer();
+    } else {
+      // This browser does not have the minimum set of APIs we need.
+      console.error('Browser not supported!');
+    }
+  
+    /*var urlInput = document.getElementById('url');
+    urlInput.addEventListener('change', (event) => {
+          manifestUri = event.target.value;
+    });
+  
+    var urlButton = document.getElementById('load-url');
+    urlButton.addEventListener('click', (event) => {
+      reloadPlayer();
+    });*/
+}
+
 window.addEventListener("DOMContentLoaded", (event) => {
+    initApp()
+
     create_button = document.getElementById('create');
     create_button.addEventListener('click', (event) => {
         createJob();
@@ -32,15 +114,23 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
+    show_button = document.getElementById('play');
+    show_button.addEventListener('click', (event) => {
+        playVideo();
+    });
+
     response_code = document.getElementById('response_code');
 
     response_body = document.getElementById('response_body');
+
+    job_essentials = document.getElementById('job_essentials');
     
     job_request = document.getElementById('job_request');
     
     video = document.getElementById('video');
 });
     
+/*
 var cfg = 
 {
     "debug": false,
@@ -59,6 +149,23 @@ if (Hls.isSupported()) {
 } else {
     window.alert("HLS not supported");
 }
+*/
+
+function playVideo() {
+    reloadPlayer()
+}
+
+var showJobTimer = null;
+var playbackTimer = null;
+
+function startShowJobTimer() {
+    showJobTimer = setTimeout(showJob, 1000);
+    //clearTimeout(statsTimer);
+}
+
+/*function startPlaybackTimer() {
+    playbackTimer = setTimeout(showJob, 16000);
+}*/
 
 function showJob() {
     let show_job_url = "http://localhost:1080/jobs/";
@@ -71,9 +178,20 @@ function showJob() {
           if (show_job_req.status === 200) {
             let job_resp = show_job_req.response;
             let j = JSON.parse(job_resp)
-            job_id = j.Id
+            job_id = j.Id;
+
+            playback_url = j.Playback_url;
+            ingest_url = j.RtmpIngestUrl;
+
+            let je = {}
+            je.playback_url = playback_url
+            je.rtmp_ingest_url = ingest_url
+
+            job_essentials.innerHTML = JSON.stringify(je, null, 2)
             response_code.innerHTML = "status code=" + show_job_req.status
             response_body.innerHTML = JSON.stringify(j, null, 2)
+
+            //startPlaybackTimer()
             //window.alert(job_resp);
           } else {
             console.log("Show live job failed. Status code:" + show_job_req.status);
@@ -99,6 +217,8 @@ function createJob() {
             response_code.innerHTML = "status code=" + create_job_req.status
             response_body.innerHTML = JSON.stringify(j, null, 2)
             create_button.disabled = true
+
+            startShowJobTimer()
             //window.alert(job_resp);
           } else {
             console.log("create new live job failed. Status code:" + create_job_req.status);
@@ -161,26 +281,4 @@ function resumeJob() {
     }
     
     resume_job_req.send();
-}
-
-function createStream() {
-    let create_url = "http://ec2-13-59-210-247.us-east-2.compute.amazonaws.com:1080/createBasicLiveStream";
-    let create_req = new XMLHttpRequest();
-    create_req.open("POST", create_url, true);
-
-    create_req.onload = function (e) {
-        if (create_req.readyState === create_req.DONE) {
-          if (create_req.status === 201) {
-            let stream_playback_id = this.response;
-            console.log("stream_playback_id: " + stream_playback_id);
-            manifestUri_aurora_stats = stream_playback_id;
-            streamCreationTime = Date.now();
-          }
-          else {
-            console.log("create new stream failed: " + create_req.status);
-          }
-        }
-    }
-
-    create_req.send();
 }

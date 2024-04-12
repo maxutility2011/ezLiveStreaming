@@ -63,7 +63,7 @@ func main() {
     ffmpeg_output_path := "/var/www/html/output_"
     ffmpeg_output_path += *jobIdPtr
     ffmpeg_output_path += "/"
-    err1 = os.Mkdir(ffmpeg_output_path, 0750)
+    err1 = os.Mkdir(ffmpeg_output_path, 0777)
     if err1 != nil {
         fmt.Println("Failed to mkdir: ", ffmpeg_output_path, " Error: ", err1)
         ffmpeg_output_path = "/var/www/html/"

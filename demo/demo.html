@@ -47,7 +47,7 @@
 <body>
 
 <head>
-	<script src="dist/hls.js"></script>
+	<script src="dist/shaka-player.compiled.js"></script>
 	<script src="live_demo_player.js"></script>
 </head>
 
@@ -63,11 +63,20 @@
 		<button id=resume type=button>Resume</button>
 		<button id=show type=button>Show</button>
 		<label id=response_code style="background-color:#e8f2e9a0;">response code</label>
+		<button id=play type=button>Play</button>
 	</form>
   </div>
   <div class="columnright" style="background-color:#d4baba;">
 	<center> 
-		<video id="video" autoplay="true" muted="true" width="640" height="360" controls playsinline></video>
+		<body>
+			<video id="video"
+				   autoplay="true"
+				   width="640"
+				   height="360"
+				   poster="https://shaka-player-demo.appspot.com/assets/poster.jpg"
+				   controls playsinline></video>
+		  </body>
+		<!--<video id="video" autoplay="true" muted="true" width="640" height="360" controls playsinline></video>-->
 	</center>
     <p>Some text..</p>
   </div>
@@ -75,8 +84,7 @@
 	<textarea id="response_body" name="response_body" rows="12" cols="73" readonly style="background-color:#f5fafaa0;"></textarea>
   </div>
   <div class="bottomright" style="background-color:#d4baba;">
-    <h2>Bottom</h2>
-    <p>Some text..</p>
+	<textarea id="job_essentials" name="job_essentials" rows="12" cols="73" readonly style="background-color:#f5fafaa0;"></textarea>
   </div>
 </div>
 
