@@ -151,3 +151,40 @@ func (rc RedisClient) HDelAll(htable string) error {
 
 	return err
 }
+
+func (rc RedisClient) QPush(qname string, v string) error {
+	_, err := rc.Client.LPush(rc.Ctx, qname, v).Result()
+	return err
+}
+
+func (rc RedisClient) QFront(qname string) (string, error) {
+	elements, err := rc.Client.LRange(rc.Ctx, qname, -1, -1).Result()
+	var r string 
+	if err == nil {
+		r = elements[0]
+	} 
+
+	return r, err
+}
+
+func (rc RedisClient) QPop(qname string) (string, error) {
+	element, err := rc.Client.RPop(rc.Ctx, qname).Result()
+	var r string 
+	if err == nil {
+		r = element
+	} 
+
+	return r, err
+}
+
+func (rc RedisClient) QLen(qname string) (int, error) {
+	len, err := rc.Client.LLen(rc.Ctx, qname).Result()
+	var r int
+	if err == nil {
+		r = int(len)
+	} else {
+		r = -1
+	}
+
+	return r, err
+}

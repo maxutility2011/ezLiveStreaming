@@ -106,8 +106,55 @@ func testHGetAll(htable string) {
 	}
 }
 
+func testQueue() {
+	fmt.Println("testQueue starts............................")
+	var err error
+	err = redisClient.QPush("testQueue", "e1")
+	err = redisClient.QPush("testQueue", "e2")
+	err = redisClient.QPush("testQueue", "e3")
+	err = redisClient.QPush("testQueue", "e4")
+	if err != nil {
+		fmt.Println("Failed to QPush in Redis. Error: ", err)
+		return
+	} 
+
+	length, err0 := redisClient.QLen("testQueue")
+	if err0 == nil {
+		fmt.Println("Queue length = ", length)
+	} else {
+		fmt.Println("Failed to QLen in Redis. Error: ", err0)
+		return
+	}
+
+	front1, err1 := redisClient.QFront("testQueue")
+	if err1 == nil {
+		fmt.Println("Queue front: ", front1)
+	} else {
+		fmt.Println("Failed to QFront in Redis. Error: ", err1)
+		return
+	}
+
+	front2, err2 := redisClient.QPop("testQueue")
+	if err2 == nil {
+		fmt.Println("Queue front: ", front2, " popped out")
+	} else {
+		fmt.Println("Failed to QPop in Redis. Error: ", err2)
+		return
+	}
+
+	front3, err3 := redisClient.QFront("testQueue")
+	if err3 == nil {
+		fmt.Println("Queue front: ", front3)
+	} else {
+		fmt.Println("Failed to QFront in Redis. Error: ", err3)
+		return
+	}
+
+	fmt.Println("testQueue ends............................")
+}
+
 func main() {
-	redisClient.RedisIp ="172.17.0.4"
+	redisClient.RedisIp ="172.17.0.5"
 	redisClient.RedisPort = "6379"
 	redisClient.Client, redisClient.Ctx = redisClient.CreateClient(redisClient.RedisIp, redisClient.RedisPort)
 
@@ -134,6 +181,7 @@ func main() {
 
 	redisClient.HDelAll(jobs)
 
+	testQueue()
 	//testHGet(jobs, j2.Id)
 	//testHScan(jobs)
 
