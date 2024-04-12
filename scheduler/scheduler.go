@@ -45,7 +45,6 @@ const max_missing_heartbeats_before_removal = 10
 var sqs_receiver job_sqs.SqsReceiver
 var redis redis_client.RedisClient
 var scheduler_config SchedulerConfig
-//var worker_loads = make(map[string]models.WorkerLoad)
 
 func readConfig() {
 	configFile, err := os.Open(scheduler_config_file_path)
@@ -185,15 +184,6 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	// It is fine if worker load is NOT found since this could be the first job for the worker
 	// in which case worker_load is yet to be created for the worker.
 
-/*
-	w_load, ok := worker_loads[w.Id]
-	// Load of this worker is yet to be created.
-	if !ok {
-		fmt.Println("Creating new WorkerLoad entry, id = ", w.Id)
-		w_load.Jobs = make(map[string]models.JobLoad)
-	}
-*/
-
 	var j_load models.JobLoad
 	j_load.Id = j.Id
 	j_load.CpuLoad, j_load.BandwidthLoad = estimateJobLoad(j)
@@ -208,8 +198,6 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
-	//w_load.Jobs[j.Id] = j_load
-	//worker_loads[w.Id] = w_load
 	w_load.Jobs = append(w_load.Jobs, j_load)
 	createUpdateWorkerLoad(w.Id, w_load)
 
@@ -224,14 +212,6 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 }
 
 func updateWorkerStatus(wid string, a_stopped_job_id string) error {
-	/*
-	w_load, ok := worker_loads[wid]
-	if !ok {
-		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
-		return errors.New("WorkerNotFound")
-	}
-	*/
-
 	var w_load models.WorkerLoad
 	v := getWorkerLoadById(wid)
 	if v != "" {
@@ -244,14 +224,6 @@ func updateWorkerStatus(wid string, a_stopped_job_id string) error {
 		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
 		return errors.New("WorkerNotFound")
 	}
-
-	/*
-	j_load, ok1 := w_load.Jobs[a_stopped_job_id]
-	if !ok1 {
-		fmt.Println("Job id = ", a_stopped_job_id, " not found in updateWorkerStatus")
-		return errors.New("JobNotFound")
-	}
-	*/
 
 	var j_load models.JobLoad
 	j_load_found := false
@@ -283,9 +255,6 @@ func updateWorkerStatus(wid string, a_stopped_job_id string) error {
 
 	// Delete job "a_stopped_job_id" from w_load.Jobs
 	w_load.Jobs = append(w_load.Jobs[:index], w_load.Jobs[index+1:]...)
-
-	//delete(w_load.Jobs, a_stopped_job_id)
-	//worker_loads[wid] = w_load
 	createUpdateWorkerLoad(wid, w_load)
 	return nil
 }
