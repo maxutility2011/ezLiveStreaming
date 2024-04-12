@@ -159,8 +159,8 @@ var showJobTimer = null;
 var playbackTimer = null;
 
 function startShowJobTimer() {
+    window.alert("show job!");
     showJobTimer = setTimeout(showJob, 1000);
-    //clearTimeout(statsTimer);
 }
 
 /*function startPlaybackTimer() {
@@ -235,6 +235,13 @@ function createJob() {
     //hls.loadSource(manifestUri_aurora_stats);
 }
 
+function cleanup()
+{
+  stopJob()
+}
+
+window.onbeforeunload = cleanup;
+
 function stopJob() {
     let stop_job_url = "http://localhost:1080/jobs/";
     stop_job_url += job_id
@@ -248,7 +255,7 @@ function stopJob() {
           if (stop_job_req.status === 202) {
             let job_resp = this.response;
             response_code.innerHTML = "status code=" + stop_job_req.status
-            response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
+            //response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
             //window.alert(job_resp);
           } else {
             console.log("stop new live job failed. Status code:" + stop_job_req.status);
@@ -272,8 +279,8 @@ function resumeJob() {
           if (resume_job_req.status === 202) {
             let job_resp = this.response;
             response_code.innerHTML = "status code=" + resume_job_req.status
-            response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
-            //window.alert(job_resp);
+            //response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
+            startShowJobTimer()
           } else {
             console.log("stop new live job failed. Status code:" + resume_job_req.status);
           }
