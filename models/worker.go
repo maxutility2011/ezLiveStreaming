@@ -44,6 +44,7 @@ type WorkerJobReport struct {
 }
 
 type JobLoad struct {
+	Id string
 	CpuLoad int
 	BandwidthLoad int
 }

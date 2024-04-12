@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"os/signal"
 	"syscall"
 	"time"
 	"net/http"
@@ -90,7 +91,7 @@ func stopJob(jid string) error {
 			fmt.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 == nil {
 				releaseRtmpPort(j.Job.RtmpIngestPort)
-				deleteJob(jid) // Need to delete the job from this worker. The job could be reassigned to another worker when it resumes.
+				deleteJob(jid) // Delete the job from this worker. The job could be reassigned to another worker when it resumes.
 				stopped = true
 			}
 		}
@@ -589,6 +590,32 @@ func main() {
 			}
 		}
 	}(ticker1)
+
+	shutdown := make(chan os.Signal, 1)
+    signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+    go func() {
+        <-shutdown
+        Log.Println("Shutting down!")
+
+		for e := running_jobs.Front(); e != nil; e = e.Next() {
+			j := RunningJob(e.Value.(RunningJob))
+			process, err1 := os.FindProcess(int(j.Command.Process.Pid))
+			if err1 != nil {
+				fmt.Printf("Process id = %d (Job id = %s) not found in stopJob. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
+			} else {
+				err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
+				fmt.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
+				// The following cleanup steps are not necessarily needed since the whole worker_app 
+				// is being shutting down. But let's keep them here.
+				if err2 == nil {
+					releaseRtmpPort(j.Job.RtmpIngestPort)
+					deleteJob(j.Job.Id) 
+				}
+			}
+		}
+
+        os.Exit(0)
+    }()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := worker_app_config.WorkerAppIp + ":" + worker_app_config.WorkerAppPort

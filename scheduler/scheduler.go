@@ -154,12 +154,14 @@ func estimateJobLoad(j job.LiveJob) (int, int) {
 func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	var w_load models.WorkerLoad
 	w_load, ok := worker_loads[w.Id]
+	// Load of this worker is yet to be created.
 	if !ok {
 		fmt.Println("Creating new WorkerLoad entry, id = ", w.Id)
 		w_load.Jobs = make(map[string]models.JobLoad)
 	}
 
 	var j_load models.JobLoad
+	j_load.Id = j.Id
 	j_load.CpuLoad, j_load.BandwidthLoad = estimateJobLoad(j)
 	fmt.Println("Previous Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
 	fmt.Println("CPU load: ", w_load.CpuLoad)
@@ -458,6 +460,53 @@ func createWorker(wkr models.WorkerInfo) (error, string) {
 	return nil, w2.Id
 }
 
+func getJobById(jid string) (job.LiveJob, bool) {
+	var j job.LiveJob
+	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
+	if e != nil {
+		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
+		return j, false
+	}
+
+	e = json.Unmarshal([]byte(v), &j)
+	if e != nil {
+		fmt.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
+		return j, false
+	}
+
+	return j, true
+}
+
+// This function ONLY set job state to "stopped". It does not stop the jobs
+func stopWorkerJobs(wid string) error {
+	w, err := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
+	if err != nil {
+		fmt.Println("Failed to get worker id = ", wid, " in stopWorkerJobs")
+		return err
+	}
+
+	var worker models.LiveWorker
+	err = json.Unmarshal([]byte(w), &worker)
+	if err != nil {
+		fmt.Println("Failed to unmarshal worker id = ", wid, " in stopWorkerJobs")
+		return err
+	}
+
+	stopped_jobs_count := 0
+	for jid := range worker.Load.Jobs {
+		j, ok := getJobById(jid)
+		if ok {
+			j.State = job.JOB_STATE_STOPPED
+			createUpdateJob(j)
+		} else {
+			fmt.Println("Failed to get job id = ", jid, " in stopWorkerJobs")
+		}
+	}
+
+	fmt.Println("Stopped ", stopped_jobs_count, " jobs that were running on worker id = ", wid)
+	return nil
+}
+
 func removeWorker(wid string) (error, string) {
 	err := redis.HDelOne(redis_client.REDIS_KEY_ALLWORKERS, wid)
 	if err != nil {
@@ -592,6 +641,7 @@ func check_worker_heartbeat() error {
 		} 
 		
 		if (time_lastHeartbeat != 0 && time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
+			stopWorkerJobs(w.Id)
 			e, wid := removeWorker(w.Id)
 			if e != nil {
 				// Worker removal failed. Let's try again in the next event. 
