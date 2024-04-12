@@ -51,6 +51,7 @@ type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
 	StreamKey string
+	Playback_url string
 	RtmpIngestPort int
 	RtmpIngestUrl string
 	Time_created time.Time

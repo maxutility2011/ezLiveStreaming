@@ -36,6 +36,8 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Id = uuid.New().String()
 	
 	lj.StreamKey = assignJobInputStreamId()
+	lj.Playback_url = "http://localhost:4080/output_" + lj.Id + "/1.mpd" // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+
 	//j.IngestUrls = make([]string)
 	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
 	//j.IngestUrls = append(j.IngestUrls, RtmpIngestUrl)

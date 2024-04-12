@@ -59,7 +59,17 @@ func main() {
 
     Log = log.New(logfile, "", log.LstdFlags)
 
-    ffmpegArgs := job.JobSpecToEncoderArgs(j)
+    // Test path ONLY. Need to output to cloud storage such as AWS S3.
+    ffmpeg_output_path := "/var/www/html/output_"
+    ffmpeg_output_path += *jobIdPtr
+    ffmpeg_output_path += "/"
+    err1 = os.Mkdir(ffmpeg_output_path, 0750)
+    if err1 != nil {
+        fmt.Println("Failed to mkdir: ", ffmpeg_output_path, " Error: ", err1)
+        ffmpeg_output_path = "/var/www/html/"
+    }
+
+    ffmpegArgs := job.JobSpecToEncoderArgs(j, ffmpeg_output_path)
     ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
 
     shutdown := make(chan os.Signal, 1)

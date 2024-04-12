@@ -60,47 +60,8 @@ if (Hls.isSupported()) {
     window.alert("HLS not supported");
 }
 
-/*
-function startListJobsTimer() {
-    if (!listJobsTimer) {
-        listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval); 
-    } else {
-        clearTimeout(listJobsTimer);
-        listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval);
-    }
-}
-
-function listJobsPeriodic() {
-    listJobs()
-    listJobsTimer = setTimeout(listJobsPeriodic, listJobsInterval);
-}
-
-function listJobs() {
-    let list_jobs_url = "http://localhost:1080/jobs";
-    let list_jobs_req = new XMLHttpRequest();
-    list_jobs_req.open("GET", list_jobs_url, true);
-
-    list_jobs_req.onload = function (e) {
-        if (list_jobs_req.readyState === list_jobs_req.DONE) {
-          if (list_jobs_req.status === 200) {
-            let job_resp = this.response;
-            let j = JSON.parse(job_resp)
-            job_id = j.Id
-            response_code.innerHTML = "status code=" + list_jobs_req.status
-            response_body.innerHTML = JSON.stringify(j, null, 2)
-            //window.alert(job_resp);
-          } else {
-            console.log("get new live job failed. Status code:" + list_jobs_req.status);
-          }
-        }
-    }
-
-    list_jobs_req.send();
-}
-*/
-
 function showJob() {
-    let show_job_url = "http://localhost:1080/jobs";
+    let show_job_url = "http://localhost:1080/jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
     show_job_req.open("GET", show_job_url, true);
@@ -120,7 +81,6 @@ function showJob() {
         }
     }
     
-    //let data = JSON.stringify(job_body);
     show_job_req.send();
 }
 
@@ -151,9 +111,8 @@ function createJob() {
         job_body = job_request.value;
     }
     
-    //let data = JSON.stringify(job_body);
     create_job_req.send(job_body);
-    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
+    //hls.loadSource(manifestUri_aurora_stats);
 }
 
 function stopJob() {
@@ -178,7 +137,6 @@ function stopJob() {
     }
     
     stop_job_req.send();
-    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
 }
 
 function resumeJob() {
@@ -203,7 +161,6 @@ function resumeJob() {
     }
     
     resume_job_req.send();
-    //aurora_stats_hls.loadSource(manifestUri_aurora_stats);
 }
 
 function createStream() {
