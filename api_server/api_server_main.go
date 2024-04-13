@@ -145,12 +145,14 @@ var liveFeedCmd *exec.Cmd
 
 // Demo only!!!
 // E.g., ffmpeg -stream_loop -1 -re -i ed_720p_english_audio.mp4 -c:v copy -c:a copy -f flv rtmp://global-ingest-live.visionular.com/live/202309-a83383e4-7db7-402d-995f-32d8c447f89e
+//       ffmpeg -i in.mp4 -vf "drawtext=fontfile=/usr/share/fonts/truetype/DroidSans.ttf: timecode='09\:57\:00\:00': r=25: \x=(w-tw)/2: y=h-(2*lh): fontcolor=white: box=1: boxcolor=0x00000000@1" -an
 func start_ffmpeg_live_contribution(spec demo.CreateLiveFeedSpec) error {
 	if isLiveFeeding {
 		fmt.Println("Live feeder is already up")
 		return errors.New("DuplicateLiveFeeding")
 	}
 
+	//liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-vf", "\"drawtext=fontfile=/usr/share/fonts/truetype/DroidSans.ttf: timecode='09:57:00:00': r=25: x=(w-tw)/2: y=h-(2*lh): fontcolor=white: box=1: boxcolor=0x00000000@1\"", "-an", "-f", "flv", spec.RtmpIngestUrl)
 	liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-f", "flv", spec.RtmpIngestUrl)
 	/*fmt.Printf("Path: " + ffmpeg.Path + " ")
 	for _, arg := range ffmpeg.Args {
@@ -183,8 +185,12 @@ func stop_ffmpeg_live_contribution() {
 		fmt.Printf("Process id = %d not found. Error: %v\n", liveFeedCmd.Process.Pid, err1)
 		return
 	} else {
-		err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
-		fmt.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", liveFeedCmd.Process.Pid,  err2)
+		err2 := process.Signal(syscall.Signal(syscall.SIGINT))
+		fmt.Printf("process.Signal.SIGINT on pid %d returned: %v\n", liveFeedCmd.Process.Pid,  err2)
+		if err2 == nil {
+			isLiveFeeding = false
+			fmt.Println("Live feed stopped successfully!")
+		}
 	}
 }
 
@@ -432,14 +438,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	
 			w.WriteHeader(http.StatusCreated)
 			e = start_ffmpeg_live_contribution(live_feed_spec)
-			/*if e != nil {
-				if e.Error() == "DuplicateLiveFeeding" {
-					res := "Duplicate live feeding"
-					fmt.Println("Err: ", res)
-					http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-					return
-				}
-			}*/
 		} else if r.Method == "DELETE" {
 			if !isLiveFeeding {
 				res := "Live feeder isn't running. Cannot stop!"

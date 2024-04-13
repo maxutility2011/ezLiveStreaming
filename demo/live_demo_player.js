@@ -42,9 +42,6 @@ async function initPlayer() {
     // Attach player to the window to make it easy to access in the JS console.
     window.player = player;
   
-    // Listen for error events.
-    player.addEventListener('error', onErrorEvent);
-  
     // Try to load a manifest.
     // This is an asynchronous process.
     try {
@@ -52,11 +49,12 @@ async function initPlayer() {
       // This runs if the asynchronous load is successful.
       console.log('The video has now been loaded!');
     } catch (e) {
-      // onError is executed if the asynchronous load fails.
       onError(e);
     }
-  
-    //startStatsTimer(); 
+}
+
+function onError(e) {
+    window.alert("Playback error: ", e);
 }
 
 async function reloadPlayer()
@@ -166,9 +164,9 @@ function startShowJobTimer() {
     showJobTimer = setTimeout(showJob, 1000);
 }
 
-/*function startPlaybackTimer() {
-    playbackTimer = setTimeout(showJob, 16000);
-}*/
+function startPlaybackTimer() {
+    playbackTimer = setTimeout(playVideo, 16000);
+}
 
 function startLiveFeedTimer() {
     showJobTimer = setTimeout(liveFeed, 500);
@@ -186,6 +184,7 @@ function liveFeed() {
             response_code.innerHTML = "status code=" + live_feed_req.status
             livefeed_button.disabled = true
             isLivefeeding = true
+            startPlaybackTimer()
           } else {
             console.log("create new live feed failed. Status code:" + create_job_req.status);
           }

@@ -416,7 +416,14 @@ func scheduleOneJob() {
 				return 
 			}
 
-			assigned_worker_id := j.Assigned_worker_id
+			assigned_worker_id := j.Assigned_worker_id 
+			// j.Assigned_worker_id may have gone already. If so, there is no need to send this stop_job to it.
+			_, ok := getWorkerById(assigned_worker_id)
+			if !ok {
+				fmt.Println("Stop_job id = ", j.Id, " NOT sent to Worker id = ", assigned_worker_id, ". The worker was NOT found. It might have already stopped.")
+				return
+			}
+
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
 				fmt.Println("Failed to send job to a worker")
@@ -525,8 +532,8 @@ func getJobById(jid string) (job.LiveJob, bool) {
 func stopWorkerJobs(wid string) error {
 	w, err := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
 	if err != nil {
-		fmt.Println("Failed to get worker id = ", wid, " in Redis (stopWorkerJobs)")
-		return err
+		fmt.Println("Load of worker id = ", wid, " is NOT found in Redis::worker_loads table (stopWorkerJobs). The worker is NOT loaded with any job. No need to stop jobs.")
+		return nil // Not an error
 	}
 
 	var w_load models.WorkerLoad
