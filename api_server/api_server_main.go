@@ -3,17 +3,21 @@ package main
 
 import (
 	"fmt"
+	"errors"
 	"time"
 	"net/http"
 	"strings"
 	"encoding/json"
 	"github.com/google/uuid"
 	"os"
+	"os/exec"
+	"syscall"
 	"log"
 	"io/ioutil"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
 	"ezliveStreaming/redis_client"
+	"ezliveStreaming/demo" // Demo ONLY!!!
 )
 
 type SqsConfig struct {
@@ -134,6 +138,54 @@ func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 	}
 
 	return jobs, true
+}
+
+var isLiveFeeding = false
+var liveFeedCmd *exec.Cmd
+
+// Demo only!!!
+// E.g., ffmpeg -stream_loop -1 -re -i ed_720p_english_audio.mp4 -c:v copy -c:a copy -f flv rtmp://global-ingest-live.visionular.com/live/202309-a83383e4-7db7-402d-995f-32d8c447f89e
+func start_ffmpeg_live_contribution(spec demo.CreateLiveFeedSpec) error {
+	if isLiveFeeding {
+		fmt.Println("Live feeder is already up")
+		return errors.New("DuplicateLiveFeeding")
+	}
+
+	liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-f", "flv", spec.RtmpIngestUrl)
+	/*fmt.Printf("Path: " + ffmpeg.Path + " ")
+	for _, arg := range ffmpeg.Args {
+		fmt.Printf(arg + " ")
+	}
+	fmt.Printf("\n")*/
+
+	fmt.Println("!!!Starting live feeding...")
+	go func() {
+		err := liveFeedCmd.Start() 
+		if err != nil {
+			fmt.Println("Could not start live feeding: ", err)
+			return
+		} else {
+			isLiveFeeding = true
+		}
+	}()
+
+	return nil
+}
+
+func stop_ffmpeg_live_contribution() {
+	if liveFeedCmd == nil {
+		fmt.Println("Live feeder isn't running")
+		return
+	}
+	
+	process, err1 := os.FindProcess(int(liveFeedCmd.Process.Pid))
+	if err1 != nil {
+		fmt.Printf("Process id = %d not found. Error: %v\n", liveFeedCmd.Process.Pid, err1)
+		return
+	} else {
+		err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
+		fmt.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", liveFeedCmd.Process.Pid,  err2)
+	}
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
@@ -352,6 +404,51 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
+		}
+	} else if strings.Contains(r.URL.Path, "feed") { // Demo ONLY!!!
+		if !(r.Method == "POST" || r.Method == "DELETE") {
+			err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+			fmt.Println(err)
+			http.Error(w, "405 method not allowed\n  Error: "+err, http.StatusMethodNotAllowed)
+			return
+		}
+
+		if r.Method == "POST" {
+			if r.Body == nil {
+				res := "Error: Trying to create live feed without input"
+				fmt.Println(res)
+				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+				return
+			}
+	
+			var live_feed_spec demo.CreateLiveFeedSpec
+			e := json.NewDecoder(r.Body).Decode(&live_feed_spec)
+			if e != nil {
+				res := "Failed to decode live feed spec"
+				fmt.Println("Error happened in JSON marshal (CreateLiveFeedSpec). Err: ", e)
+				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+				return
+			}
+	
+			w.WriteHeader(http.StatusCreated)
+			e = start_ffmpeg_live_contribution(live_feed_spec)
+			/*if e != nil {
+				if e.Error() == "DuplicateLiveFeeding" {
+					res := "Duplicate live feeding"
+					fmt.Println("Err: ", res)
+					http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+					return
+				}
+			}*/
+		} else if r.Method == "DELETE" {
+			if !isLiveFeeding {
+				res := "Live feeder isn't running. Cannot stop!"
+				fmt.Println(res)
+				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+			}
+
+			stop_ffmpeg_live_contribution()
+			w.WriteHeader(http.StatusCreated)
 		}
 	}
 }

@@ -4,6 +4,8 @@ var create_button;
 var stop_button;
 var resume_button;
 var show_button;
+var livefeed_button;
+var stoplivefeed_button;
 var response_code;
 var response_body;
 var job_request;
@@ -114,6 +116,16 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
+    livefeed_button = document.getElementById('livefeed');
+    livefeed_button.addEventListener('click', (event) => {
+        liveFeed();
+    });
+
+    stoplivefeed_button = document.getElementById('stoplivefeed');
+    stoplivefeed_button.addEventListener('click', (event) => {
+        stopLiveFeed();
+    });
+
     show_button = document.getElementById('play');
     show_button.addEventListener('click', (event) => {
         playVideo();
@@ -159,13 +171,65 @@ var showJobTimer = null;
 var playbackTimer = null;
 
 function startShowJobTimer() {
-    window.alert("show job!");
     showJobTimer = setTimeout(showJob, 1000);
 }
 
 /*function startPlaybackTimer() {
     playbackTimer = setTimeout(showJob, 16000);
 }*/
+
+function startLiveFeedTimer() {
+    showJobTimer = setTimeout(liveFeed, 500);
+}
+
+function liveFeed() {
+    let live_feed_url = "http://localhost:1080/feed";
+    let live_feed_req = new XMLHttpRequest();
+    live_feed_req.open("POST", live_feed_url, true);
+    live_feed_req.setRequestHeader("Content-Type", "application/json");
+
+    live_feed_req.onload = function (e) {
+        if (live_feed_req.readyState === live_feed_req.DONE) {
+          if (live_feed_req.status === 201) {
+            response_code.innerHTML = "status code=" + live_feed_req.status
+            livefeed_button.disabled = true
+          } else {
+            console.log("create new live feed failed. Status code:" + create_job_req.status);
+          }
+        }
+    }
+
+    let feed_body = ""
+    if (ingest_url != "") {
+        body = {}
+        body.RtmpIngestUrl = ingest_url
+        feed_body = JSON.stringify(body)
+        live_feed_req.send(feed_body);
+    } else {
+        console.log("create new live feed failed.")
+        return
+    }
+}
+
+function stopLiveFeed() {
+    let stop_live_feed_url = "http://localhost:1080/feed";
+
+    let stop_live_feed_req = new XMLHttpRequest();
+    stop_live_feed_req.open("DELETE", stop_live_feed_url, true);
+
+    stop_live_feed_req.onload = function (e) {
+        if (stop_live_feed_req.readyState === stop_live_feed_req.DONE) {
+          if (stop_live_feed_req.status === 201) {
+            response_code.innerHTML = "status code=" + stop_live_feed_req.status
+            livefeed_button.disabled = false
+          } else {
+            console.log("stop live feed failed. Status code:" + stop_live_feed_req.status);
+          }
+        }
+    }
+    
+    stop_live_feed_req.send();
+}
 
 function showJob() {
     let show_job_url = "http://localhost:1080/jobs/";
@@ -191,7 +255,7 @@ function showJob() {
             response_code.innerHTML = "status code=" + show_job_req.status
             response_body.innerHTML = JSON.stringify(j, null, 2)
 
-            //startPlaybackTimer()
+            startLiveFeedTimer()
             //window.alert(job_resp);
           } else {
             console.log("Show live job failed. Status code:" + show_job_req.status);
@@ -237,6 +301,7 @@ function createJob() {
 
 function cleanup()
 {
+  stopLiveFeed()
   stopJob()
 }
 
