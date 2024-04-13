@@ -13,6 +13,8 @@ var video;
 var job_id;
 var listJobsTimer = null;
 var listJobsInterval = 2000
+var sample_live_job = '{"Input": {"Url": "rtmp://127.0.0.1:1935/live/app"},"Output": {"Stream_type": "dash","Segment_format": "fmp4","Segment_duration": 4,"Low_latency_mode": false,"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Threads": 2,"Gop_size": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Threads": 2,"Gop_size": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var isLivefeeding = false
 
 async function initPlayer() {
     //var urlInput = document.getElementById('url');
@@ -81,16 +83,6 @@ function initApp() {
       // This browser does not have the minimum set of APIs we need.
       console.error('Browser not supported!');
     }
-  
-    /*var urlInput = document.getElementById('url');
-    urlInput.addEventListener('change', (event) => {
-          manifestUri = event.target.value;
-    });
-  
-    var urlButton = document.getElementById('load-url');
-    urlButton.addEventListener('click', (event) => {
-      reloadPlayer();
-    });*/
 }
 
 window.addEventListener("DOMContentLoaded", (event) => {
@@ -155,9 +147,9 @@ var cfg =
 };
 
 if (Hls.isSupported()) {
-    var aurora_stats_hls = new Hls(cfg);
-    aurora_stats_hls.attachMedia(video);
-    aurora_stats_hls.loadSource(playback_url);
+    var stats_hls = new Hls(cfg);
+    stats_hls.attachMedia(video);
+    stats_hls.loadSource(playback_url);
 } else {
     window.alert("HLS not supported");
 }
@@ -193,6 +185,7 @@ function liveFeed() {
           if (live_feed_req.status === 201) {
             response_code.innerHTML = "status code=" + live_feed_req.status
             livefeed_button.disabled = true
+            isLivefeeding = true
           } else {
             console.log("create new live feed failed. Status code:" + create_job_req.status);
           }
@@ -212,6 +205,10 @@ function liveFeed() {
 }
 
 function stopLiveFeed() {
+    if (!isLivefeeding) {
+        return
+    }
+
     let stop_live_feed_url = "http://localhost:1080/feed";
 
     let stop_live_feed_req = new XMLHttpRequest();
@@ -293,14 +290,16 @@ function createJob() {
     let job_body = ""
     if (job_request.value != "") {
         job_body = job_request.value;
+    } else {
+        j = JSON.parse(sample_live_job)
+        job_body = JSON.stringify(j)
+        job_request.innerHTML = JSON.stringify(j, null, 2)
     }
     
     create_job_req.send(job_body);
-    //hls.loadSource(manifestUri_aurora_stats);
 }
 
-function cleanup()
-{
+function cleanup() {
   stopLiveFeed()
   stopJob()
 }
