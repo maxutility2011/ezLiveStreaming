@@ -209,7 +209,6 @@ function stopLiveFeed() {
     }
 
     let stop_live_feed_url = "http://localhost:1080/feed";
-
     let stop_live_feed_req = new XMLHttpRequest();
     stop_live_feed_req.open("DELETE", stop_live_feed_url, true);
 
@@ -289,6 +288,12 @@ function createJob() {
     let job_body = ""
     if (job_request.value != "") {
         job_body = job_request.value;
+        try {
+            JSON.parse(job_body)
+        } catch (e) {
+            window.alert("Invalid JSON")
+            return
+        }
     } else {
         j = JSON.parse(sample_live_job)
         job_body = JSON.stringify(j)

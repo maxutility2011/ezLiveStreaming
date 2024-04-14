@@ -494,6 +494,7 @@ func createWorker(wkr models.WorkerInfo) (error, string) {
 	w.Registered_at = time.Now()
 	w.Info = wkr
 	w.State = models.WORKER_STATE_IDLE
+	w.LastHeartbeatTime = time.Now() // Treat registerWorker request as the 1st heartbeat.
 
 	e := createUpdateWorker(w)
 	if e != nil {
@@ -692,7 +693,8 @@ func check_worker_heartbeat() error {
 			w.State = models.WORKER_STATE_NOTAVAILABLE
 		} 
 		
-		if (time_lastHeartbeat != 0 && time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
+		// time_lastHeartbeat is first set when the worker is registered.
+		if (time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_removal * hbinterval / 1000000)) {
 			stopWorkerJobs(w.Id)
 			e, wid := removeWorker(w.Id)
 			if e != nil {

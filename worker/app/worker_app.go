@@ -456,7 +456,7 @@ func sendHeartbeat() error {
 	hb.LastHeartbeatTime = time.Now()
 	b, _ := json.Marshal(hb)
 
-	Log.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
+	fmt.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
 	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
 	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
     if err != nil {
@@ -492,7 +492,7 @@ func registerWorker(conf WorkerAppConfig) error {
 	
 	b, _ := json.Marshal(new_worker_request)
 
-	fmt.Println("Registering new worker at: ", register_new_worker_url) 
+	fmt.Println("Registering new worker at: ", register_new_worker_url, " at time = ", time.Now()) 
 	req, err := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
     if err != nil {
         fmt.Println("Error: Failed to POST to: ", register_new_worker_url)
