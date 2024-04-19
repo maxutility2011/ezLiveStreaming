@@ -1,7 +1,4 @@
 {
-        "Input": {
-            "Url": "rtmp://172.17.0.3:1935/live/app"
-        },
         "Output": {
             "Stream_type": "dash",
             "Segment_format": "fmp4",

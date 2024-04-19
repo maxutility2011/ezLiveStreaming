@@ -395,8 +395,12 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
+func checkIngestActiveness() {
+	
+}
+
 func checkJobStatus() {
-	fmt.Println("Checking job status... Number of running jobs = ", running_jobs.Len())
+	//fmt.Println("Checking job status... Number of running jobs = ", running_jobs.Len())
 	var job_report models.WorkerJobReport
 	var prev_e *list.Element
 	var jobProcessFound bool
@@ -456,7 +460,7 @@ func sendHeartbeat() error {
 	hb.LastHeartbeatTime = time.Now()
 	b, _ := json.Marshal(hb)
 
-	fmt.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
+	//fmt.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
 	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
 	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
     if err != nil {
