@@ -1,5 +1,23 @@
 # ezliveStreaming
-A work-in-progress live transcoding and streaming service. 
+ezliveStreaming is a highly scalable and efficient live transcoding system written in Go. ezliveStreaming provides simple API methods for users to submit and manage live transcoding requests to the system via HTTP. The requests specify how the user want her live streams to be transcoded and streamed, e.g., the transcoding video/audio codec, output video resolution, bitrate, frame rate and delivery format such as Apple-HLS or MPEG-DASH, etc. ezliveStreaming outputs and uploads audio/video segments and manifests/playlists to the origin streaming server for delivery. ezliveStreaming is designed to be highly scalable, reliable and resource efficient. This repository also includes a simple transcoding UI for demo purposes. ezliveStreaming uses FFmpeg for live video transcoding and packaging.
+
+What can ezliveStreaming do?
+
+Answer: live Adaptative BitRate (ABR) transcoding, HLS/DASH streaming, live transcoding API, DRM protection (to be supported), standard-compliant media transcoding and packaging which potentially work with any video players.
+
+High-level architecture
+
+ezliveStreaming consists of 4 microservices that can be independently scaled,
+- An API server
+- A live job scheduler
+- A cluster of live transcoding worker
+- Redis data store
+
+The API server exposes API endpoints to users for submitting and managing live jobs. The API server receives job requests from users and sends them to the job scheduler via a job queue (AWS Simple Queue Service). The API server uses a stateless design which does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store.
+
+The job scheduler fetches a job from AWS SQS and assign it to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment. The job scheduler is responsible for managing a live job throughout its lifecycle, for examplem, assigning the job, monitoring its status, restarting/reassigning the job if it fails for any reason. The job scheduler also manages a cluster of transcoding workers.
+
+A live transcoding worker receives a live job from the job scheduler and launches a FFmpeg transcoder to carry out the job. Specifically, the worker launches a FFmpeg transcoder that ingest an incoming live input stream. The input stream can be a RTMP or SRT stream (Currently, ezliveStreaming only supports RTMP ingest). The FFmpeg transcoder takes the user-specified parameters to transcode the input to multiple outputs with different bitrates. 
 
 api_server/ contains the implementation of a live streaming api server which accepts requests to create live channels, parse the requests and schedule live workers to fulfill the requests.
 
