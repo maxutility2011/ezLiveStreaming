@@ -23,50 +23,47 @@ POST /jobs
 Request body: JSON string representing the live job specification
 ```
 {
-        "Input": {
-            "Url": "rtmp://127.0.0.1:1935/live/app"
-        },
-        "Output": {
-            "Stream_type": "dash",
-            "Segment_format": "fmp4",
-            "Segment_duration": 4,
-            "Low_latency_mode": false,
-            "Video_outputs": [
-                {
-                    "Label": "video365k",
-                    "Codec": "h264",
-                    "Framerate": 25,
-                    "Width": 640,
-                    "Height": 360,
-                    "Bitrate": "365k",
-                    "Max_bitrate": "500k",
-                    "Buf_size": "500k",
-                    "Preset": "faster",
-                    "Threads": 2,
-                    "Gop_size": 2
-                },
-                {
-                    "Label": "video550k",
-                    "Codec": "h264",
-                    "Framerate": 25,
-                    "Width": 768,
-                    "Height": 432,
-                    "Bitrate": "550k",
-                    "Max_bitrate": "750k",
-                    "Buf_size": "750k",
-                    "Preset": "faster",
-                    "Threads": 2,
-                    "Gop_size": 2
-                }
-            ],
-            "Audio_outputs": [
-                {
-                    "Codec": "aac",
-                    "Bitrate": "128k"
-                }
-            ]
-        }
+    "Output": {
+        "Stream_type": "dash",
+        "Segment_format": "fmp4",
+        "Segment_duration": 4,
+        "Low_latency_mode": false,
+        "Video_outputs": [
+            {
+                "Label": "video365k",
+                "Codec": "h264",
+                "Framerate": 25,
+                "Width": 640,
+                "Height": 360,
+                "Bitrate": "365k",
+                "Max_bitrate": "500k",
+                "Buf_size": "500k",
+                "Preset": "faster",
+                "Threads": 2,
+                "Gop_size": 2
+            },
+            {
+                "Label": "video550k",
+                "Codec": "h264",
+                "Framerate": 25,
+                "Width": 768,
+                "Height": 432,
+                "Bitrate": "550k",
+                "Max_bitrate": "750k",
+                "Buf_size": "750k",
+                "Preset": "faster",
+                "Threads": 2,
+                "Gop_size": 2
+            }
+        ],
+        "Audio_outputs": [
+            {
+                "Codec": "aac",
+                "Bitrate": "128k"
+            }
+        ]
     }
+}
 ```
 Response code on success: 201 created
 Response body: on success, the server returns the original request body, plus the created job ID, timestamps and job states.
