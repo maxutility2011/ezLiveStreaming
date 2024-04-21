@@ -1,4 +1,6 @@
 {
+    "Server_hostname": "0.0.0.0",
+    "Server_port": "80",
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },

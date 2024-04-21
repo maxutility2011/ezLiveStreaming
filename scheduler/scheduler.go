@@ -26,6 +26,8 @@ type SqsConfig struct {
 }
 
 type SchedulerConfig struct {
+	Server_hostname string
+	Server_port string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
 }
@@ -712,9 +714,9 @@ func check_worker_heartbeat() error {
 }
 
 // TODO: We should NOT save received jobs in memory. They should be saved in a distributed data store.
-var server_ip = "0.0.0.0"
+var server_hostname = "0.0.0.0"
 var server_port = "80" 
-var server_addr = server_ip + ":" + server_port
+var server_addr string
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("----------------------------------------")
@@ -917,6 +919,15 @@ func main() {
 	}(ticker)
 
 	http.HandleFunc("/", main_server_handler)
+	if scheduler_config.Server_hostname != "" {
+		server_hostname = scheduler_config.Server_hostname
+	}
+
+	if scheduler_config.Server_port != "" {
+		server_port = scheduler_config.Server_port
+	}
+
+	server_addr = server_hostname + ":" + server_port
     fmt.Println("API server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 
