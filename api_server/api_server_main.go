@@ -25,6 +25,8 @@ type SqsConfig struct {
 }
 
 type ApiServerConfig struct {
+	Server_hostname string
+	Server_port string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
 }
@@ -451,9 +453,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var server_ip = "0.0.0.0"
+var server_hostname = "0.0.0.0"
 var server_port = "1080" 
-var server_addr = server_ip + ":" + server_port
+var server_addr string
 var Log *log.Logger
 var server_config_file_path = "config.json"
 var sqs_sender job_sqs.SqsSender
@@ -488,6 +490,15 @@ func main() {
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
 
+	if server_config.Server_hostname != "" {
+		server_hostname = server_config.Server_hostname
+	}
+
+	if server_config.Server_port != "" {
+		server_port = server_config.Server_port
+	}
+	
+	server_addr = server_hostname + ":" + server_port
     fmt.Println("API server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 }
