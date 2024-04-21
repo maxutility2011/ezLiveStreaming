@@ -21,6 +21,7 @@ The API server exposes API endpoints to users for submitting and managing live t
 Creating a new live transcoding request (a.k.a. live transcoding job or live job)
 POST /jobs 
 Request body: JSON string representing the live job specification
+```
 {
         "Input": {
             "Url": "rtmp://127.0.0.1:1935/live/app"
@@ -66,7 +67,7 @@ Request body: JSON string representing the live job specification
             ]
         }
     }
-
+```
 Response code on success: 201 created
 Response body: on success, the server returns the original request body, plus the created job ID, timestamps and job states.
 
