@@ -18,9 +18,9 @@ The API server exposes API endpoints to users for submitting and managing live t
 ## List of API methods
 
 ### Create Job
-Creating a new live transcoding request (a.k.a. live transcoding job or live job)
-POST /jobs 
-Request body: JSON string representing the live job specification
+Creating a new live transcoding request (a.k.a. live transcoding job or live job) <br>
+POST /jobs <br>
+Request body: JSON string representing the live job specification <br>
 ```
 {
     "Output": {
@@ -65,40 +65,38 @@ Request body: JSON string representing the live job specification
     }
 }
 ```
-Response code on success: 201 created
-Response body: on success, the server returns the original request body, plus the created job ID, timestamps and job states.
+Response code on success: 201 created <br>
+Response body: on success, the server returns the original request body, plus the created job ID, timestamps and job states. <br>
 
 ### Get all the jobs
-Show all the jobs including currently running ones and already finished ones. 
-
-GET /jobs 
-Request body: None
-Response code on success: 200 OK
-Response body: A JSON array that lists all the jobs
+Show all the jobs including currently running ones and already finished ones. <br>
+GET /jobs <br>
+Request body: None <br>
+Response code on success: 200 OK <br>
+Response body: A JSON array that lists all the jobs <br>
 
 ### Get one job
-Show a single job given by its ID
-
-GET /jobs/[job_id]
-Request body: None
-Response code on success: 200 OK
-Response body: the requested job 
+Show a single job given by its ID. <br>
+GET /jobs/[job_id] <br>
+Request body: None <br>
+Response code on success: 200 OK <br>
+Response body: the requested job <br>
 
 ### Stop a job
-Stop a job given by its ID. Upon request, the job states will remain in Redis, but the worker_transcoder and ffmpeg instance will be stopped. The job ID, stream key and all the transcoding and packaging parameters remain the same when the job is resumed in the future.
+Stop a job given by its ID. Upon request, the job states will remain in Redis, but the worker_transcoder and ffmpeg instance will be stopped. The job ID, stream key and all the transcoding and packaging parameters remain the same when the job is resumed in the future. <br>
 
-PUT /jobs/[job_id]
-Request body: None
-Response code on success: 202 Accepted
-Response body: None
+PUT /jobs/[job_id] <br>
+Request body: None <br>
+Response code on success: 202 Accepted <br>
+Response body: None <br>
 
 ### Resume a job
-Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder and ffmpeg instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused.
+Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder and ffmpeg instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
 
-PUT /jobs/[job_id]
-Request body: None
-Response code on success: 202 Accepted
-Response body: None
+PUT /jobs/[job_id] <br>
+Request body: None <br>
+Response code on success: 202 Accepted <br>
+Response body: None <br>
 
 The job scheduler periodically poll the job queue and fetches a job from AWS SQS and assign it to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment, etc. The job scheduler is responsible for managing a live job throughout its lifecycle, for examplem, assigning the job to a worker, monitoring its status, restarting/reassigning the job if it fails for any reason. The job scheduler also manages a cluster of transcoding workers.
 
@@ -108,21 +106,21 @@ A live transcoding worker receives a live job from the job scheduler and launche
 
 api_server/ contains the implementation of a live streaming api server which accepts requests to create live channels, parse the requests and schedule live workers to fulfill the requests.
 
-demo/ provides source code of a simple UI demo.
+demo/ provides source code of a simple UI demo. <br>
 
-job/ contains definition of api requests and live job states, and the FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job.
+job/ contains definition of api requests and live job states, and the FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job. <br>
 
-job_sqs/ contains the implementation of a AWS Simple Queue Service (SQS) sender and receiver. The api_server sends new live jobs to the job queue (AWS SQS). The job scheduler periodically polls the job queue to receive new jobs.
+job_sqs/ contains the implementation of a AWS Simple Queue Service (SQS) sender and receiver. The api_server sends new live jobs to the job queue (AWS SQS). The job scheduler periodically polls the job queue to receive new jobs. <br>
 
-model/ contains various model definitions.
+model/ contains various model definitions. <br>
 
-redis_client/ implements a redis client.
+redis_client/ implements a redis client. <br>
 
-scheduler/ contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes HTTP endpoints and receives new live worker registration requests from newly launched workers.
+scheduler/ contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes HTTP endpoints and receives new live worker registration requests from newly launched workers. <br>
 
-worker/ contains the implementation of live transcoding/streaming workers. The file app/worker_app.go implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (worker/transcoder/worker_transcode.go) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc.
+worker/ contains the implementation of live transcoding/streaming workers. The file app/worker_app.go implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (worker/transcoder/worker_transcode.go) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc. <br>
 
-sample_live_job.json contains a sample live job request.
+sample_live_job.json contains a sample live job request. <br>
 
 There are four executables, api_server, job scheduler and worker_app, worker_transcoder. The entire live transcoding system may consist of a cluster of api_server, a cluster of job scheduler, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "upstream" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which can handle live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the job queue and Redis. 
 
