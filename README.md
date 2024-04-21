@@ -18,6 +18,8 @@ ezliveStreaming consists of 4 microservices that can be independently scaled,
 - live transcoding worker
 - **Redis** data store
 
+![screenshot](architecture_diagram.png)
+
 The API server exposes API endpoints to users for submitting and managing live transcoding jobs. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store.
 
 ## List of API methods
