@@ -153,11 +153,35 @@ On each live worker VM, there runs one instance of worker_app which manages all 
 
 # Build and run
 
-To build api_server, go to *api_server/*  and run "*go build api_server_main.go*", then start the server by running "*./api_server_main*". api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
+To build api_server, go to *api_server/* and run 
+```
+*go build api_server_main.go*
+```
+then start the server by running
+```
+*./api_server_main*"
+``` 
+api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
 
-To build the job scheduler, go to *scheduler/* and run "*go build scheduler.go*", then start the job scheduler by running "*./scheduler*". Job scheduler does not take any arguments. You can set the hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
+To build the job scheduler, go to *scheduler/* and run 
+```
+go build scheduler.go
+``` 
+then start the job scheduler by running 
+```
+./scheduler
+``` 
+Job scheduler does not take any arguments. You can set the hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
 
-To build worker_app, go to *worker/app/* and run "*go build worker_app.go*", then start the worker by running "*./worker_app -config=worker_app_config.json*". The "*-config*" argument specifies the path to the worker_app configuration file. In the *worker_app_config.json*, you can configure,
+To build worker_app, go to *worker/app/* and run 
+```
+go build worker_app.go
+``` 
+then start the worker by running 
+```
+./worker_app -config=worker_app_config.json
+```
+The "*-config*" argument specifies the path to the worker_app configuration file. In the *worker_app_config.json*, you can configure,
 - the hostname and network port of the worker_app. 
 - the URL of the job scheduler. The worker_app sends heartbeat, reports status of jobs via this URL.
 - the IP address or hostname, and network port of the worker VM on which the worker_app runs.
@@ -165,13 +189,17 @@ To build worker_app, go to *worker/app/* and run "*go build worker_app.go*", the
 You can write your own docker compose file and/or scripts to automate the deployment of your api_server cluster, the job scheduler cluster, the worker cluster and Redis cluster. I'm also working on providing a sample docker compose file.
 
 You need to configure AWS access to allow the api_server and job scheduler to access AWS SQS - the job queue. Specifically, you need to configure the following environment variables,
+```
 - "export AWS_ACCESS_KEY_ID=[your_aws_access_key]"
 - "export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]"
 - "export AWS_DEFAULT_REGION=[your_default_aws_region]" (optional)
+```
 
 Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
+```
 - "export PATH=[path_to_your_worker_transcoder_binary]]:$PATH"
 - "export PATH=[path_to_your_ffmpeg_binary]]:$PATH"
+```
 
 You may also configure path to api_server and job scheduler.
 
