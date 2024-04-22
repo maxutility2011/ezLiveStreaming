@@ -258,3 +258,5 @@ Next, click the "Create" button to create a new live stream. The default job req
 
 ![screenshot](diagrams/demo_step3.png)
 
+To stop the demo, you may click the "Stop" button or simply reload the demo page. When you reload the page, the demo program will send a stop_job request to api_server to stop the live stream and stop the worker_transcoder/ffmpeg instance running on the live worker.
+
