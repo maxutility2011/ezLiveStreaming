@@ -190,15 +190,15 @@ You can write your own docker compose file and/or scripts to automate the deploy
 
 You need to configure AWS access to allow the api_server and job scheduler to access AWS SQS - the job queue. Specifically, you need to configure the following environment variables,
 ```
-- "export AWS_ACCESS_KEY_ID=[your_aws_access_key]"
-- "export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]"
-- "export AWS_DEFAULT_REGION=[your_default_aws_region]" (optional)
+export AWS_ACCESS_KEY_ID=[your_aws_access_key]
+export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]
+export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
 ```
 
 Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
 ```
-- "export PATH=[path_to_your_worker_transcoder_binary]]:$PATH"
-- "export PATH=[path_to_your_ffmpeg_binary]]:$PATH"
+export PATH=[path_to_your_worker_transcoder_binary]]:$PATH
+export PATH=[path_to_your_ffmpeg_binary]]:$PATH
 ```
 
 You may also configure path to api_server and job scheduler.
