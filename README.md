@@ -166,3 +166,21 @@ You may also configure path to api_server and job scheduler.
 After building the project (go build api_server_main.go, go build scheduler.go, go build worker_main.go), start the api_server by "*./api_server*". The server will run on port 1080 and in its own docker container. I'm still building the container, https://hub.docker.com/repository/docker/maxutility2011/live_streaming_api/general. To submit a live job request, you may use postman to send a POST request to "http://localhost:1080/jobs" (the API endpoint. I'm testing on localhost, but feel free to host the api server anywhere). The request body is the content of live_job.json. The live worker will run also inside a docker container that I'm still building, https://hub.docker.com/repository/docker/maxutility2011/live_streaming_worker/general. 
 
 To run the api_server, run "*./api_server*". To run the scheduler, run "*./scheduler*". The live job workers should be launched and managed by the cloud autoscaling algorithm. A newly launched worker should be registered with the job scheduler, then it becomes ready to be assigned new jobs.
+
+# List of Redis data structures
+## "jobs": 
+All live jobs - REDIS_KEY_ALLJOBS in redis_client/redis_client.go
+**Data structure**: hash table
+**key**: job id
+**value**: "type LiveJob struct" in job/job.go
+
+## "queued_jobs": 
+Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled - REDIS_KEY_ALLJOBS in redis_client/redis_client.go
+**Data structure**: list
+**value**: "type LiveJob struct" in job/job.go
+
+## "worker_loads": 
+The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go
+**Data structure**: hash table
+**key**: worker id
+**value**: "type LiveWorker struct" in models/worker.go
