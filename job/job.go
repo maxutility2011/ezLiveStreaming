@@ -35,6 +35,7 @@ type LiveJobOutputSpec struct {
 
 type LiveJobInputSpec struct {
 	Url string 
+	JobUdpPortBase int
 }
 
 type LiveJobSpec struct {

@@ -308,6 +308,14 @@ func createIngestUrl(job job.LiveJob) error {
 
 func launchJob(j job.LiveJob) error {
 	j.Spec.Input.Url = j.RtmpIngestUrl
+	total_outputs := 0
+	for e := running_jobs.Front(); e != nil; e = e.Next() {
+		j = RunningJob(e.Value.(RunningJob))
+		total_outputs += j.Job.Spec.Output.Video_outputs
+	}
+
+	j.Spec.Input.JobUdpPortBase = worker_app_config.WorkerUdpPortBase + total_outputs
+	
 	b, err := json.Marshal(j.Spec)
 	if err != nil {
 		fmt.Println("Failed to marshal job output (launchJob). Error: ", err)

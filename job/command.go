@@ -16,6 +16,8 @@ import (
 )
 
 const RTMP = "rtmp"
+const MPEGTS = "mpegts"
+const udp_port_base = 10001
 const HLS = "hls"
 const DASH = "dash"
 const H264_CODEC = "h264"
@@ -29,6 +31,125 @@ const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
 }
+
+/*
+func JobSpecToFFmpegArgs(j LiveJobSpec, ffmpeg_output_path string) []string {
+    var ffmpegArgs []string 
+    if strings.Contains(j.Input.Url, RTMP) {
+        ffmpegArgs = append(ffmpegArgs, "-f")
+        ffmpegArgs = append(ffmpegArgs, "flv")
+
+    	ffmpegArgs = append(ffmpegArgs, "-listen")
+    	ffmpegArgs = append(ffmpegArgs, "1")
+	}
+
+    ffmpegArgs = append(ffmpegArgs, "-i")
+    ffmpegArgs = append(ffmpegArgs, j.Input.Url)
+
+	kf := "expr:gte(t,n_forced*"
+	kf += strconv.Itoa(j.Output.Segment_duration)
+	kf += ")"
+
+	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+    ffmpegArgs = append(ffmpegArgs, kf)
+
+	port_base := j.Input.JobUdpPortBase
+	// Video encoding params
+	for i := range j.Output.Video_outputs {
+		vo := j.Output.Video_outputs[i]
+
+		ffmpegArgs = append(ffmpegArgs, "-map")
+		ffmpegArgs = append(ffmpegArgs, "v:0")
+
+		s := "-s:"
+		s += strconv.Itoa(i)
+		ffmpegArgs = append(ffmpegArgs, s)
+
+		resolution := strconv.Itoa(vo.Width)
+		resolution += "x"
+		resolution += strconv.Itoa(vo.Height)
+		ffmpegArgs = append(ffmpegArgs, resolution)
+
+		ffmpegArgs = append(ffmpegArgs, "-c:v")
+		if vo.Codec == H264_CODEC {
+			ffmpegArgs = append(ffmpegArgs, FFMPEG_H264)
+		} else if vo.Codec == H265_CODEC {
+			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
+		}
+
+		var h26xProfile string
+		if vo.Height <= 480 {
+			h26xProfile = "baseline"
+		} else if vo.Height > 480 && vo.Height <= 720 {
+			h26xProfile = "main"
+		} else if vo.Height > 720 {
+			h26xProfile = "high"
+		}
+
+		ffmpegArgs = append(ffmpegArgs, "-profile:v")
+		ffmpegArgs = append(ffmpegArgs, h26xProfile)
+
+		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
+			bv := "-b:v:"
+			bv += strconv.Itoa(i)
+			ffmpegArgs = append(ffmpegArgs, bv)
+			ffmpegArgs = append(ffmpegArgs, vo.Bitrate)
+
+			ffmpegArgs = append(ffmpegArgs, "-maxrate")
+			ffmpegArgs = append(ffmpegArgs, vo.Max_bitrate)
+
+			ffmpegArgs = append(ffmpegArgs, "-bufsize")
+			ffmpegArgs = append(ffmpegArgs, vo.Buf_size)
+		} else if vo.Bitrate != "" && vo.Max_bitrate == "" && vo.Buf_size == "" {
+			bv := "-b:v:"
+			bv += strconv.Itoa(i)
+			ffmpegArgs = append(ffmpegArgs, bv)
+			ffmpegArgs = append(ffmpegArgs, vo.Bitrate)
+		}
+
+		if vo.Preset != "" {
+			ffmpegArgs = append(ffmpegArgs, "-preset")
+			ffmpegArgs = append(ffmpegArgs, vo.Preset)
+		}
+
+		if vo.Threads != 0 {
+			ffmpegArgs = append(ffmpegArgs, "-threads")
+			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Threads))
+		}
+
+		ffmpegArgs = append(ffmpegArgs, "-f")
+		ffmpegArgs = append(ffmpegArgs, MPEGTS)
+		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:")
+		ffmpegArgs = append(ffmpegArgs, strconv.Itoa(port_base + i))
+	}
+
+	// Audio encoding params
+	if len(j.Output.Audio_outputs) == 0 {
+		ffmpegArgs = append(ffmpegArgs, "-an")
+	} else {
+		for i := range j.Output.Audio_outputs {
+			ao := j.Output.Audio_outputs[i]
+
+			ffmpegArgs = append(ffmpegArgs, "-map")
+			ffmpegArgs = append(ffmpegArgs, "a:0")
+
+			ffmpegArgs = append(ffmpegArgs, "-c:a")
+			if ao.Codec == AAC_CODEC {
+				ffmpegArgs = append(ffmpegArgs, AAC_CODEC)
+			} else if ao.Codec == MP3_CODEC {
+				ffmpegArgs = append(ffmpegArgs, MP3_CODEC)
+			}
+
+			ffmpegArgs = append(ffmpegArgs, "-b:a")
+			ffmpegArgs = append(ffmpegArgs, ao.Bitrate)
+		}
+	}
+}
+
+func JobSpecToShakaPackagerArgs(j LiveJobSpec, ffmpeg_output_path string) []string {
+
+}
+*/
 
 // Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
 // Regular latency: 
