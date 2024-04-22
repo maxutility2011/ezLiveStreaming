@@ -197,18 +197,18 @@ export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
 
 Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
 ```
-export PATH=[path_to_your_worker_transcoder_binary]]:$PATH
-export PATH=[path_to_your_ffmpeg_binary]]:$PATH
+export PATH=[path_to_your_worker_transcoder_binary]:$PATH
+export PATH=[path_to_your_ffmpeg_binary]:$PATH
 ```
 
 You may also configure path to api_server and job scheduler.
 
 Here are a list of docker images that I have created or used for building ezLiveStreaming,
-- **live_streaming_api**: https://hub.docker.com/repository/docker/maxutility2011/live_streaming_api/general.  
+- **ezlivestreaming_server**: https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_server  
 
 This is for hosting both the api_server and job scheduler.
 
-- **live_streaming_worker**: https://hub.docker.com/repository/docker/maxutility2011/live_streaming_worker/general. 
+- **ezlivestreaming_worker**: https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_worker
 
 This is for hosting a single live worker including the worker_app and multiple instances of worker_transcoder.
 
