@@ -151,6 +151,8 @@ There are four executables, **api_server**, **job scheduler** and **worker_app**
 
 On each live worker VM, there runs one instance of worker_app which manages all the live jobs running on the VM. Each live job is executed by one instance of worker_transcoder which coordinates the live transcoder and the live packager to ingest, transcode and package the HLS/DASH live output stream. worker_app is a long-standing daemon while worker_transcoder only lives when a live job is still alive.
 
+# Build and run
+
 To build api_server, go to *api_server/*  and run "*go build api_server_main.go*", then start the server by running "*./api_server_main*". api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
 
 To build the job scheduler, go to *scheduler/* and run "*go build scheduler.go*", then start the job scheduler by running "*./scheduler*". Job scheduler does not take any arguments. You can set the hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
