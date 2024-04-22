@@ -75,6 +75,8 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 **Response code** on success: 201 created <br>
 **Response body**: on success, the server returns the original request body, plus the created job ID, timestamps and job states. <br>
 
+![screenshot](create_job.png)
+
 ### Get all the jobs
 Show all the jobs including currently running ones and already finished ones. <br>
 **GET /jobs** <br>
@@ -89,6 +91,8 @@ Show a single job given by its ID. <br>
 **Response code** on success: 200 OK <br>
 **Response body**: the requested job <br>
 
+![screenshot](get_job.png)
+
 ### Stop a job
 Stop a job given by its ID. Upon request, the job states will remain in Redis, but the worker_transcoder and ffmpeg instance will be stopped. The job ID, stream key and all the transcoding and packaging parameters remain the same when the job is resumed in the future. <br>
 
@@ -97,6 +101,8 @@ Stop a job given by its ID. Upon request, the job states will remain in Redis, b
 **Response code** on success: 202 Accepted <br>
 **Response body**: None <br>
 
+![screenshot](stop_job.png)
+
 ### Resume a job
 Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder and ffmpeg instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
 
@@ -104,6 +110,8 @@ Resume a job given by its ID. Upon request, the stopped job will be resumed. A n
 **Request body**: None <br>
 **Response code** on success: 202 Accepted <br>
 **Response body**: None <br>
+
+![screenshot](resume_job.png)
 
 The job scheduler periodically poll the job queue and fetches a job from AWS SQS and assign it to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment, etc. The job scheduler is responsible for managing a live job throughout its lifecycle, for examplem, assigning the job to a worker, monitoring its status, restarting/reassigning the job if it fails for any reason. The job scheduler also manages a cluster of transcoding workers.
 
