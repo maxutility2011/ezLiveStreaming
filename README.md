@@ -245,7 +245,7 @@ Tis demo integrates with the Shaka player (https://github.com/shaka-project/shak
 location / {
     root   /var/www/html;
     index  index.html index.htm;
-    **add_header 'Access-Control-Allow-Origin' '*';**
+    add_header 'Access-Control-Allow-Origin' '*';
 }
 ```
 
