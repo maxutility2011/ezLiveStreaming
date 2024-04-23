@@ -6,7 +6,6 @@ ezLiveStreaming is designed to be highly scalable, reliable and resource efficie
 
 ## What can ezLiveStreaming do?
 
-Answer: 
 - live Adaptative BitRate (ABR) transcoding, 
 - HLS/DASH streaming, 
 - live transcoding API,
@@ -194,6 +193,8 @@ export AWS_ACCESS_KEY_ID=[your_aws_access_key]
 export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]
 export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
 ```
+
+Please remember to create your own SQS queue first, and put the queue name in the api_server and scheduler config file.
 
 Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
 ```
