@@ -25,8 +25,10 @@ type SqsConfig struct {
 }
 
 type ApiServerConfig struct {
-	Server_hostname string
-	Server_port string
+	Api_server_hostname string
+	Api_server_port string
+	Origin_server_hostname string
+        Origin_server_port string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
 }
@@ -42,7 +44,7 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Id = uuid.New().String()
 	
 	lj.StreamKey = assignJobInputStreamId()
-	lj.Playback_url = "http://" + server_config.Server_hostname + ":4080/output_" + lj.Id + "/1.mpd" // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+	lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/output_" + lj.Id + "/1.mpd" // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 
 	//j.IngestUrls = make([]string)
 	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
@@ -200,6 +202,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=ascii")
   	w.Header().Set("Access-Control-Allow-Origin", "*")
   	w.Header().Set("Access-Control-Allow-Headers","Content-Type,access-control-allow-origin, access-control-allow-headers")
+	w.Header().Set("Access-Control-Allow-Methods", "*")
 
 	if (*r).Method == "OPTIONS" {
         return
@@ -490,12 +493,12 @@ func main() {
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
 
-	if server_config.Server_hostname != "" {
-		server_hostname = server_config.Server_hostname
+	if server_config.Api_server_hostname != "" {
+		server_hostname = server_config.Api_server_hostname
 	}
 
-	if server_config.Server_port != "" {
-		server_port = server_config.Server_port
+	if server_config.Api_server_port != "" {
+		server_port = server_config.Api_server_port
 	}
 	
 	server_addr = server_hostname + ":" + server_port

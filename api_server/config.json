@@ -1,11 +1,13 @@
 {
-    "server_hostname": "0.0.0.0",
-    "server_port": "1080",
+    "Api_server_hostname": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "Api_server_port": "1080",
+    "Origin_server_hostname": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "Origin_server_port": "4080", 
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },
     "Redis": {
-        "RedisIp": "172.17.0.4",
+        "RedisIp": "127.0.0.1",
         "RedisPort": "6379"
     }
 }

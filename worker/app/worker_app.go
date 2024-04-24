@@ -297,7 +297,7 @@ func createIngestUrl(job job.LiveJob) error {
 		err = errors.New("NotEnoughRtmpIngestPort")
 	} else {
 		job.RtmpIngestPort = rtmp_ingest_port
-		job.RtmpIngestUrl = "rtmp://" + "0.0.0.0" + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
 		// job.SrtIngestUrl = ...
 		// job.RtpIngestUrl = ...
 	}

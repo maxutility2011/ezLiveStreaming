@@ -107,6 +107,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
+	/*
     livefeed_button = document.getElementById('livefeed');
     livefeed_button.addEventListener('click', (event) => {
         liveFeed();
@@ -116,6 +117,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
     stoplivefeed_button.addEventListener('click', (event) => {
         stopLiveFeed();
     });
+	*/
 
     show_button = document.getElementById('play');
     show_button.addEventListener('click', (event) => {
@@ -130,6 +132,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
     
     job_request = document.getElementById('job_request');
     
+    job_essentials.innerHTML = "Playback URL and RTMP ingest URL will be shown after clicking the Create button. Please push your live feed to the RTMP ingest URL. After you start feeding the live channel, wait 15 secs then hit the Play button to play your channel."
     video = document.getElementById('video');
 });
     

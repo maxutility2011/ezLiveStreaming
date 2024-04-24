@@ -1,11 +1,11 @@
 {
     "Server_hostname": "0.0.0.0",
-    "Server_port": "80",
+    "Server_port": "3080",
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },
     "Redis": {
-        "RedisIp": "172.17.0.4",
+        "RedisIp": "127.0.0.1",
         "RedisPort": "6379"
     }
 }
