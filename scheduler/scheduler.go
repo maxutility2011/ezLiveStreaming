@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"github.com/google/uuid"
-    //"log"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
 	"ezliveStreaming/models"
@@ -931,6 +930,5 @@ func main() {
     fmt.Println("API server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 
-	fmt.Println("Job scheduler started...")
 	<-quit
 }

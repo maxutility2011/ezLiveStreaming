@@ -1,5 +1,6 @@
-var playback_url = "http://localhost:4080/ezliveStreaming/1.mp4";
-var ingest_url = ""
+var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";
+var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
+var ingest_url = "";
 var create_button;
 var stop_button;
 var resume_button;
@@ -13,7 +14,7 @@ var video;
 var job_id;
 var listJobsTimer = null;
 var listJobsInterval = 2000
-var sample_live_job = '{"Input": {"Url": "rtmp://127.0.0.1:1935/live/app"},"Output": {"Stream_type": "dash","Segment_format": "fmp4","Segment_duration": 4,"Low_latency_mode": false,"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Threads": 2,"Gop_size": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Threads": 2,"Gop_size": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var sample_live_job = '{"Output": {"Stream_type": "dash","Segment_format": "fmp4","Segment_duration": 4,"Low_latency_mode": false,"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Threads": 2,"Gop_size": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Threads": 2,"Gop_size": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
 var isLivefeeding = false
 
 async function initPlayer() {
@@ -106,6 +107,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
+	/*
     livefeed_button = document.getElementById('livefeed');
     livefeed_button.addEventListener('click', (event) => {
         liveFeed();
@@ -115,6 +117,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
     stoplivefeed_button.addEventListener('click', (event) => {
         stopLiveFeed();
     });
+	*/
 
     show_button = document.getElementById('play');
     show_button.addEventListener('click', (event) => {
@@ -129,6 +132,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
     
     job_request = document.getElementById('job_request');
     
+    job_essentials.innerHTML = "Playback URL and RTMP ingest URL will be shown after clicking the Create button. Please push your live feed to the RTMP ingest URL. After you start feeding the live channel, wait 15 secs then hit the Play button to play your channel."
     video = document.getElementById('video');
 });
     
@@ -173,7 +177,7 @@ function startLiveFeedTimer() {
 }
 
 function liveFeed() {
-    let live_feed_url = "http://localhost:1080/feed";
+    let live_feed_url = api_server_url + "feed";
     let live_feed_req = new XMLHttpRequest();
     live_feed_req.open("POST", live_feed_url, true);
     live_feed_req.setRequestHeader("Content-Type", "application/json");
@@ -208,7 +212,7 @@ function stopLiveFeed() {
         return
     }
 
-    let stop_live_feed_url = "http://localhost:1080/feed";
+    let stop_live_feed_url = api_server_url + "feed";
     let stop_live_feed_req = new XMLHttpRequest();
     stop_live_feed_req.open("DELETE", stop_live_feed_url, true);
 
@@ -227,7 +231,7 @@ function stopLiveFeed() {
 }
 
 function showJob() {
-    let show_job_url = "http://localhost:1080/jobs/";
+    let show_job_url = api_server_url + "jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
     show_job_req.open("GET", show_job_url, true);
@@ -250,7 +254,7 @@ function showJob() {
             response_code.innerHTML = "status code=" + show_job_req.status
             response_body.innerHTML = JSON.stringify(j, null, 2)
 
-            startLiveFeedTimer()
+            //startLiveFeedTimer()
             //window.alert(job_resp);
           } else {
             console.log("Show live job failed. Status code:" + show_job_req.status);
@@ -262,7 +266,7 @@ function showJob() {
 }
 
 function createJob() {
-    let create_job_url = "http://localhost:1080/jobs";
+    let create_job_url = api_server_url + "jobs";
     let create_job_req = new XMLHttpRequest();
     create_job_req.open("POST", create_job_url, true);
     create_job_req.setRequestHeader("Content-Type", "application/json");
@@ -311,7 +315,7 @@ function cleanup() {
 window.onbeforeunload = cleanup;
 
 function stopJob() {
-    let stop_job_url = "http://localhost:1080/jobs/";
+    let stop_job_url = api_server_url + "jobs/";
     stop_job_url += job_id
     stop_job_url += "/stop"
 
@@ -335,7 +339,7 @@ function stopJob() {
 }
 
 function resumeJob() {
-    let resume_job_url = "http://localhost:1080/jobs/";
+    let resume_job_url = api_server_url + "jobs/";
     resume_job_url += job_id
     resume_job_url += "/resume"
 

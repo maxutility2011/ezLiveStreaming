@@ -3,16 +3,12 @@ package job
 import (
 	"fmt"
     //"os"
-	//"net/http"
 	"strings"
 	"strconv"
 	//"encoding/json"
     //"os/exec"
     //"job"
 	//"io/ioutil"
-    //"log"
-    //"flag"
-    //"bytes"
 )
 
 const RTMP = "rtmp"
@@ -32,7 +28,6 @@ func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
 }
 
-/*
 func JobSpecToFFmpegArgs(j LiveJobSpec, ffmpeg_output_path string) []string {
     var ffmpegArgs []string 
     if strings.Contains(j.Input.Url, RTMP) {
@@ -149,7 +144,6 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, ffmpeg_output_path string) []string {
 func JobSpecToShakaPackagerArgs(j LiveJobSpec, ffmpeg_output_path string) []string {
 
 }
-*/
 
 // Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
 // Regular latency: 

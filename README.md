@@ -1,12 +1,11 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides simple API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a create_stream request to the API server and specify how she want the live stream to be transcoded and streamed, for example, what the transcoding video/audio codec she want to use, what resolutions/bitrate/frame rate are used for output video streams, and what delivery format (Apple-HLS or MPEG-DASH) is used to stream to the live stream viewers. ezLiveStreaming outputs and uploads audio/video segments and manifests/playlists to the origin streaming server for delivering to the viewers. 
+ezLiveStreaming is designed to be a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides simple API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a create_stream request to the API server and specify how she want the live stream to be transcoded and streamed, for example, what the transcoding video/audio codec she want to use, what resolutions/bitrate/frame rate are used for outputting video streams, and what delivery format (Apple-HLS or MPEG-DASH) is used to stream to live viewers. ezLiveStreaming outputs and uploads audio/video segments and manifests/playlists to origin streaming servers for delivering to the viewers. 
 
 ezLiveStreaming is designed to be highly scalable, reliable and resource efficient. This repository also includes a simple transcoding UI for demo purposes. ezLiveStreaming uses **FFmpeg** for live video transcoding and packaging. I'm currently working on using **Shaka packager** to package and DRM-protecting live streams.
 
 ## What can ezLiveStreaming do?
 
-Answer: 
 - live Adaptative BitRate (ABR) transcoding, 
 - HLS/DASH streaming, 
 - live transcoding API,
@@ -195,6 +194,8 @@ export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]
 export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
 ```
 
+Please remember to create your own SQS queue first, and put the queue name in the api_server and scheduler config file.
+
 Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
 ```
 export PATH=[path_to_your_worker_transcoder_binary]:$PATH
@@ -245,7 +246,7 @@ Tis demo integrates with the Shaka player (https://github.com/shaka-project/shak
 location / {
     root   /var/www/html;
     index  index.html index.htm;
-    **add_header 'Access-Control-Allow-Origin' '*';**
+    add_header 'Access-Control-Allow-Origin' '*';
 }
 ```
 

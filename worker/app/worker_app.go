@@ -25,6 +25,7 @@ type WorkerAppConfig struct {
 	SchedulerUrl string
 	WorkerAppIp string
 	WorkerAppPort string
+	WorkerUdpPortBase int
 }
 
 type RunningJob struct {
@@ -314,6 +315,11 @@ func launchJob(j job.LiveJob) error {
 		total_outputs += j.Job.Spec.Output.Video_outputs
 	}
 
+	// Each new job must be allocated a number of UDP ports, one per each rendition.
+	// The ports are used for streaming from FFmpeg transcoder to Shaka packager.
+	// WorkerUdpPortBase: port base of the entire worker.
+	// total_outputs: total number of output renditions across all the live jobs on this worker.
+	// WorkerUdpPortBase + total_outputs: the port base of the new job.
 	j.Spec.Input.JobUdpPortBase = worker_app_config.WorkerUdpPortBase + total_outputs
 	
 	b, err := json.Marshal(j.Spec)
