@@ -189,6 +189,11 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		media_segment_template := media_output_path + output_label + "/seg_$Number$.m4s"
 		video_output += ("," + media_segment_template_prefix + media_segment_template)
 
+		if j.Output.Stream_type == HLS {
+			playlist_name := "playlist_name=" + media_output_path + output_label + ".m3u8"
+			video_output += ("," + playlist_name)
+		}
+
 		packagerArgs = append(packagerArgs, video_output)
 	}
 
@@ -212,55 +217,70 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		media_segment_template := media_output_path + output_label + "/seg_$Number$.m4s"
 		audio_output += ("," + media_segment_template_prefix + media_segment_template)
 
+		if j.Output.Stream_type == HLS {
+			playlist_name := "playlist_name=" + media_output_path + output_label + ".m3u8"
+			audio_output += ("," + playlist_name)
+
+			hls_group_id := "hls_group_id=" + output_label
+			audio_output += ("," + hls_group_id)
+		}
+
 		packagerArgs = append(packagerArgs, audio_output)
 	}
 
 	if j.Output.Stream_type == DASH {
 		frag_duration_option := "--fragment_duration"
 		packagerArgs = append(packagerArgs, frag_duration_option)
-
 		frag_duration_value := strconv.Itoa(j.Output.Fragment_duration)
 		packagerArgs = append(packagerArgs, frag_duration_value)
 
 		seg_duration_option := "--segment_duration"
 		packagerArgs = append(packagerArgs, seg_duration_option)
-
 		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
 		packagerArgs = append(packagerArgs, seg_duration_value)
 
 		min_buffer_time_option := "--min_buffer_time"
 		packagerArgs = append(packagerArgs, min_buffer_time_option)
-
 		min_buffer_time_value := "2" // Hardcode min_buffer_time to 2 seconds.
 		packagerArgs = append(packagerArgs, min_buffer_time_value)
 
 		minimum_update_period_option := "--minimum_update_period"
 		packagerArgs = append(packagerArgs, minimum_update_period_option)
-
 		minimum_update_period_value := "60" // Hardcode minimum_update_period to 60 seconds. TODO: make it configurable
 		packagerArgs = append(packagerArgs, minimum_update_period_value)
 
 		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
-
 		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth) 
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
 
-		/*preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
+		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
 		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_option)
-
 		preserved_segments_outside_live_window_value := "8" // Hardcode to 8 seconds
-		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_value)*/
+		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_value)
 
 		mpd_output := "--mpd_output"
 		packagerArgs = append(packagerArgs, mpd_output)
-
 		mpd_output_path := media_output_path + DASH_MPD_FILE_NAME
 		packagerArgs = append(packagerArgs, mpd_output_path)
 	} else if j.Output.Stream_type == HLS {
+		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
+		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
+		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth) 
+		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+
+		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
+		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_option)
+		preserved_segments_outside_live_window_value := "8" // Hardcode to 8 seconds
+		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_value)
+
+		hls_playlist_type_option := "--hls_playlist_type"
+		packagerArgs = append(packagerArgs, hls_playlist_type_option)
+		hls_playlist_type_value := "live" 
+		packagerArgs = append(packagerArgs, hls_playlist_type_value)
+
 		m3u8_output := "--hls_master_playlist_output"
 		packagerArgs = append(packagerArgs, m3u8_output)
-
 		m3u8_output_path := media_output_path + HLS_MASTER_PLAYLIST_FILE_NAME
 		packagerArgs = append(packagerArgs, m3u8_output_path)
 	}
