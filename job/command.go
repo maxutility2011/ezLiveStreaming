@@ -2,13 +2,8 @@ package job
 
 import (
 	"fmt"
-    //"os"
 	"strings"
 	"strconv"
-	//"encoding/json"
-    //"os/exec"
-    //"job"
-	//"io/ioutil"
 )
 
 const RTMP = "rtmp"
@@ -23,7 +18,9 @@ const FFMPEG_H265 = "libx265"
 const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
 const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
-const dash_manifest_filename = "1.mpd"
+const DASH_MPD_FILE_NAME = "master.mpd"
+const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
+const Media_output_path_prefix = "output_"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -44,7 +41,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
     ffmpegArgs = append(ffmpegArgs, j.Input.Url)
 
 	kf := "expr:gte(t,n_forced*"
-	kf += strconv.Itoa(j.Output.Segment_duration)
+	kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
 	kf += ")"
 
 	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
@@ -58,6 +55,8 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	// - video rendition 3: udp://127.0.0.1:10003
 	// - audio rendition 1: udp://127.0.0.1:10004
 	// - audio rendition 2: udp://127.0.0.1:10005
+
+	// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
 
 	// Video renditions
 	var i int
@@ -82,6 +81,11 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		} else if vo.Codec == H265_CODEC {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
 		}
+
+		ffmpegArgs = append(ffmpegArgs, "-filter:v")
+		fps := "fps="
+		fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
+		ffmpegArgs = append(ffmpegArgs, fps)
 
 		var h26xProfile string
 		if vo.Height <= 480 {
@@ -167,6 +171,7 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
 
+		// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
 		video_output := "in="
 		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base + i)
 		video_output += instream
@@ -210,11 +215,55 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		packagerArgs = append(packagerArgs, audio_output)
 	}
 
-	mpd_output := "--mpd_output"
-	packagerArgs = append(packagerArgs, mpd_output)
+	if j.Output.Stream_type == DASH {
+		frag_duration_option := "--fragment_duration"
+		packagerArgs = append(packagerArgs, frag_duration_option)
 
-	mpd_output_path := media_output_path + dash_manifest_filename
-	packagerArgs = append(packagerArgs, mpd_output_path)
+		frag_duration_value := strconv.Itoa(j.Output.Fragment_duration)
+		packagerArgs = append(packagerArgs, frag_duration_value)
+
+		seg_duration_option := "--segment_duration"
+		packagerArgs = append(packagerArgs, seg_duration_option)
+
+		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
+		packagerArgs = append(packagerArgs, seg_duration_value)
+
+		min_buffer_time_option := "--min_buffer_time"
+		packagerArgs = append(packagerArgs, min_buffer_time_option)
+
+		min_buffer_time_value := "2" // Hardcode min_buffer_time to 2 seconds.
+		packagerArgs = append(packagerArgs, min_buffer_time_value)
+
+		minimum_update_period_option := "--minimum_update_period"
+		packagerArgs = append(packagerArgs, minimum_update_period_option)
+
+		minimum_update_period_value := "60" // Hardcode minimum_update_period to 60 seconds. TODO: make it configurable
+		packagerArgs = append(packagerArgs, minimum_update_period_value)
+
+		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
+		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
+
+		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth) 
+		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+
+		/*preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
+		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_option)
+
+		preserved_segments_outside_live_window_value := "8" // Hardcode to 8 seconds
+		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_value)*/
+
+		mpd_output := "--mpd_output"
+		packagerArgs = append(packagerArgs, mpd_output)
+
+		mpd_output_path := media_output_path + DASH_MPD_FILE_NAME
+		packagerArgs = append(packagerArgs, mpd_output_path)
+	} else if j.Output.Stream_type == HLS {
+		m3u8_output := "--hls_master_playlist_output"
+		packagerArgs = append(packagerArgs, m3u8_output)
+
+		m3u8_output_path := media_output_path + HLS_MASTER_PLAYLIST_FILE_NAME
+		packagerArgs = append(packagerArgs, m3u8_output_path)
+	}
 
     return packagerArgs
 }

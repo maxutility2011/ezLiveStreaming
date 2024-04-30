@@ -35,8 +35,10 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
     "Output": {
         "Stream_type": "dash", // valid values: "dash" | "hls"
         "Segment_format": "fmp4", // valid values: "mpegts" | "fmp4" | "cmaf"
+        "Fragment_duration": 1, // fragment (GOP) duration in second. Currently, this will set the closed GOP size and key frame interval
         "Segment_duration": 4, // duration of segments in second
         "Low_latency_mode": false, // if low latency mode is used
+        "Time_shift_buffer_depth": 120 // DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size
         "Video_outputs": [ // An array of video output renditions
             {
                 "Label": "video365k", // A label for the rendition
@@ -48,8 +50,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
                 "Max_bitrate": "500k", // video bitrate cap (e.g., "-maxrate 500k")
                 "Buf_size": "500k", // VBV buffer size (e.g., "-bufsize 500k")
                 "Preset": "faster", // encoding preset
-                "Threads": 2, // number of threads used for encoding this rendition
-                "Gop_size": 2 // size of GOP (Group of Pictures) in second
+                "Threads": 2 // number of threads used for encoding this rendition
             },
             {
                 "Label": "video550k",
@@ -61,8 +62,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
                 "Max_bitrate": "750k",
                 "Buf_size": "750k",
                 "Preset": "faster",
-                "Threads": 2,
-                "Gop_size": 2
+                "Threads": 2
             }
         ],
         "Audio_outputs": [

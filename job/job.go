@@ -15,7 +15,6 @@ type LiveVideoOutputSpec struct {
 	Buf_size string
 	Preset string
 	Threads int
-	Gop_size int 
 }
 
 type LiveAudioOutputSpec struct {
@@ -28,7 +27,9 @@ type LiveJobOutputSpec struct {
 	Stream_type string 
 	Segment_format string 
 	Segment_duration int 
+	Fragment_duration int
 	Low_latency_mode bool
+	Time_shift_buffer_depth int
 	Video_outputs []LiveVideoOutputSpec 
 	Audio_outputs []LiveAudioOutputSpec 
 }

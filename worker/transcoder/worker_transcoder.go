@@ -71,7 +71,7 @@ func main() {
     Log = log.New(logfile, "", log.LstdFlags)
 
     // Test path ONLY. Need to output to cloud storage such as AWS S3.
-    media_output_path := "/var/www/html/output_"
+    media_output_path := "/var/www/html/" + job.Media_output_path_prefix
     media_output_path += *jobIdPtr
     media_output_path += "/"
     err1 = os.Mkdir(media_output_path, 0777)

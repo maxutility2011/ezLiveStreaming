@@ -14,7 +14,7 @@ var video;
 var job_id;
 var listJobsTimer = null;
 var listJobsInterval = 2000
-var sample_live_job = '{"Output": {"Stream_type": "dash","Segment_format": "fmp4","Segment_duration": 4,"Low_latency_mode": false,"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Threads": 2,"Gop_size": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Threads": 2,"Gop_size": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var sample_live_job = '{"Output": {"Stream_type": "dash","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": false,"Time_shift_buffer_depth": 120,"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Threads": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Threads": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
 var isLivefeeding = false
 
 async function initPlayer() {

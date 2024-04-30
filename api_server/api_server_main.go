@@ -45,7 +45,11 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Id = uuid.New().String()
 	
 	lj.StreamKey = assignJobInputStreamId()
-	lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/output_" + lj.Id + "/1.mpd" // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+	if j.Output.Stream_type == job.DASH {
+		lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.DASH_MPD_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+	} else if j.Output.Stream_type == job.HLS {
+		lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+	}
 
 	//j.IngestUrls = make([]string)
 	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
