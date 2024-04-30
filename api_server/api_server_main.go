@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"syscall"
 	"log"
+	"flag"
 	"io/ioutil"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
@@ -254,6 +255,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			//Log.Println("Header: ", r.Header)
 			//Log.Printf("Job: %+v\n", job)
 
+			// TODO: Need to implement a job validator
 			e1, j := createJob(job)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -477,6 +479,13 @@ func readConfig() {
 }
 
 func main() {
+	configPtr := flag.String("config", "", "config file path")
+    flag.Parse()
+
+	if *configPtr != "" {
+		server_config_file_path = *configPtr
+	}
+
 	var logfile, err1 = os.Create("/tmp/api_server.log")
     if err1 != nil {
         panic(err1)

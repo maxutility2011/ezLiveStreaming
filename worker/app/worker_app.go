@@ -310,9 +310,11 @@ func createIngestUrl(job job.LiveJob) error {
 func launchJob(j job.LiveJob) error {
 	j.Spec.Input.Url = j.RtmpIngestUrl
 	total_outputs := 0
+	// Get the total outputs of all the running jobs on this worker and calculate UDP port base for the new job based on
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
-		j = RunningJob(e.Value.(RunningJob))
-		total_outputs += j.Job.Spec.Output.Video_outputs
+		rj := RunningJob(e.Value.(RunningJob))
+		total_outputs += len(rj.Job.Spec.Output.Video_outputs)
+		total_outputs += len(rj.Job.Spec.Output.Audio_outputs)
 	}
 
 	// Each new job must be allocated a number of UDP ports, one per each rendition.
@@ -339,34 +341,35 @@ func launchJob(j job.LiveJob) error {
 	transcoderArgs = append(transcoderArgs, paramArg)
 
 	fmt.Println("Worker arguments: ", strings.Join(transcoderArgs, " "))
-	ffmpegCmd := exec.Command("worker_transcoder", transcoderArgs...)
+	transcoderCmd := exec.Command("worker_transcoder", transcoderArgs...)
 
 	var rj RunningJob
 	rj.Job = j
-	rj.Command = ffmpegCmd
+	rj.Command = transcoderCmd
 	je := running_jobs.PushBack(rj)
 
 	var out []byte
 	var err2 error
 	err2 = nil
 	go func() {
-		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
+		out, err2 = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
 		if err2 != nil {
-			running_jobs.Remove(je) // Cleanup if ffmpegCmd fails
+			running_jobs.Remove(je) // Cleanup if transcoderCmd fails
         	fmt.Println("Errors running worker transcoder: ", string(out))
 		}
 	}()
 
-	// Wait 100ms to get ffmpegCmd (which runs in its own go routine) result (err2). 
+	// Wait 100ms to get transcoderCmd (which runs in its own go routine) result (err2). 
 
 	// If we don't wait, err2=nil (its initial value) will always be returned before 
-	// ffmpegCmd.CombinedOutput() finishes and returns the real result. This will cause inconsistency
-	// when launchJob() returns nil (success) but ffmpegCmd.CombinedOutput() actually fails. 
+	// transcoderCmd.CombinedOutput() finishes and returns the real result. This will cause inconsistency
+	// when launchJob() returns nil (success) but transcoderCmd.CombinedOutput() actually fails. 
 
-	// On the other hand, if ffmpegCmd succeeds, the go routine (ffmpegCmd.CombinedOutput) blocks until 
+	// On the other hand, if transcoderCmd succeeds, the go routine (transcoderCmd.CombinedOutput) blocks until 
 	// ffmpeg stops (e.g., when the user issues a stop_job request). In this case, err2 will not be 
 	// updated when the sleep ends thus err2=nil will be returned (which is valid). 
 	time.Sleep(100 * time.Millisecond)
+	fmt.Println("Worker transcoder process id: ", transcoderCmd.Process.Pid)
 	return err2
 }
 

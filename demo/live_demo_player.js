@@ -1,4 +1,4 @@
-var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";
+//var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";
 var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
 var ingest_url = "";
 var create_button;

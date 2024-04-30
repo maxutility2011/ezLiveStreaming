@@ -10,6 +10,7 @@ import (
 	"time"
 	"strings"
 	"bytes"
+	"flag"
 	"strconv"
 	"io/ioutil"
 	"math/rand"
@@ -35,7 +36,7 @@ const workersEndpoint = "workers"
 const heartbeatEndpoint = "heartbeat"
 const jobStatusEndpoint = "jobstatus"
 
-const scheduler_config_file_path = "config.json"
+var scheduler_config_file_path = "config.json"
 const update_worker_load_interval = "1s" // update worker load when the previous one failed.  
 const job_scheduling_interval = "0.2s" // Scheduling timer interval
 const sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time when the job scheduling timer fires 
@@ -880,6 +881,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	configPtr := flag.String("config", "", "config file path")
+    flag.Parse()
+
+	if *configPtr != "" {
+		scheduler_config_file_path = *configPtr
+	}
+
 	readConfig()
 	sqs_receiver.QueueName = scheduler_config.Sqs.Queue_name
 	sqs_receiver.SqsClient = sqs_receiver.CreateClient()
