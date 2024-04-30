@@ -23,6 +23,7 @@ const FFMPEG_H265 = "libx265"
 const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
 const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
+const dash_manifest_filename = "1.mpd"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -190,7 +191,7 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		ao := j.Output.Audio_outputs[k]
 
 		audio_output := "in="
-		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base + i + k)
+		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base + i + 1 + k)
 		audio_output += instream
 
 		stream_selector := "stream=audio"
@@ -208,6 +209,12 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 
 		packagerArgs = append(packagerArgs, audio_output)
 	}
+
+	mpd_output := "--mpd_output"
+	packagerArgs = append(packagerArgs, mpd_output)
+
+	mpd_output_path := media_output_path + dash_manifest_filename
+	packagerArgs = append(packagerArgs, mpd_output_path)
 
     return packagerArgs
 }

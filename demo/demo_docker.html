@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* {
+  box-sizing: border-box;
+}
+
+/* Create two equal columns that floats next to each other */
+.columnleft {
+  float: left;
+  width: 47%;
+  padding: 5px;
+  height: 360px; /* Should be removed. Only for demonstration */
+}
+
+.columnright {
+  float: left;
+  width: 53%;
+  padding: 1px;
+  height: 360px; /* Should be removed. Only for demonstration */
+}
+
+.bottomleft {
+  float: left;
+  width: 47%;
+  padding: 2px;
+  height: 200px; /* Should be removed. Only for demonstration */
+}
+
+.bottomright {
+  float: left;
+  width: 53%;
+  padding: 2px;
+  height: 200px; /* Should be removed. Only for demonstration */
+}
+
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+.button {
+  background-color: #05515c;
+  border: none;
+  padding: 5px 12px;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 12px;
+  font-family: Garamond, serif;
+  margin: 4px 2px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<head>
+	<script src="dist/shaka-player.compiled.js"></script>
+  <script>var api_server_url = "http://127.0.0.1:1080/";</script>
+	<script src="live_demo_player.js"></script>
+</head>
+
+<div class="row">
+  <div class="columnleft" style="background-color:#745904;">
+    <form>
+		<b><label id=livestream style="font-family: Garamond, serif; font-size: 25px; display: block; text-align: center">Live job request</label></b>
+		<br>
+		<textarea id="job_request" name="job_request" rows="18" cols="74"></textarea>
+		<br>
+		<button class="button" id=create type=button>Create</button>
+		<button class="button" id=stop type=button>Stop</button>
+		<button class="button" id=resume type=button>Resume</button>
+		<button class="button" id=show type=button>Show</button>
+		<label id=response_code style="font-size: 12px; background-color:#e8f2e9a0;">response code</label>
+		<!--<button class="button" id=livefeed type=button>livefeed</button>
+		<button class="button" id=stoplivefeed type=button>stoplivefeed</button>-->
+		<label id=obs style="font-size: 12px; background-color:#745904;">Use OBS to live feed</label>
+		<button class="button" id=play type=button>Play</button>
+	</form>
+  </div>
+  <div class="columnright" style="background-color:#161452;">
+	<center> 
+		<body>
+			<video id="video"
+				   autoplay="true"
+				   width="640"
+				   height="360"
+				   poster="https://shaka-player-demo.appspot.com/assets/poster.jpg"
+				   controls playsinline></video>
+		  </body>
+		<!--<video id="video" autoplay="true" muted="true" width="640" height="360" controls playsinline></video>-->
+	</center>
+  </div>
+  <div class="bottomleft" style="background-color:#745904;">
+	<textarea id="response_body" name="response_body" rows="12" cols="74" readonly style="background-color:#f5fafaa0;"></textarea>
+  </div>
+  <div class="bottomright" style="background-color:#161452;">
+	<textarea id="job_essentials" name="job_essentials" rows="12" cols="84" readonly style="background-color:#f5fafaa0;"></textarea>
+  </div>
+</div>
+
+</body>
+</html>
