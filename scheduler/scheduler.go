@@ -169,7 +169,7 @@ func createUpdateWorkerLoad(wid string, load models.WorkerLoad) error {
 }
 
 // Function addNewJobLoad() adds new jobs to the table after they are successfully launched on the assigned workers.
-// Function updateWorkerStatus() updates load of workers upon reception of worker reports.
+// Function updateWorkerLoad() updates load of workers upon reception of worker reports.
 // Worker_app periodically check the status of all the running jobs and report any stopped jobs to the scheduler.
 // The scheduler updates the "worker_loads" hash table in Redis by subtracting the load of the stopped jobs.
 func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
@@ -213,7 +213,7 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	return nil
 }
 
-func updateWorkerStatus(wid string, a_stopped_job_id string) error {
+func updateWorkerLoad(wid string, a_stopped_job_id string) error {
 	var w_load models.WorkerLoad
 	v := getWorkerLoadById(wid)
 	if v != "" {
@@ -223,7 +223,7 @@ func updateWorkerStatus(wid string, a_stopped_job_id string) error {
 			return err // Found worker load in Redis but got bad data
 		}
 	} else {
-		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerStatus)")
+		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerLoad)")
 		return errors.New("WorkerNotFound")
 	}
 
@@ -244,14 +244,14 @@ func updateWorkerStatus(wid string, a_stopped_job_id string) error {
 		return errors.New("JobLoadNotFound")
 	}
 
-	fmt.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerStatus: ")
+	fmt.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
 	w_load.CpuLoad -= j_load.CpuLoad
 	w_load.BandwidthLoad -= j_load.BandwidthLoad
 
-	fmt.Println("New Worker Load (worker id = ", wid, ") in updateWorkerStatus: ")
+	fmt.Println("New Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
 	fmt.Println("CPU load: ", w_load.CpuLoad)
 	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
@@ -867,8 +867,19 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		for _, j := range report.StoppedJobs {
-			e := updateWorkerStatus(report.WorkerId, j)
+		// Handle stopped jobs reported by a worker
+		// 1. Set job state to STOPPED
+		// 2. Update worker load
+		for _, jid := range report.StoppedJobs {
+			j, ok := getJobById(jid)
+			if ok {
+				j.State = job.JOB_STATE_STOPPED
+				createUpdateJob(j)
+			} else {
+				fmt.Println("Failed to get job id = ", jid, " when handling new job status request from worker id=", report.WorkerId)
+			}
+
+			e := updateWorkerLoad(report.WorkerId, jid)
 			if e == nil {
 				fmt.Println("Successfully deleted stopped job id = ", j, " and updated load of worker id = ", report.WorkerId)
 			} else {

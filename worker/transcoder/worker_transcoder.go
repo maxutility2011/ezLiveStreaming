@@ -5,7 +5,6 @@ import (
 	"fmt"
     "os"
     "time"
-	//"strings"
 	"encoding/json"
     "os/exec"
     "os/signal"
@@ -17,15 +16,49 @@ import (
 )
 
 var Log *log.Logger
-
 var transcoder_status_check_interval = "2s"
 
-func checkPackagerStatus() {
+// Monitor ffmpeg and shaka packager
+// ffmpeg and packager must both be running.
+// If one dies, the other should be killed.
+// If neither ffmpeg nor the packager is running, worker_transcoder should exit.
+func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
+    process1, err1 := os.FindProcess(int(command1.Process.Pid))
+    process2, err2 := os.FindProcess(int(command2.Process.Pid))
 
-}
+    if err1 != nil && err2 != nil {
+        Log.Printf("Neither ffmpeg nor packager is found. Worker_transcoder exiting...")
+        os.Exit(0)
+    } else if err1 == nil && err2 != nil {
+        err := process1.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
+        // Return instead of os.Exit(0). if SIGTERM fails to kill the process, worker_transcoder will
+        // exit the next time this function is called.
+        return
+    } else if err1 != nil && err2 == nil {
+        err := process2.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command2.Process.Pid, err)
+        return
+    }
 
-func checkFfmpegStatus() {
+    err1 = process1.Signal(syscall.Signal(0))
+    Log.Printf("process.Signal on pid %d returned: %v\n", command1.Process.Pid, err1)
 
+    err2 = process2.Signal(syscall.Signal(0))
+    Log.Printf("process.Signal on pid %d returned: %v\n", command2.Process.Pid, err2)
+
+    if err1 != nil && err2 != nil {
+        Log.Printf("Neither ffmpeg nor packager is running. Worker_transcoder exiting...")
+        os.Exit(0)
+    } else if err1 == nil && err2 != nil {
+        err := process1.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
+        return
+    } else if err1 != nil && err2 == nil {
+        err := process2.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command2.Process.Pid, err)
+        return
+    }
 }
 
 // worker_transcoder -file job.json 
@@ -119,7 +152,6 @@ func main() {
 	go func() {
 		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
 		if err2 != nil {
-			//running_jobs.Remove(je) // Cleanup if ffmpegCmd fails
         	Log.Println("Errors starting ffmpeg: ", string(out))
             os.Exit(1)
 		}
@@ -162,40 +194,7 @@ func main() {
         os.Exit(0)
     }()
 
-    /*
-    ffmpegArgs := job.JobSpecToEncoderArgs(j, ffmpeg_output_path)
-    ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
-
-    shutdown := make(chan os.Signal, 1)
-    // syscall.SIGKILL cannot be handled
-    signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
-    go func() {
-        <-shutdown
-        Log.Println("Shutting down!")
-
-        // Received signal from worker_app:
-        // - first, stop ffmpeg
-        // - then, exit myself
-        process, err1 := os.FindProcess(int(ffmpegCmd.Process.Pid))
-		if err1 != nil {
-        	Log.Printf("Process id = %d (ffmpeg) not found. Error: %v\n", ffmpegCmd.Process.Pid, err1)
-    	} else {
-			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
-			Log.Printf("process.Signal.SIGTERM on pid %d (ffmpeg) returned: %v\n", ffmpegCmd.Process.Pid, err2)
-    	}
-
-        os.Exit(0)
-    }()
-
-    out, err2 := ffmpegCmd.CombinedOutput()
-    if err2 != nil {
-        // error case : status code of command is different from 0
-        Log.Println("ffmpeg error: %v", err2, string(out))
-    }
-
-    Log.Println("FFmpeg log: ", string(out))
-    */
-
+    // Periodically manage ffmpeg and shaka packager
     d, _ := time.ParseDuration(transcoder_status_check_interval)
 	ticker := time.NewTicker(d)
 	quit := make(chan struct{})
@@ -203,8 +202,7 @@ func main() {
 		for {
 		   select {
 			    case <-ticker.C: {
-				    checkPackagerStatus()
-                    checkFfmpegStatus()
+				    manageCommands(packagerCmd, ffmpegCmd)
 			    }
 			    case <-quit: {
 				    ticker.Stop()

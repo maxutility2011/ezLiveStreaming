@@ -346,7 +346,8 @@ func launchJob(j job.LiveJob) error {
 	var rj RunningJob
 	rj.Job = j
 	rj.Command = transcoderCmd
-	je := running_jobs.PushBack(rj)
+	//je := running_jobs.PushBack(rj)
+	running_jobs.PushBack(rj)
 
 	var out []byte
 	var err2 error
@@ -354,7 +355,10 @@ func launchJob(j job.LiveJob) error {
 	go func() {
 		out, err2 = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
 		if err2 != nil {
-			running_jobs.Remove(je) // Cleanup if transcoderCmd fails
+			//running_jobs.Remove(je) // Cleanup if transcoderCmd fails
+			
+			// Let's not remove the failed job from running_jobs here, but leave it to function checkJobStatus()
+			// checkJobStatus() does more than just removing the job, it also updates worker load with scheduler
         	fmt.Println("Errors running worker transcoder: ", string(out))
 		}
 	}()
@@ -417,7 +421,7 @@ func checkIngestActiveness() {
 }
 
 func checkJobStatus() {
-	//fmt.Println("Checking job status... Number of running jobs = ", running_jobs.Len())
+	fmt.Println("Checking job status... Number of running jobs = ", running_jobs.Len())
 	var job_report models.WorkerJobReport
 	var prev_e *list.Element
 	var jobProcessFound bool
@@ -453,7 +457,7 @@ func checkJobStatus() {
 			jobProcessFound = false
         } else {
 			err2 = process.Signal(syscall.Signal(0))
-			fmt.Printf("process.Signal on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
+			fmt.Printf("process.Signal 0 on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 != nil {
 				jobProcessRunning = false
 			}
