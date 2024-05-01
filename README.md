@@ -154,11 +154,11 @@ On each live worker VM, there runs one instance of worker_app which manages all 
 
 To build api_server, go to *api_server/* and run 
 ```
-*go build api_server_main.go*
+go build api_server_main.go
 ```
 then start the server by running
 ```
-*./api_server_main*"
+./api_server_main
 ``` 
 api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
 
@@ -224,10 +224,20 @@ All live jobs - REDIS_KEY_ALLJOBS in redis_client/redis_client.go
 **key**: job id
 **value**: "type LiveJob struct" in job/job.go
 
+To view all jobs in redis-cli, run "hgetall jobs".
+
 ## "queued_jobs": 
 Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled - REDIS_KEY_ALLJOBS in redis_client/redis_client.go
 **Data structure**: list
-**value**: "type LiveJob struct" in job/job.go
+**value**: string of "type LiveJob struct" (job/job.go)
+
+## "workers":
+The set of live workers currently being managed by the job scheduler - REDIS_KEY_ALLWORKERS in redis_client/redis_client.go
+**Data structure**: hash table
+**key**: worker id
+**value**: string of "type LiveWorker struct" (models/worker.go)
+
+To view all workers in redis-cli, run "hgetall workers".
 
 ## "worker_loads": 
 The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go
