@@ -130,7 +130,7 @@ func main() {
 		if err2 != nil {
 			//running_jobs.Remove(je) // Cleanup if packagerCmd fails
         	Log.Println("Errors starting Shaka packager: ", string(out))
-            os.Exit(1)
+            // os.Exit(1) // Do not exit worker_transcoder here since ffmpeg also needs to be stopped after the packager is stopped. Let function manageCommand() to handle this.
 		}
 	}()
 
@@ -138,7 +138,7 @@ func main() {
     time.Sleep(100 * time.Millisecond)
     if (err2 != nil) {
         Log.Println("Errors starting Shaka packager: ", string(out))
-        os.Exit(1)
+        //os.Exit(1)
     }
 
     // Start ffmpeg ONLY if Shaka packager is running
@@ -153,7 +153,7 @@ func main() {
 		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
 		if err2 != nil {
         	Log.Println("Errors starting ffmpeg: ", string(out))
-            os.Exit(1)
+            //os.Exit(1)
 		}
 	}()
 
@@ -161,7 +161,7 @@ func main() {
     time.Sleep(100 * time.Millisecond)
     if (err2 != nil) {
         Log.Println("Errors starting ffmpeg: ", string(out))
-        os.Exit(1)
+        //os.Exit(1)
     }
 
     // Handle system signals to terminate worker_transcoder
