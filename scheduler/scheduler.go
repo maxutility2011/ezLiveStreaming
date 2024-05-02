@@ -100,7 +100,7 @@ func assignWorker(j job.LiveJob) (string, bool) {
 func createUpdateJob(j job.LiveJob) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
+		fmt.Println("Failed to create/update job id=", j.Id, ". Error: ", err)
 	}
 
 	return err

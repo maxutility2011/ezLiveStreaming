@@ -23,14 +23,11 @@ type RedisConfig struct {
 // The following constants define all the Redis keys including hash tables (accessed by HSET/HGET) 
 // and variables (accessed by SET/GET)
 const REDIS_KEY_ALLJOBS = "jobs"
-//const REDIS_KEY_WAITINGSET = "waiting_set"
-//const REDIS_KEY_PENDINGSET = "pending_set"
-//const REDIS_KEY_DONESET = "done_set"
 const REDIS_KEY_ALLWORKERS = "workers"
-const REDIS_KEY_NUMWORKERS = "num_workers"
-//const REDIS_KEY_NUMJOBS = "num_jobs"
+//const REDIS_KEY_NUMWORKERS = "num_workers"
 const REDIS_KEY_SCHEDULER_QUEUED_JOBS = "queued_jobs"
 const REDIS_KEY_WORKER_LOADS = "worker_loads"
+const REDIS_KEY_DRM_KEYS = "drm_keys"
 
 func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.Client, context.Context) {
 	redisAddr := redis_ip + ":" + redis_port

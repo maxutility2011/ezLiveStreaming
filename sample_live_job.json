@@ -6,6 +6,11 @@
             "Segment_duration": 4,
             "Low_latency_mode": false,
             "Time_shift_buffer_depth": 120,
+            "Drm": {
+                "Protection_system": "clear_key",
+                "Protection_scheme": "cbcs",
+                "Key_server_url": ""
+            },
             "Video_outputs": [
                 {
                     "Label": "video365k",
