@@ -3,6 +3,8 @@
     "Api_server_port": "1080",
     "Origin_server_hostname": "ec2-34-202-195-77.compute-1.amazonaws.com",
     "Origin_server_port": "4080", 
+    "Drm_key_server_url": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "Drm_key_server_port": "5080", 
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },

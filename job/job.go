@@ -2,6 +2,7 @@ package job
 
 import (
 	"time"
+	"ezliveStreaming/models"
 )
 
 type LiveVideoOutputSpec struct {
@@ -23,6 +24,11 @@ type LiveAudioOutputSpec struct {
 	Bitrate string 
 }
 
+type DrmConfig struct {
+	Protection_system string
+	Protection_scheme string
+}
+
 type LiveJobOutputSpec struct {
 	Stream_type string 
 	Segment_format string 
@@ -30,6 +36,7 @@ type LiveJobOutputSpec struct {
 	Fragment_duration int
 	Low_latency_mode bool
 	Time_shift_buffer_depth int
+	Drm DrmConfig
 	Video_outputs []LiveVideoOutputSpec 
 	Audio_outputs []LiveAudioOutputSpec 
 }
@@ -61,6 +68,7 @@ type LiveJob struct {
 	Time_received_by_worker time.Time
 	Assigned_worker_id string
 	State string
+	DrmEncryptionKeyInfo models.KeyInfo
 	Stop bool // A flag indicating the job is to be stopped
 	Delete bool // A flag indicating the job is to be deleted
 }

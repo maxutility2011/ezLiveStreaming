@@ -3,6 +3,7 @@
     "Api_server_port": "1080",
     "Origin_server_hostname": "127.0.0.1",
     "Origin_server_port": "4080", 
+    "Drm_key_server_url": "http://172.17.0.6:5080/keys/",
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },

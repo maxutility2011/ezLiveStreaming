@@ -14,10 +14,12 @@ import (
 	"syscall"
 	"log"
 	"flag"
+	"bytes"
 	"io/ioutil"
 	"ezliveStreaming/job"
 	"ezliveStreaming/job_sqs"
 	"ezliveStreaming/redis_client"
+	"ezliveStreaming/models"
 	"ezliveStreaming/demo" // Demo ONLY!!!
 )
 
@@ -29,7 +31,8 @@ type ApiServerConfig struct {
 	Api_server_hostname string
 	Api_server_port string
 	Origin_server_hostname string
-        Origin_server_port string
+    Origin_server_port string
+	Drm_key_server_url string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
 }
@@ -40,9 +43,77 @@ func assignJobInputStreamId() string {
 	return uuid.New().String()
 }
 
+func createDrmKey(jid string) (models.CreateKeyResponse, error) {
+	var ckreq models.CreateKeyRequest
+	var ckresp models.CreateKeyResponse
+	ckreq.Content_id = jid
+	b, _ := json.Marshal(ckreq)
+	req, err := http.NewRequest(http.MethodPost, server_config.Drm_key_server_url, bytes.NewReader(b))
+    if err != nil {
+        fmt.Println("Error: Failed to POST to: ", server_config.Drm_key_server_url)
+		// TODO: Need to retry when failed
+        return ckresp, errors.New("StatusReportFailure_fail_to_post")
+    }
+	
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        fmt.Println("Failed to POST to: ", server_config.Drm_key_server_url)
+		return ckresp, err
+    }
+
+	// TODO: Need to handle error response (other than http code 201)
+	if resp.StatusCode != http.StatusCreated {
+		fmt.Println("Bad response from DRM key server for CreateKeyRequest")
+        return ckresp, errors.New("StatusReportFailure_fail_to_read_key_server_response")
+	}
+	
+	defer resp.Body.Close()
+    bodyBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error: Failed to read response body (createDrmKey)")
+        return ckresp, errors.New("http_post_response_parsing_failure")
+    }
+
+	json.Unmarshal(bodyBytes, &ckresp)
+	return ckresp, nil
+}
+
+func getDrmKey(key_id string) (models.KeyInfo, error) {
+	var k models.KeyInfo
+	req, err := http.NewRequest(http.MethodGet, server_config.Drm_key_server_url + key_id, nil)
+    if err != nil {
+        fmt.Println("Error: Failed to GET: ", server_config.Drm_key_server_url)
+		// TODO: Need to retry when failed
+        return k, errors.New("StatusReportFailure_fail_to_get")
+    }
+	
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        fmt.Println("Failed to GET: ", server_config.Drm_key_server_url)
+		return k, err
+    }
+
+	// TODO: Need to handle error response (other than http code 200)
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Bad response from DRM key server for GetKeyRequest")
+        return k, errors.New("StatusReportFailure_fail_to_read_key_server_response")
+	}
+	
+	defer resp.Body.Close()
+    bodyBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error: Failed to read response body (getDrmKey)")
+        return k, errors.New("http_post_response_parsing_failure")
+    }
+
+	json.Unmarshal(bodyBytes, &k)
+	return k, nil
+}
+
 func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
+	fmt.Println("Generating a random job ID: ", lj.Id)
 	
 	lj.StreamKey = assignJobInputStreamId()
 	if j.Output.Stream_type == job.DASH {
@@ -60,7 +131,25 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Stop = false // Set to true when the client wants to stop this job
 	lj.Delete = false // Set to true when the client wants to delete this job
 	lj.State = job.JOB_STATE_CREATED
-	fmt.Println("Generating a random job ID: ", lj.Id)
+	
+	var k models.KeyInfo
+	var err_get_key error
+	if (j.Output.Drm.Protection_system != "") {
+		create_key_resp, err_create_key := createDrmKey(lj.Id)
+		if err_create_key == nil {
+			k, err_get_key = getDrmKey(create_key_resp.Key_id)
+			if err_get_key == nil {
+				lj.DrmEncryptionKeyInfo = k
+				fmt.Printf("DRM Key INFO: key_id: %s, key: %s, content_id: %s\n", lj.DrmEncryptionKeyInfo.Key_id, lj.DrmEncryptionKeyInfo.Key, lj.DrmEncryptionKeyInfo.Content_id)
+			} else {
+				fmt.Printf("Failed to get DRM info. Do not protect the live stream")
+			}
+		} else {
+			fmt.Printf("Failed to create DRM key. Do not protect the live stream")
+		}
+	} else {
+		fmt.Printf("DRM is not configured. Do not protect the live stream")
+	}
 
 	e := createUpdateJob(lj)
 	if e != nil {

@@ -46,7 +46,7 @@ func getKeyById(kid string) (models.KeyInfo, bool) {
 
 	err = json.Unmarshal([]byte(v), &k)
 	if err != nil {
-		fmt.Println("Failed to unmarshal Redis result (getJobById). Error: ", err)
+		fmt.Println("Failed to unmarshal Redis result (getKeyById). Error: ", err)
 		return k, false
 	}
 
@@ -115,7 +115,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
                 FileContentType := "application/json"
         		w.Header().Set("Content-Type", FileContentType)
-                w.WriteHeader(http.StatusOK)
+                w.WriteHeader(http.StatusCreated)
 
                 var resp models.CreateKeyResponse
                 resp.Key_id = k.Key_id

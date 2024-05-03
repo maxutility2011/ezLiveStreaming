@@ -8,8 +8,7 @@
             "Time_shift_buffer_depth": 120,
             "Drm": {
                 "Protection_system": "clear_key",
-                "Protection_scheme": "cbcs",
-                "Key_server_url": ""
+                "Protection_scheme": "cbcs"
             },
             "Video_outputs": [
                 {

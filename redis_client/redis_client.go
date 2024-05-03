@@ -24,7 +24,7 @@ type RedisConfig struct {
 // and variables (accessed by SET/GET)
 const REDIS_KEY_ALLJOBS = "jobs"
 const REDIS_KEY_ALLWORKERS = "workers"
-//const REDIS_KEY_NUMWORKERS = "num_workers"
+const REDIS_KEY_NUMWORKERS = "num_workers"
 const REDIS_KEY_SCHEDULER_QUEUED_JOBS = "queued_jobs"
 const REDIS_KEY_WORKER_LOADS = "worker_loads"
 const REDIS_KEY_DRM_KEYS = "drm_keys"
