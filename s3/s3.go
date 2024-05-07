@@ -8,8 +8,8 @@ import (
 )
 
 // https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/go/example_code/s3/s3_upload_object.go
-func Upload(filename string, bucketname string) error {
-	file, err := os.Open(filename)
+func Upload(local_file_path string, remote_file_name string, bucketname string) error {
+	file, err := os.Open(local_file_path)
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func Upload(filename string, bucketname string) error {
 	uploader := s3manager.NewUploader(sess)
 	_, err = uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucketname),
-		Key: aws.String(filename),
+		Key: aws.String(remote_file_name),
 		Body: file,
 	})
 

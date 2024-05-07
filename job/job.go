@@ -25,8 +25,13 @@ type LiveAudioOutputSpec struct {
 }
 
 type DrmConfig struct {
+	disable_clear_key bool
 	Protection_system string
 	Protection_scheme string
+}
+
+type s3OutputConfig struct {
+	Bucket string
 }
 
 type LiveJobOutputSpec struct {
@@ -37,6 +42,7 @@ type LiveJobOutputSpec struct {
 	Low_latency_mode bool
 	Time_shift_buffer_depth int
 	Drm DrmConfig
+	S3_output s3OutputConfig
 	Video_outputs []LiveVideoOutputSpec 
 	Audio_outputs []LiveAudioOutputSpec 
 }

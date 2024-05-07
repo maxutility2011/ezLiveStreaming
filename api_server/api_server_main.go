@@ -30,8 +30,8 @@ type SqsConfig struct {
 type ApiServerConfig struct {
 	Api_server_hostname string
 	Api_server_port string
-	Origin_server_hostname string
-    Origin_server_port string
+	//Origin_server_hostname string
+    //Origin_server_port string
 	Drm_key_server_url string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
@@ -117,9 +117,12 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	
 	lj.StreamKey = assignJobInputStreamId()
 	if j.Output.Stream_type == job.DASH {
-		lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.DASH_MPD_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+		// Example: https://bozhang-private.s3.amazonaws.com/output_70255156-26ef-4378-811b-dfc44a7c6cb5/master.mpd
+		lj.Playback_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + job.DASH_MPD_FILE_NAME
+		//lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.DASH_MPD_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 	} else if j.Output.Stream_type == job.HLS {
-		lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
+		lj.Playback_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME
+		//lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 	}
 
 	//j.IngestUrls = make([]string)

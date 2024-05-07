@@ -324,12 +324,22 @@ func launchJob(j job.LiveJob) error {
 	// WorkerUdpPortBase + total_outputs: the port base of the new job.
 	j.Spec.Input.JobUdpPortBase = worker_app_config.WorkerUdpPortBase + total_outputs
 	
-	b, err := json.Marshal(j.Spec)
-	if err != nil {
-		fmt.Println("Failed to marshal job output (launchJob). Error: ", err)
-		return err
+	b1, err1 := json.Marshal(j.Spec)
+	if err1 != nil {
+		fmt.Println("Failed to marshal job output (launchJob). Error: ", err1)
+		return err1
 	}
 	
+	var b2 []byte
+	var err2 error
+	if j.DrmEncryptionKeyInfo.Key_id != "" {
+		b2, err2 = json.Marshal(j.DrmEncryptionKeyInfo)
+		if err2 != nil {
+			fmt.Println("Failed to marshal job output (launchJob). Error: ", err2)
+			return err2
+		}
+	}
+
 	var transcoderArgs []string
 
 	jobIdArg := "-job_id="
@@ -337,10 +347,16 @@ func launchJob(j job.LiveJob) error {
 	transcoderArgs = append(transcoderArgs, jobIdArg)
 
 	paramArg := "-param="
-	paramArg += string(b[:])
+	paramArg += string(b1[:])
 	transcoderArgs = append(transcoderArgs, paramArg)
 
-	fmt.Println("Worker arguments: ", strings.Join(transcoderArgs, " "))
+	if j.DrmEncryptionKeyInfo.Key_id != "" {
+		drmArg := "-drm="
+		drmArg += string(b2[:])
+		transcoderArgs = append(transcoderArgs, drmArg)
+	}
+
+	fmt.Println("Worker transcoder arguments: ", strings.Join(transcoderArgs, " "))
 	transcoderCmd := exec.Command("worker_transcoder", transcoderArgs...)
 
 	var rj RunningJob
@@ -350,11 +366,11 @@ func launchJob(j job.LiveJob) error {
 	running_jobs.PushBack(rj)
 
 	var out []byte
-	var err2 error
-	err2 = nil
+	var err_transcoder error
+	err_transcoder = nil
 	go func() {
-		out, err2 = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
-		if err2 != nil {
+		out, err_transcoder = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
+		if err_transcoder != nil {
 			//running_jobs.Remove(je) // Cleanup if transcoderCmd fails
 			
 			// Let's not remove the failed job from running_jobs here, but leave it to function checkJobStatus()
@@ -373,8 +389,11 @@ func launchJob(j job.LiveJob) error {
 	// ffmpeg stops (e.g., when the user issues a stop_job request). In this case, err2 will not be 
 	// updated when the sleep ends thus err2=nil will be returned (which is valid). 
 	time.Sleep(100 * time.Millisecond)
-	fmt.Println("Worker transcoder process id: ", transcoderCmd.Process.Pid)
-	return err2
+	if transcoderCmd.Process != nil {
+		fmt.Println("Worker transcoder process id: ", transcoderCmd.Process.Pid)
+	}
+
+	return err_transcoder
 }
 
 func reportJobStatus(report models.WorkerJobReport) error {

@@ -7,8 +7,12 @@
             "Low_latency_mode": false,
             "Time_shift_buffer_depth": 120,
             "Drm": {
+                "disable_clear_key": false,
                 "Protection_system": "clear_key",
                 "Protection_scheme": "cbcs"
+            },
+            "S3_output": {
+                "Bucket": "bzhang-test-bucket-public"
             },
             "Video_outputs": [
                 {

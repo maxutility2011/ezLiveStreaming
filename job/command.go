@@ -1,10 +1,10 @@
 package job
 
 import (
-	"fmt"
 	"strings"
 	"strconv"
-	//"ezliveStreaming/models"
+	"encoding/json"
+	"ezliveStreaming/models"
 )
 
 const RTMP = "rtmp"
@@ -18,6 +18,8 @@ const H265_CODEC = "h265"
 const FFMPEG_H265 = "libx265"
 const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
+const PROTECTION_SYSTEM_FAIRPLAY = "FairPlay"
+const PROTECTION_SCHEME_CBCS = "cbcs"
 const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
 const DASH_MPD_FILE_NAME = "master.mpd"
 const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
@@ -29,7 +31,7 @@ func ArgumentArrayToString(args []string) string {
 
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
 func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
-    var ffmpegArgs []string 
+	var ffmpegArgs []string 
     if strings.Contains(j.Input.Url, RTMP) {
         ffmpegArgs = append(ffmpegArgs, "-f")
         ffmpegArgs = append(ffmpegArgs, "flv")
@@ -162,9 +164,16 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
     return ffmpegArgs
 }
 
-func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []string {
+func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
     var packagerArgs []string 
+	var local_media_output_path_subdirs []string
 	port_base := j.Input.JobUdpPortBase
+
+	var k models.KeyInfo
+	if drmKeyInfo != "" {
+        bytesKeyInfoSpec := []byte(drmKeyInfo)
+        json.Unmarshal(bytesKeyInfoSpec, &k)
+    }
 
 	// In the ffmpeg command, video outputs come first and use the lower UDP ports, starting from the port base. 
 	// Audio outputs follow and use the higher UDP ports.
@@ -181,6 +190,7 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		video_output += ("," + stream_selector)
 
 		output_label := "video_" + vo.Bitrate
+		local_media_output_path_subdirs = append(local_media_output_path_subdirs, output_label)
 
 		init_segment_template_prefix := "init_segment="
 		init_segment_template := media_output_path + output_label + "/init.mp4"
@@ -209,6 +219,7 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		audio_output += ("," + stream_selector)
 
 		output_label := "audio_" + ao.Bitrate
+		local_media_output_path_subdirs = append(local_media_output_path_subdirs, output_label)
 
 		init_segment_template_prefix := "init_segment="
 		init_segment_template := media_output_path + output_label + "/init.mp4"
@@ -280,13 +291,38 @@ func JobSpecToShakaPackagerArgs(j LiveJobSpec, media_output_path string) []strin
 		hls_playlist_type_value := "live" 
 		packagerArgs = append(packagerArgs, hls_playlist_type_value)
 
+		// Configure DRM protection 
+		if drmKeyInfo != "" {
+			protection_system_option := "--protection_systems"
+			packagerArgs = append(packagerArgs, protection_system_option)
+			protection_system_value := j.Output.Drm.Protection_system 
+			packagerArgs = append(packagerArgs, protection_system_value)
+
+			protection_scheme_option := "--protection_scheme"
+			packagerArgs = append(packagerArgs, protection_scheme_option)
+			protection_scheme_value := j.Output.Drm.Protection_scheme 
+			packagerArgs = append(packagerArgs, protection_scheme_value)
+
+			// Use clear key
+			if !j.Output.Drm.disable_clear_key {
+				enable_raw_key_option := "--enable_raw_key_encryption"
+				packagerArgs = append(packagerArgs, enable_raw_key_option)
+
+				// Key file URL format: "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + models.DrmKeyFileName
+				hls_key_uri_option := "--hls_key_uri"
+				packagerArgs = append(packagerArgs, hls_key_uri_option)
+				hls_key_uri_value := "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + job_id + "/" + models.DrmKeyFileName
+				packagerArgs = append(packagerArgs, hls_key_uri_value)
+			}
+		}
+
 		m3u8_output := "--hls_master_playlist_output"
 		packagerArgs = append(packagerArgs, m3u8_output)
 		m3u8_output_path := media_output_path + HLS_MASTER_PLAYLIST_FILE_NAME
 		packagerArgs = append(packagerArgs, m3u8_output_path)
 	}
 
-    return packagerArgs
+    return packagerArgs, local_media_output_path_subdirs
 }
 
 // Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
@@ -439,9 +475,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
 
 	output_path := media_output_path + "1.mpd"
 	ffmpegArgs = append(ffmpegArgs, output_path)
-
-	ffmpegArgsString := ArgumentArrayToString(ffmpegArgs)
-	fmt.Println("FFmpeg arguments: ", ffmpegArgsString)
 
     return ffmpegArgs
 }

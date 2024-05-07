@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+var DrmKeyFileName = "decryption.key"
+
 type CreateKeyRequest struct {
 	Content_id string
 }
