@@ -27,17 +27,16 @@ type KeyInfo struct {
 
 func Random_16bytes_as_string() (string, error) {
 	rand_16bytes := ""
-
-	c := 16
-	b := make([]byte, c)
+	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {
 		return rand_16bytes, err
 	}
 
-	for _, i := range b {
-		h := fmt.Sprintf("%x", i)
+	for n, i := range b {
+		h := fmt.Sprintf("%02x", i)
 		rand_16bytes += h
+		fmt.Println("n: ", n, ": ", h)
 	}
 
 	return rand_16bytes, nil

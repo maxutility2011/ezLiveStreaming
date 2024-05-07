@@ -24,6 +24,7 @@ const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
 const DASH_MPD_FILE_NAME = "master.mpd"
 const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
+const drm_label_video = "allvideos"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -169,10 +170,10 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 	var local_media_output_path_subdirs []string
 	port_base := j.Input.JobUdpPortBase
 
-	var k models.KeyInfo
+	var key models.KeyInfo
 	if drmKeyInfo != "" {
         bytesKeyInfoSpec := []byte(drmKeyInfo)
-        json.Unmarshal(bytesKeyInfoSpec, &k)
+        json.Unmarshal(bytesKeyInfoSpec, &key)
     }
 
 	// In the ffmpeg command, video outputs come first and use the lower UDP ports, starting from the port base. 
@@ -203,6 +204,11 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		if j.Output.Stream_type == HLS {
 			playlist_name := "playlist_name=" + media_output_path + output_label + ".m3u8"
 			video_output += ("," + playlist_name)
+		}
+
+		if drmKeyInfo != "" {
+			drm_label := "drm_label=" + drm_label_video
+			video_output += ("," + drm_label)
 		}
 
 		packagerArgs = append(packagerArgs, video_output)
@@ -295,7 +301,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		if drmKeyInfo != "" {
 			protection_system_option := "--protection_systems"
 			packagerArgs = append(packagerArgs, protection_system_option)
-			protection_system_value := j.Output.Drm.Protection_system 
+			protection_system_value := PROTECTION_SYSTEM_FAIRPLAY 
 			packagerArgs = append(packagerArgs, protection_system_value)
 
 			protection_scheme_option := "--protection_scheme"
@@ -307,6 +313,18 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 			if !j.Output.Drm.disable_clear_key {
 				enable_raw_key_option := "--enable_raw_key_encryption"
 				packagerArgs = append(packagerArgs, enable_raw_key_option)
+
+				keys_option := "--keys"
+				packagerArgs = append(packagerArgs, keys_option)
+
+				key_label_value := "label=" + drm_label_video 
+				key_id_value := "key_id=" + key.Key_id
+				key_value := "key=" + key.Key
+
+				iv, _ := models.Random_16bytes_as_string()
+				iv_value := "iv=" + iv
+				keys_value := key_label_value + ":" + key_id_value + ":" + key_value + ":" + iv_value
+				packagerArgs = append(packagerArgs, keys_value)
 
 				// Key file URL format: "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + models.DrmKeyFileName
 				hls_key_uri_option := "--hls_key_uri"
