@@ -9,15 +9,17 @@ ezLiveStreaming is designed to be highly scalable, reliable and resource efficie
 - live Adaptative BitRate (ABR) transcoding, 
 - HLS/DASH streaming, 
 - live transcoding API,
-- DRM protection (coming soon...), 
+- clear key DRM protection, 
+- uploading transcoder outputs to AWS S3 buckets,
 - standard-compliant media transcoding and packaging which potentially work with any video players.
 
 # Workflow and high-level architecture
 
-ezLiveStreaming consists of 4 microservices that can be independently scaled,
+ezLiveStreaming consists of 5 microservices that can be independently scaled,
 - live API server
 - live job scheduler
 - live transcoding worker
+- a simple clear-key DRM key server called **ezKey_server**
 - **Redis** data store
 
 ![screenshot](diagrams/architecture_diagram.png)
@@ -80,9 +82,9 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 
 ![screenshot](diagrams/create_job.png)
 
-**Transcoding parameter definitions**
+## Transcoding parameter definitions
 
-| Param | data type | Definition | valid values |
+| Param | Data type | Definition | Valid values |
 | --- | --- | --- | --- |
 | Stream_type | string | stream type (protocol) | "hls", "dash" |
 | Segment_format | string | media segment format | "fmp4", "mpegts", "cmaf" |
@@ -106,7 +108,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg) | for example, "750k" |
 |Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg) | for example, "750k" |
 | Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets |
-| Threads | integer | Number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values |
+| Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values |
 | Audio_outputs | json | array of audio outputs | n/a |
 | Codec (Audio_outputs) | string | audio codec | "aac" |
 
@@ -156,11 +158,26 @@ When worker_app on a live worker first starts, it needs to register with the job
 
 A list of internal API provided by job scheduler and worker_app can be found in ezLiveStreaming postman_collection.
 
+## DRM configuration
+
+A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS/DASH streams. 
+
+```
+"Drm": {
+    "disable_clear_key": false,
+    "Protection_system": "FairPlay",
+    "Protection_scheme": "cbcs"
+},
+```
+Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party, paid DRM services which I am happy to implement if sponsorship is provided.
+
 # Code structure
 
 **api_server/** contains the implementation of a live streaming API server which handle requests to create/list/stop/resume live streams.
 
 **demo/** provides the implementation of a simple UI demo. <br>
+
+**drm/** provides the implementation of a simple DRM key server. <br>
 
 **job/** contains the definition of API requests and live job states, and also contains source code for generating FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job. <br>
 
@@ -172,7 +189,8 @@ A list of internal API provided by job scheduler and worker_app can be found in 
 
 **scheduler/** contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes API endpoints and receives new live worker registration requests from newly launched workers. <br>
 
-**worker/** contains the implementation of live transcoding/streaming workers. The file *app/worker_app.go* implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (*worker/transcoder/worker_transcode.go*) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc. <br>
+**worker/** contains the implementation of live transcoding/streaming workers. The file *app/worker_app.go* implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (*worker/transcoder/worker_transcode.go*) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc. *worker/* also contains the Shaka packager binary "packager" (the nightly build from 04/2024).
+<br>
 
 **sample_live_job.json** contains a sample live job request. <br>
 
@@ -190,7 +208,7 @@ go build api_server_main.go
 ```
 then start the server by running
 ```
-./api_server_main
+./api_server_main -config=config.json
 ``` 
 api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
 
@@ -200,7 +218,7 @@ go build scheduler.go
 ``` 
 then start the job scheduler by running 
 ```
-./scheduler
+./scheduler -config=config.json
 ``` 
 Job scheduler does not take any arguments. You can set the hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
 
@@ -216,6 +234,15 @@ The "*-config*" argument specifies the path to the worker_app configuration file
 - the hostname and network port of the worker_app. 
 - the URL of the job scheduler. The worker_app sends heartbeat, reports status of jobs via this URL.
 - the IP address or hostname, and network port of the worker VM on which the worker_app runs.
+
+To build ezKey_server, go to *drm/* and run 
+```
+go build ezKey_server.go
+``` 
+then start the key server by running
+```
+./ezKey_server -config=config.json
+```
 
 You can write your own docker compose file and/or scripts to automate the deployment of your api_server cluster, the job scheduler cluster, the worker cluster and Redis cluster. I'm also working on providing a sample docker compose file.
 
