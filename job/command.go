@@ -24,7 +24,7 @@ const DEFAULT_MAXBITRATE_AVGBITRATE_RATIO = 1.5
 const DASH_MPD_FILE_NAME = "master.mpd"
 const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
-const drm_label_video = "allvideos"
+const drm_label_allmedia = "allmedia"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -207,7 +207,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		}
 
 		if drmKeyInfo != "" {
-			drm_label := "drm_label=" + drm_label_video
+			drm_label := "drm_label=" + drm_label_allmedia
 			video_output += ("," + drm_label)
 		}
 
@@ -241,6 +241,11 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 
 			hls_group_id := "hls_group_id=" + output_label
 			audio_output += ("," + hls_group_id)
+		}
+
+		if drmKeyInfo != "" {
+			drm_label := "drm_label=" + drm_label_allmedia
+			audio_output += ("," + drm_label)
 		}
 
 		packagerArgs = append(packagerArgs, audio_output)
@@ -301,7 +306,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		if drmKeyInfo != "" {
 			protection_system_option := "--protection_systems"
 			packagerArgs = append(packagerArgs, protection_system_option)
-			protection_system_value := PROTECTION_SYSTEM_FAIRPLAY 
+			protection_system_value := j.Output.Drm.Protection_system 
 			packagerArgs = append(packagerArgs, protection_system_value)
 
 			protection_scheme_option := "--protection_scheme"
@@ -317,7 +322,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 				keys_option := "--keys"
 				packagerArgs = append(packagerArgs, keys_option)
 
-				key_label_value := "label=" + drm_label_video 
+				key_label_value := "label=" + drm_label_allmedia 
 				key_id_value := "key_id=" + key.Key_id
 				key_value := "key=" + key.Key
 

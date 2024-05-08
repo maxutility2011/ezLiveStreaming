@@ -8,7 +8,7 @@
             "Time_shift_buffer_depth": 120,
             "Drm": {
                 "disable_clear_key": false,
-                "Protection_system": "clear_key",
+                "Protection_system": "FairPlay",
                 "Protection_scheme": "cbcs"
             },
             "S3_output": {

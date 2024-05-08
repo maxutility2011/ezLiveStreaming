@@ -245,7 +245,6 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string) erro
 
                 // Packager has finished writing to a stream file when it is renamed
                 if event.Op == fsnotify.Create {
-                    //uploadStreamFile(event.Name, remote_media_output_path)
                     if isStreamFile(event.Name) {
                         addToUploadList(event.Name, remote_media_output_path)
                     } else {
@@ -271,7 +270,6 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string) erro
         }
     }
 
-    // Block main goroutine forever.
     <-make(chan struct{})
     return err
 }
@@ -468,17 +466,13 @@ func main() {
     // Periodically manage ffmpeg and shaka packager
     d2, _ := time.ParseDuration(stream_file_upload_interval)
 	ticker = time.NewTicker(d2)
-	//quit = make(chan struct{})
 	go func(ticker *time.Ticker) {
 		for {
 		   select {
 			    case <-ticker.C: {
+                    // Periodically call function uploadFiles every "stream_file_upload_interval" time units
                     uploadFiles()
 			    }
-			    //case <-quit: {
-				//    ticker.Stop()
-                //    os.Exit(0)
-                //}
 			}
 		}
 	}(ticker)

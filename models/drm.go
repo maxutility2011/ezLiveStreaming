@@ -33,10 +33,9 @@ func Random_16bytes_as_string() (string, error) {
 		return rand_16bytes, err
 	}
 
-	for n, i := range b {
+	for _, i := range b {
 		h := fmt.Sprintf("%02x", i)
 		rand_16bytes += h
-		fmt.Println("n: ", n, ": ", h)
 	}
 
 	return rand_16bytes, nil
