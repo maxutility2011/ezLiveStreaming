@@ -82,8 +82,8 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 
 **Transcoding parameter definitions**
 
-Param | data type | Definition | valid values 
-:---: | :---: | :---: | :---: 
+| Param | data type | Definition | valid values |
+| --- | --- | --- | --- |
 Stream_type | string | stream type (protocol) | "hls", "dash" 
 --- | --- | --- | --- 
 Segment_format | string | media segment format | "fmp4", "mpegts", "cmaf" 
