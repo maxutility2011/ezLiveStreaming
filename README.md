@@ -314,6 +314,9 @@ The current load of a worker: list of jobs running on the worker and its CPU and
 
 ## "drm_keys":
 This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis_client.go.
+**Data structure**: hash table
+**key**: DRM key id
+**value**: "type KeyInfo struct" in models/drm.go
 
 # Demo
 
