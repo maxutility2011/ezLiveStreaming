@@ -87,51 +87,28 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Stream_type | string | stream type (protocol) | "hls", "dash" |
 | Segment_format | string | media segment format | "fmp4", "mpegts", "cmaf" |
 | Fragment_duration | integer | fragment (GOP) duration in second. Currently, this will set the closed GOP size and key frame interval | n/a |
-| --- | --- | --- | --- |
 | Segment_duration | integer | duration of segments in second | n/a |
-| --- | --- | --- | --- |
 | Low_latency_mode | boolean | whether low latency mode is used | n/a |
-| --- | --- | --- | --- |
 | Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | n/a |
-| --- | --- | --- | --- |
 | Drm | json | DRM configuration | n/a |
-| --- | --- | --- | --- |
 | disable_clear_key | bool | whether clear key DRM is disabled | n/a |
-| --- | --- | --- | --- |
 | Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
-| --- | --- | --- | --- |
 | Protection_scheme | string | DRM protection (encryption) scheme | "cbcs" (other schemes to be added, e.g., "cenc") |
-| --- | --- | --- | --- |
 | S3_output | json | output S3 bucket configuration | n/a |
-| --- | --- | --- | --- |
 | Bucket | string | S3 bucket name | n/a |
-| --- | --- | --- | --- |
 | Video_outputs | json array | Array of video rendition outputs | n/a |
-| --- | --- | --- | --- |
 | Label | string | label of an output (rendition) | n/a |
-| --- | --- | --- | --- |
 | Codec (Video_outputs) | string | video codec | "h264" (libx264), "h265" (libx265) |
-| --- | --- | --- | --- |
 | Framerate | integer | output video frame rate | n/a |
-| --- | --- | --- | --- |
 | Width | integer | output video resolution (width) | n/a |
-| --- | --- | --- | --- |
 | Height | integer | output video resolution (height) | n/a |
-| --- | --- | --- | --- |
 | Bitrate | string | output video bitrate (corresponds to "-b:v" in ffmpeg) | for example, "500k", "1m" |
-| --- | --- | --- | --- |
 | Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg) | for example, "750k" |
-| --- | --- | --- | --- |
 |Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg) | for example, "750k" |
-| --- | --- | --- | --- |
 | Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets |
-| --- | --- | --- | --- |
 | Threads | integer | Number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values |
-| --- | --- | --- | --- |
 | Audio_outputs | json | array of audio outputs | n/a |
-| --- | --- | --- | --- |
 | Codec (Audio_outputs) | string | audio codec | "aac" |
-| --- | --- | --- | --- |
 
 ### Get all the jobs
 Show all the jobs including currently running jobs and already finished jobs. <br>
