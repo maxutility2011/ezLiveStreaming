@@ -35,12 +35,20 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 ```
 {
     "Output": {
-        "Stream_type": "dash", 
+        "Stream_type": "hls", 
         "Segment_format": "fmp4", 
         "Fragment_duration": 1, 
         "Segment_duration": 4, 
         "Low_latency_mode": false, 
-        "Time_shift_buffer_depth": 120 
+        "Time_shift_buffer_depth": 120,
+        "Drm": {
+                "disable_clear_key": false,
+                "Protection_system": "FairPlay",
+                "Protection_scheme": "cbcs"
+            },
+        "S3_output": {
+            "Bucket": "bzhang-test-bucket-public"
+        },
         "Video_outputs": [ 
             {
                 "Label": "video365k", 
