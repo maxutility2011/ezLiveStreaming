@@ -1,4 +1,3 @@
-//var api_server_url = "http://127.0.0.1:1080/";
 var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
 var ingest_url = "";
 var create_button;
@@ -18,22 +17,8 @@ var sample_live_job = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4"
 var isLivefeeding = false
 
 async function initPlayer() {
-    //var urlInput = document.getElementById('url');
-  
     // Create a Player instance.
     const video = document.getElementById('video');
-  
-    /*video.addEventListener('loadstart', (event) => {
-        loadStartTime = Date.now();
-    });
-  
-    video.addEventListener('loadeddata', (event) => {
-        loadEndTime = Date.now();
-    });
-  
-    video.addEventListener('waiting', (event) => {
-      ++waitingEvents;
-    });*/
   
     const player = new shaka.Player(video);
   
@@ -135,27 +120,6 @@ window.addEventListener("DOMContentLoaded", (event) => {
     job_essentials.innerHTML = "Playback URL and RTMP ingest URL will be shown after clicking the Create button. Please push your live feed to the RTMP ingest URL. After you start feeding the live channel, wait 15 secs then hit the Play button to play your channel."
     video = document.getElementById('video');
 });
-    
-/*
-var cfg = 
-{
-    "debug": false,
-    "enableWorker": true,
-    "lowLatencyMode": true,
-    "backBufferLength": 90,
-    "maxLiveSyncPlaybackRate": 1,
-    "liveSyncDuration": 6,
-    "liveMaxLatencyDuration": 7
-};
-
-if (Hls.isSupported()) {
-    var stats_hls = new Hls(cfg);
-    stats_hls.attachMedia(video);
-    stats_hls.loadSource(playback_url);
-} else {
-    window.alert("HLS not supported");
-}
-*/
 
 function playVideo() {
     reloadPlayer()

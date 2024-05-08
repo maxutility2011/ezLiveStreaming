@@ -1,4 +1,3 @@
-//var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";
 var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
 var ingest_url = "";
 var create_button;
@@ -18,22 +17,8 @@ var sample_live_job = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4"
 var isLivefeeding = false
 
 async function initPlayer() {
-    //var urlInput = document.getElementById('url');
-  
     // Create a Player instance.
     const video = document.getElementById('video');
-  
-    /*video.addEventListener('loadstart', (event) => {
-        loadStartTime = Date.now();
-    });
-  
-    video.addEventListener('loadeddata', (event) => {
-        loadEndTime = Date.now();
-    });
-  
-    video.addEventListener('waiting', (event) => {
-      ++waitingEvents;
-    });*/
   
     const player = new shaka.Player(video);
   
@@ -136,27 +121,6 @@ window.addEventListener("DOMContentLoaded", (event) => {
     video = document.getElementById('video');
 });
     
-/*
-var cfg = 
-{
-    "debug": false,
-    "enableWorker": true,
-    "lowLatencyMode": true,
-    "backBufferLength": 90,
-    "maxLiveSyncPlaybackRate": 1,
-    "liveSyncDuration": 6,
-    "liveMaxLatencyDuration": 7
-};
-
-if (Hls.isSupported()) {
-    var stats_hls = new Hls(cfg);
-    stats_hls.attachMedia(video);
-    stats_hls.loadSource(playback_url);
-} else {
-    window.alert("HLS not supported");
-}
-*/
-
 function playVideo() {
     reloadPlayer()
 }
