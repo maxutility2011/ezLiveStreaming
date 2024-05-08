@@ -286,7 +286,7 @@ This is the official Redis image that I'm using.
 
 # List of Redis data structures 
 ## "jobs": 
-All live jobs - REDIS_KEY_ALLJOBS in redis_client/redis_client.go <br>
+All live jobs - see REDIS_KEY_ALLJOBS in redis_client/redis_client.go. <br>
 **Data structure**: hash table <br>
 **key**: job id <br>
 **value**: "type LiveJob struct" in job/job.go <br>
@@ -294,12 +294,12 @@ All live jobs - REDIS_KEY_ALLJOBS in redis_client/redis_client.go <br>
 To view all jobs in redis-cli, run "hgetall jobs". <br>
 
 ## "queued_jobs": 
-Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled - REDIS_KEY_ALLJOBS in redis_client/redis_client.go <br>
+Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled - see REDIS_KEY_ALLJOBS in redis_client/redis_client.go. <br>
 **Data structure**: list <br>
 **value**: string of "type LiveJob struct" (job/job.go) <br>
 
 ## "workers":
-The set of live workers currently being managed by the job scheduler - REDIS_KEY_ALLWORKERS in redis_client/redis_client.go <br>
+The set of live workers currently being managed by the job scheduler - see REDIS_KEY_ALLWORKERS in redis_client/redis_client.go. <br>
 **Data structure**: hash table <br>
 **key**: worker id <br>
 **value**: string of "type LiveWorker struct" (models/worker.go) <br>
@@ -307,10 +307,13 @@ The set of live workers currently being managed by the job scheduler - REDIS_KEY
 To view all workers in redis-cli, run "hgetall workers".
 
 ## "worker_loads": 
-The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go
+The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - see REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go.
 **Data structure**: hash table
 **key**: worker id
 **value**: "type LiveWorker struct" in models/worker.go
+
+## "drm_keys":
+This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis_client.go.
 
 # Demo
 
