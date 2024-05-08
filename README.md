@@ -304,19 +304,19 @@ The set of live workers currently being managed by the job scheduler - see REDIS
 **key**: worker id <br>
 **value**: string of "type LiveWorker struct" (models/worker.go) <br>
 
-To view all workers in redis-cli, run "hgetall workers".
+To view all workers in redis-cli, run "hgetall workers". 
 
 ## "worker_loads": 
-The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - see REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go.
-**Data structure**: hash table
-**key**: worker id
-**value**: "type LiveWorker struct" in models/worker.go
+The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - see REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go. <br>
+**Data structure**: hash table <br>
+**key**: worker id <br>
+**value**: "type LiveWorker struct" in models/worker.go <br>
 
 ## "drm_keys":
-This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis_client.go.
-**Data structure**: hash table
-**key**: DRM key id
-**value**: "type KeyInfo struct" in models/drm.go
+This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis_client.go. <br>
+**Data structure**: hash table <br>
+**key**: DRM key id <br>
+**value**: "type KeyInfo struct" in models/drm.go <br>
 
 # Demo
 
