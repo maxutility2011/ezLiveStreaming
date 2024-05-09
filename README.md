@@ -166,7 +166,13 @@ When worker_app on a live worker first starts, it needs to register with the job
 
 A list of internal API provided by job scheduler and worker_app can be found in ezLiveStreaming postman_collection.
 
-## DRM configuration
+# Live stream data flow
+
+![screenshot](diagrams/data_flow.png)
+
+ezLiveStreaming's live stream data flow is shown in the above diagram. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to a ffmpeg transcoder running on the worker VM (started by worker_transcoder). The transcoder outputs N number of output MPEG-TS streams, one for each configured output rendition in the job request. The MPEG-TS streams are sent to a Shaka packager (also starte3d by worker_transcoder) running on the same LAN over UDP. Shaka packager outputs HLS/DASH streams as fragment MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
+
+# DRM configuration
 
 A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS/DASH streams. 
 
@@ -178,6 +184,16 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
 },
 ```
 Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party, paid DRM services which I am happy to implement if sponsorship is provided.
+
+# S3 output configuration
+
+ezLiveStreaming supports uploading transcoder outputs to AWS S3 buckets. You can configure S3 media output via the "S3_output" section,
+```
+"S3_output": {
+    "Bucket": "bzhang-test-bucket-public"
+}
+```
+Currently, ezLiveStreaming does not support programmatic S3 authentication methods. You may configure AWS access key and secret key as environment variables on the worker VM, so that worker_transcoder has access to upload to the bucket.
 
 # Code structure
 
@@ -319,7 +335,6 @@ This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis
 **value**: "type KeyInfo struct" in models/drm.go <br>
 
 # Demo
-
 This repository provide a simple transcoding UI for demo purposes. The demo source code can be found at *demo/* folder,
 - demo/demo.html: a simple UI html
 - demo/live_demo_player.js: implements listener functions for the "Create", "Stop", "Resume" and "Show", "Livefeed", "Stoplivefeed" and "Play" buttons. Upon button click events, those listener functions will send API requests to the API server. 
