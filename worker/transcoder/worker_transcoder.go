@@ -99,6 +99,16 @@ func writeKeyFile(key string, keyFileName string) error {
     return err
 }
 
+func writeKeyInfoFile(k models.KeyInfo, keyInfoFileName string) error {
+    b, _ := json.Marshal(k)
+    err := os.WriteFile(keyInfoFileName, b, 0644)
+    if err != nil {
+        Log.Printf("Failed to write key info file. Error: ", err)
+    }
+
+    return err
+}
+
 func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, remote_media_output_path string) error {
     var k models.KeyInfo
 	bytesKeyInfoSpec := []byte(keyInfoStr)
@@ -114,11 +124,26 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
         return err
     }
 
-    // Next, upload the local key file to cloud storage
+    err = writeKeyInfoFile(k, local_media_output_path + models.DrmKeyInfoFileName)
+    if err != nil {
+        return err
+    }
+
+    // Next, upload the local key file and key info file to cloud storage
     err = s3.Upload(local_media_output_path + models.DrmKeyFileName, models.DrmKeyFileName, remote_media_output_path)
     if err != nil {
         Log.Printf("Failed to upload %s to %s", local_media_output_path + models.DrmKeyFileName, remote_media_output_path)
     }
+
+    // Key info file contains key_id and key in plain text. 
+    // It is only written to local disk for debugging purposes. 
+    // Do NOT upload to origin!!!
+    /*
+    err = s3.Upload(local_media_output_path + models.DrmKeyInfoFileName, models.DrmKeyInfoFileName, remote_media_output_path)
+    if err != nil {
+        Log.Printf("Failed to upload %s to %s", local_media_output_path + models.DrmKeyInfoFileName, remote_media_output_path)
+    }
+    */
 
     return err
 }

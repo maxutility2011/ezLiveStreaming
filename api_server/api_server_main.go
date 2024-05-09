@@ -404,6 +404,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					FileContentType := "application/json"
         			w.Header().Set("Content-Type", FileContentType)
         			w.WriteHeader(http.StatusOK)
+
+					j.DrmEncryptionKeyInfo.Key = "********************************" // Hide DRM key
         			json.NewEncoder(w).Encode(j)
 					return
 				} else {

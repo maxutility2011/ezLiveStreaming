@@ -209,10 +209,14 @@ function showJob() {
 
             playback_url = j.Playback_url;
             ingest_url = j.RtmpIngestUrl;
+            drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
+            drm_key = j.DrmEncryptionKeyInfo.Key;
 
             let je = {}
             je.playback_url = playback_url
             je.rtmp_ingest_url = ingest_url
+            je.drm_key_id = drm_key_id
+            je.drm_key = drm_key            
 
             job_essentials.innerHTML = JSON.stringify(je, null, 2)
             response_code.innerHTML = "status code=" + show_job_req.status

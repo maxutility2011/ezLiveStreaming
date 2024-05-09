@@ -7,6 +7,7 @@ import (
 )
 
 var DrmKeyFileName = "key.bin"
+var DrmKeyInfoFileName = "key.json"
 
 type CreateKeyRequest struct {
 	Content_id string
