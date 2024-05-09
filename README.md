@@ -185,6 +185,19 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
 ```
 Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party, paid DRM services which I am happy to implement if sponsorship is provided.
 
+To play the clear-key DRM-protected HLS stream, I used Shaka player and configured key_id and key in the player. I simply added the following section to the Shaka player configuration,
+```
+{
+  "drm": {
+    "clearKeys": {
+      "6185c9f2cba899e585c61f046ac5bfe7": "459ad6f73d96190c8348d0059d71f77a"
+    }
+  }
+}
+```
+Please replace the key_id and key with your ones.
+![screenshot](diagrams/shaka_player_drm_config.png)
+
 # S3 output configuration
 
 ezLiveStreaming supports uploading transcoder outputs to AWS S3 buckets. You can configure S3 media output via the "S3_output" section,
