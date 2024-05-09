@@ -1,5 +1,5 @@
 {
-    "Api_server_hostname": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "Api_server_hostname": "0.0.0.0",
     "Api_server_port": "1080",
     "Drm_key_server_url": "http://ec2-34-202-195-77.compute-1.amazonaws.com:5080/keys/",
     "Sqs": {

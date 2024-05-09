@@ -202,7 +202,7 @@ Please replace the key_id and key with your ones. The above configuration tells 
 ![screenshot](diagrams/shaka_player_drm_config.png)
 
 ### How to get the DRM key_id and key
-The DRM key_id can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
+The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
 
 Actually, the above DRM key configuration is not needed if you play the individual variant playlists. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
 
@@ -255,7 +255,7 @@ then start the server by running
 ```
 ./api_server_main -config=config.json
 ``` 
-api_server_main does not take any arguments. However, you can set the hostname and network port of the api_server, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports.
+You can configure api_server_main in the config file. Specifically, you can configure the server hostname and network port, Drm key server url, and the AWS SQS job queue name and Redis server address in *api_server_main/config.json*. By default, the api_server listens for incoming live transcoding requests on http://0.0.0.0:1080/. This is also the base URL of any API endpoints that the server supports. You need to open port 1080 for incoming traffic to the Internet.
 
 To build the job scheduler, go to *scheduler/* and run 
 ```
@@ -265,7 +265,7 @@ then start the job scheduler by running
 ```
 ./scheduler -config=config.json
 ``` 
-Job scheduler does not take any arguments. You can set the hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
+You can configure scheduler in the config file. Specifically, you can set the server hostname and network port of the scheduler, and the AWS SQS job queue name and Redis server address in *scheduler/config.json*. By default, the scheduler listens for incoming requests on http://0.0.0.0:80/.
 
 To build worker_app, go to *worker/app/* and run 
 ```
@@ -279,6 +279,7 @@ The "*-config*" argument specifies the path to the worker_app configuration file
 - the hostname and network port of the worker_app. 
 - the URL of the job scheduler. The worker_app sends heartbeat, reports status of jobs via this URL.
 - the IP address or hostname, and network port of the worker VM on which the worker_app runs.
+- WorkerUdpPortBase: the UDP port base used by the MPEG-TS streams between ffmpeg transcoder and Shaka packager. Since ffmpeg and Shaka packager run on the same VM, these ports are for internal use only.
 
 To build ezKey_server, go to *drm/* and run 
 ```
