@@ -82,8 +82,9 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
     }
 }
 
-func writeKeyFile(key string, keyFileName string) error {
-    b := []byte(key)
+func writeKeyFile(kid string, key string, keyFileName string) error {
+    key_pair := kid + ":" + key
+    b := []byte(key_pair)
     err := os.WriteFile(keyFileName, b, 0644)
     if err != nil {
         Log.Printf("Failed to write key file. Error: ", err)
@@ -102,7 +103,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
     }
 
     // First, write key file to a local path
-    err = writeKeyFile(k.Key, local_media_output_path + models.DrmKeyFileName)
+    err = writeKeyFile(k.Key_id, k.Key, local_media_output_path + models.DrmKeyFileName)
     if err != nil {
         return err
     }

@@ -1,8 +1,6 @@
 # ezLiveStreaming
 
-ezLiveStreaming is designed to be a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides simple API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a create_stream request to the API server and specify how she want the live stream to be transcoded and streamed, for example, what the transcoding video/audio codec she want to use, what resolutions/bitrate/frame rate are used for outputting video streams, and what delivery format (Apple-HLS or MPEG-DASH) is used to stream to live viewers. ezLiveStreaming outputs and uploads audio/video segments and manifests/playlists to origin streaming servers for delivering to the viewers. 
-
-ezLiveStreaming is designed to be highly scalable, reliable and resource efficient. This repository also includes a simple transcoding UI for demo purposes. ezLiveStreaming uses **FFmpeg** for live video transcoding and packaging. I'm currently working on using **Shaka packager** to package and DRM-protecting live streams.
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides simple API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec she wants to use, what resolutions/bitrate/frame rate to use for outputting video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI for demo purposes. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
 
 ## What can ezLiveStreaming do?
 
@@ -10,7 +8,7 @@ ezLiveStreaming is designed to be highly scalable, reliable and resource efficie
 - HLS/DASH streaming, 
 - live transcoding API,
 - clear key DRM protection, 
-- uploading transcoder outputs to AWS S3 buckets,
+- uploading transcoder outputs to AWS S3,
 - standard-compliant media transcoding and packaging which potentially work with any video players.
 
 # Workflow and high-level architecture
@@ -24,7 +22,7 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 
 ![screenshot](diagrams/architecture_diagram.png)
 
-The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler then assign the new job requests to live workers from the worker cluster. The live workers launch ffmpeg/shaka packager instances to ingest, transcode, package and output live streams. The users are responsible for generating live input feeds (using for example, RTMP, SRT) and pushing them to the ffmpeg workers. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store.
+The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. Specifically, a ffmpeg transcoder is started to ingest and transcode the live input feed, and also a shaka packager is started to receive transcoded multi-bitrate MPEG transport streams from ffmpeg transcoder, then package, encrypt and output an ABR stream (e.g., HLS/DASH). The output HLS/DASH stream is uploaded to cloud origin servers such as AWS S3. The users are responsible for generating and pushing live input feeds (using protocols such as RTMP SRT) to the ffmpeg transcoder. The API server requests DRM encrypt key from ezKey_server, pass it along to Shaka packager with other DRM configurations for stream encryption.The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
 ## List of API methods
 
@@ -45,7 +43,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
                 "disable_clear_key": false,
                 "Protection_system": "FairPlay",
                 "Protection_scheme": "cbcs"
-            },
+        },
         "S3_output": {
             "Bucket": "bzhang-test-bucket-public"
         },
@@ -101,13 +99,13 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Low_latency_mode | boolean | whether low latency mode is used | n/a |
 | Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | n/a |
 | Drm | json | DRM configuration | n/a |
-| disable_clear_key | bool | whether clear key DRM is disabled | n/a |
+| disable_clear_key | boolean | whether clear key DRM is disabled | n/a |
 | Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
 | Protection_scheme | string | DRM protection (encryption) scheme | "cbcs" (other schemes to be added, e.g., "cenc") |
-| S3_output | json | output S3 bucket configuration | n/a |
+| S3_output | json | S3 output configuration | n/a |
 | Bucket | string | S3 bucket name | n/a |
-| Video_outputs | json array | Array of video rendition outputs | n/a |
-| Label | string | label of an output (rendition) | n/a |
+| Video_outputs | json array | Array of video output renditions | n/a |
+| Label | string | label of an output rendition | n/a |
 | Codec (Video_outputs) | string | video codec | "h264" (libx264), "h265" (libx265) |
 | Framerate | integer | output video frame rate | n/a |
 | Width | integer | output video resolution (width) | n/a |
@@ -156,21 +154,25 @@ Resume a job given by its ID. Upon request, the stopped job will be resumed. A n
 
 ![screenshot](diagrams/resume_job.png)
 
-The job scheduler periodically polls the job queue and fetches a job from AWS SQS. The frequency of job queue polling must be set low to avoid any delay of job processing. The newly fetched jobs are inserted to the back of the "queued_jobs" list in Redis. On the other side, the job scheduler also periodically checks the front of "queued_jobs" for new jobs. When a new job is found in the "queued_jobs", it is assigned to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment, etc. The job scheduler is responsible for managing a live job throughout its lifecycle, for examplem, assigning the job to a worker, monitoring its status, restarting/reassigning the job if it fails for any reason. 
+This repository also provides a postman collection including all the external and internal API provided by the API server, the job scheduler and worker_app.
 
-The job scheduler also manages a cluster of transcoding workers. Specifically, the scheduler assigns ID to a new worker upon new worker registration, monitor heartbeats of all the workers, monitoring workload of each worker for job assignment purposes, etc. The job scheduler does not maintain any states of live jobs and live workers in memory, rather it keeps all the data in Redis. Therefore, you can put a load balancer in front of all the job scheduler instances, so that any one instance can either serve new jobs from the API server or communicate with the live workers. 
+The job scheduler periodically polls the job queue and fetches a job from AWS SQS. The frequency of job queue polling must be set low to avoid any delay of job processing. The newly fetched jobs are inserted to the back of the "queued_jobs" list in Redis. On the other side, the job scheduler periodically checks the front of "queued_jobs" for new jobs. When a new job is found in the "queued_jobs", it is assigned to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment, etc. The job scheduler is responsible for managing a live job throughout its lifecycle, for example, assigning the job to a worker, monitoring its status, restarting/reassigning the job if it fails. 
 
-A live transcoding worker (or simply live worker) receives a live job from the job scheduler and launches a worker_transcoder to execute the job. Specifically, the worker launches a ffmpeg transcoder that ingest a live input stream. The input stream can be a RTMP or SRT stream (Currently, ezLiveStreaming only supports RTMP ingest). The worker_transcoder takes the user-specified parameters to transcode the input to multiple outputs with different bitrates. *job/command.go* is responsible for translating the live encoding specification to ffmpeg arguments.
+The job scheduler also manages a cluster of live transcoding workers. Specifically, the scheduler assigns ID to each new worker when it starts. After that, the scheduler keeps monitoring heartbeats sent from the worker. The scheduler also monitors workload of each worker as new job requests come in and get finished. 
 
-When worker_app on a live worker first starts, it needs to register with the job scheduler and receives a worker id assigned by the scheduler. After that worker_app needs to send periodic heartbeat to the scheduler so that the latter knows the former is still running. If no heartbeat is received for some time from a worker, the scheduler presumes that worker is no longer running and removes it from the active worker set and also remove all the live jobs running on that worker. On the worker side, worker_app needs to periodically ping the live jobs (worker_transcoders) running on it. If a worker_transcoder does not respond, the worker_app presumes that the corresponding live job is no longer running and it will update its workload with the job scheduler. The job scheduler will remove the bad jobs from that worker's workload record.
+Though the job scheduler manages all the live jobs and live workers, it does not maintain any states of them in memory, instead they are all kept in Redis. Because of its stateless design, one can put a load balancer in front of a cluster of independent job scheduler instances, so that any one instance can be assigned to handle any job requests or events from the workers. 
 
-A list of internal API provided by job scheduler and worker_app can be found in ezLiveStreaming postman_collection.
+Each live worker is a virtual machine that runs ezLiveStreaming worker services. The worker runs a web service daemon called worker_app which communicates with the job scheduler to receive job requests, report job status, or worker status, etc. When the worker_app receives a live job request from the scheduler, it launches an instance of **worker_transcoder** to execute the job. Specifically, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager to run a live video channel. The worker_transcoder follows the transcoding/packaging parameters specified in the live job request to transcode the input to multiple outputs with different bitrates. *job/command.go* is responsible for translating the live encoding parameter to ffmpeg and Shaka packager command-line options.
+
+When worker_app on a live worker first starts, it registers with the job scheduler and receives a worker ID assigned by the scheduler. After that worker_app needs to send periodic heartbeat to the scheduler so that the latter knows the former is still running. If no heartbeat is received from a worker for a certain length of time, the scheduler presumes that worker is no longer running so it deletes the worker from the active worker set and also stops all the live jobs running on that worker. The worker_app also handles **stop_job** requests and **resume_job** requests to stop a running job or resumes a stopped job. 
+
+A worker_app not only handles normal job requests, it also handles unexpected job failures. To detect failed jobs, a worker_app periodically ping the live jobs (worker_transcoders) running on that worker VM. If a worker_transcoder does not respond, the worker_app presumes that the corresponding live job is no longer running. The worker_app reports the failed jobs to the job scheduler. The latter will adjust workload accordingly.
 
 # Live stream data flow
 
 ![screenshot](diagrams/data_flow.png)
 
-ezLiveStreaming's live stream data flow is shown in the above diagram. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to a ffmpeg transcoder running on the worker VM (started by worker_transcoder). The transcoder outputs N number of output MPEG-TS streams, one for each configured output rendition in the job request. The MPEG-TS streams are sent to a Shaka packager (also starte3d by worker_transcoder) running on the same LAN over UDP. Shaka packager outputs HLS/DASH streams as fragment MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
+The live stream data flow on a live worker VM is shown in the above diagram. To run a live channel, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs N number of output MPEG-TS streams, where N is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
 
 # DRM configuration
 
@@ -183,7 +185,7 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
     "Protection_scheme": "cbcs"
 },
 ```
-Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party, paid DRM services which I am happy to implement if sponsorship is provided.
+Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided.
 
 To play the clear-key DRM-protected HLS stream, I used Shaka player and configured key_id and key in the player. I simply added the following section to the Shaka player configuration,
 ```
