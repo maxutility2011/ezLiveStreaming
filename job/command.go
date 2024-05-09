@@ -304,10 +304,12 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 
 		// Configure DRM protection 
 		if drmKeyInfo != "" {
+			/*
 			protection_system_option := "--protection_systems"
 			packagerArgs = append(packagerArgs, protection_system_option)
 			protection_system_value := j.Output.Drm.Protection_system 
 			packagerArgs = append(packagerArgs, protection_system_value)
+			*/
 
 			protection_scheme_option := "--protection_scheme"
 			packagerArgs = append(packagerArgs, protection_scheme_option)
