@@ -328,9 +328,10 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 				key_id_value := "key_id=" + key.Key_id
 				key_value := "key=" + key.Key
 
-				iv, _ := models.Random_16bytes_as_string()
-				iv_value := "iv=" + iv
-				keys_value := key_label_value + ":" + key_id_value + ":" + key_value + ":" + iv_value
+				//iv, _ := models.Random_16bytes_as_string()
+				//iv_value := "iv=" + iv
+				
+				keys_value := key_label_value + ":" + key_id_value + ":" + key_value// + ":" + iv_value
 				packagerArgs = append(packagerArgs, keys_value)
 
 				// Key file URL format: "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + models.DrmKeyFileName
