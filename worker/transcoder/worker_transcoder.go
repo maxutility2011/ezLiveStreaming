@@ -8,6 +8,7 @@ import (
     "time"
     "strings"
 	"encoding/json"
+    "encoding/hex"
     "os/exec"
     "os/signal"
     "syscall"
@@ -108,7 +109,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
     }
 
     // First, write key file to a local path
-    err = writeKeyFile(k.Key_id, k.Key, local_media_output_path + models.DrmKeyFileName)
+    err = writeKeyFile(k.Key, local_media_output_path + models.DrmKeyFileName)
     if err != nil {
         return err
     }
