@@ -1,6 +1,6 @@
 {
         "Output": {
-            "Stream_type": "dash",
+            "Stream_type": "hls",
             "Segment_format": "fmp4",
             "Fragment_duration": 1,
             "Segment_duration": 4,

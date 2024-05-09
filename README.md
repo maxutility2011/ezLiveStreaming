@@ -101,7 +101,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Drm | json | DRM configuration | n/a |
 | disable_clear_key | boolean | whether clear key DRM is disabled | n/a |
 | Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
-| Protection_scheme | string | DRM protection (encryption) scheme | "cbcs" (other schemes to be added, e.g., "cenc") |
+| Protection_scheme | string | DRM protection (encryption) scheme | "cbcs", "cenc" |
 | S3_output | json | S3 output configuration | n/a |
 | Bucket | string | S3 bucket name | n/a |
 | Video_outputs | json array | Array of video output renditions | n/a |
@@ -176,7 +176,7 @@ The live stream data flow on a live worker VM is shown in the above diagram. To 
 
 # DRM configuration
 
-A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS/DASH streams. 
+A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. 
 
 ```
 "Drm": {
@@ -185,9 +185,9 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
     "Protection_scheme": "cbcs"
 },
 ```
-Currently, ezLiveStreaming **ONLY** supports the above DRM configuration. Particularly we must set *disable_clear_key* to false, *Protection_system* to *FairPlay* and *Protection_scheme* to *cbcs* in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided.
+Particularly we must set *disable_clear_key* to false in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
 
-To play the clear-key DRM-protected HLS stream, I used Shaka player and configured key_id and key in the player. I simply added the following section to the Shaka player configuration,
+To play the clear-key DRM-protected HLS stream, I used the Shaka player demo (https://shaka-player-demo.appspot.com/demo) and configured key_id and key . I simply added the following section to the Shaka player "extra config" section,
 ```
 {
   "drm": {
@@ -197,8 +197,11 @@ To play the clear-key DRM-protected HLS stream, I used Shaka player and configur
   }
 }
 ```
-Please replace the key_id and key with your ones.
+Please replace the key_id and key with your ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, please copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
+
 ![screenshot](diagrams/shaka_player_drm_config.png)
+
+Actually, the above DRM key configuration is not needed if you play the individual variant playlists. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
 
 # S3 output configuration
 
