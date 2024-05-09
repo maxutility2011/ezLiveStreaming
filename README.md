@@ -176,7 +176,7 @@ The live stream data flow on a live worker VM is shown in the above diagram. To 
 
 # DRM configuration
 
-A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. 
+A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. For clear-key DRM, a key file named *key.bin* is output and uploaded to S3. As per HLS specification, for clear key DRM, key.bin is a public file which contains the decrypt key in binary format. Its S3 URI is included the *EXT-X-KEY* tag in the variant playlist. The player can download the key file to access the decrypt key. Note that clear-key DRM is ONLY for testing and debugging purposes. A full DRM workflow is needed to keep you content secure.
 
 ```
 "Drm": {
@@ -200,6 +200,9 @@ To play the clear-key DRM-protected HLS stream, I used the Shaka player demo (ht
 Please replace the key_id and key with your ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, please copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
 
 ![screenshot](diagrams/shaka_player_drm_config.png)
+
+### How to get the DRM key_id and key
+The DRM key_id can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
 
 Actually, the above DRM key configuration is not needed if you play the individual variant playlists. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
 
