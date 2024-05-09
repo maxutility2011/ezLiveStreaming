@@ -82,10 +82,15 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
     }
 }
 
-func writeKeyFile(kid string, key string, keyFileName string) error {
-    key_pair := kid + ":" + key
-    b := []byte(key_pair)
-    err := os.WriteFile(keyFileName, b, 0644)
+func writeKeyFile(key string, keyFileName string) error {
+    bin, err := hex.DecodeString(key)
+    if err != nil {
+        Log.Printf("Failed to write key file. Error: ", err)
+        return err
+    }
+
+    b := []byte(bin)
+    err = os.WriteFile(keyFileName, b, 0644)
     if err != nil {
         Log.Printf("Failed to write key file. Error: ", err)
     }
