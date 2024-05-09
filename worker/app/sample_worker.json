@@ -1,7 +1,0 @@
-{
-    "ServerIp": "localhost",
-    "ServerPort": 80,
-    "CpuCapacity": 5000,
-    "BandwidthCapacity": 100000, 
-    "HeartbeatInterval": "1s"
-}
