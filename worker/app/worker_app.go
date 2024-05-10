@@ -298,7 +298,7 @@ func createIngestUrl(job job.LiveJob) error {
 		err = errors.New("NotEnoughRtmpIngestPort")
 	} else {
 		job.RtmpIngestPort = rtmp_ingest_port
-		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerAppIp + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerHostname + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
 		// job.SrtIngestUrl = ...
 		// job.RtpIngestUrl = ...
 	}
@@ -528,7 +528,7 @@ func sendHeartbeat() error {
 func registerWorker(conf WorkerAppConfig) error {
 	register_new_worker_url := job_scheduler_url + "/" + "workers"
 	var new_worker_request models.WorkerInfo
-	new_worker_request.ServerIp = conf.WorkerAppIp
+	new_worker_request.ServerIp = conf.WorkerHostname
 	new_worker_request.ServerPort = conf.WorkerAppPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
@@ -663,7 +663,7 @@ func main() {
     }()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
-	worker_app_addr := worker_app_config.WorkerAppIp + ":" + worker_app_config.WorkerAppPort
+	worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerAppPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
     err := http.ListenAndServe(worker_app_addr, nil)
