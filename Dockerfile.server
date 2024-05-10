@@ -11,7 +11,7 @@ RUN cd /var/www/html/ezLiveStreaming/api_server \
     && cp /var/www/html/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
 
-RUN cp /var/www/html/api_server/start_server.sh /home/streamer/bin/
+RUN cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/
 
 ENV PATH="${PATH}:/home/streamer/bin"
 
