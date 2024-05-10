@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v1 as base
+FROM maxutility2011/ezlivestreaming_baseimage:v2 as base
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -11,8 +11,8 @@ RUN cd /var/www/html/ezLiveStreaming/api_server \
     && cp /var/www/html/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
 
-RUN cp /var/www/html/ezLiveStreaming/api_server/nginx.conf /etc/nginx/nginx.conf \
-    && cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
+#RUN cp /var/www/html/ezLiveStreaming/api_server/nginx.conf /etc/nginx/nginx.conf \
+RUN cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
     && chmod +x /home/streamer/bin/start_server.sh
 
 ENV PATH="${PATH}:/home/streamer/bin"
