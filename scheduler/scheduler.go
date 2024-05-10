@@ -946,7 +946,7 @@ func main() {
 	}
 
 	server_addr = server_hostname + ":" + server_port
-    fmt.Println("API server listening on: ", server_addr)
+    fmt.Println("Scheduler server listening on: ", server_addr)
     http.ListenAndServe(server_addr, nil)
 
 	<-quit
