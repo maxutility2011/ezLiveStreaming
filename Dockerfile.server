@@ -11,7 +11,8 @@ RUN cd /var/www/html/ezLiveStreaming/api_server \
     && cp /var/www/html/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
 
-RUN cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
+RUN cp /var/www/html/ezLiveStreaming/api_server/nginx.conf /etc/nginx/nginx.conf \
+    && cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
     && chmod +x /home/streamer/bin/start_server.sh
 
 ENV PATH="${PATH}:/home/streamer/bin"
