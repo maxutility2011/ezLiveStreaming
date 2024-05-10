@@ -1,8 +1,8 @@
 {
-    "Server_hostname": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "Server_hostname": "0.0.0.0",
     "Server_port": "5080",
     "Redis": {
-        "RedisIp": "127.0.0.1",
+        "RedisIp": "redis",
         "RedisPort": "6379"
     }
 }
