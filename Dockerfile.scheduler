@@ -1,0 +1,22 @@
+FROM maxutility2011/ezlivestreaming_baseimage:v1 as base
+
+RUN mkdir /home/streamer/src \
+    && mkdir /home/streamer/bin \
+    && mkdir /home/streamer/conf \
+    && cd /home/streamer/src \
+    && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
+
+RUN cd /home/streamer/src/ezLiveStreaming/scheduler \
+    && /usr/local/go/bin/go build scheduler.go \
+    && cp /home/streamer/src/ezLiveStreaming/scheduler/scheduler /home/streamer/bin/ \
+    && cp /home/streamer/src/ezLiveStreaming/scheduler/config.json /home/streamer/conf/scheduler_config.json \
+    && cd ..
+
+ENV PATH="${PATH}:/home/streamer/bin"
+
+EXPOSE 3080
+USER streamer
+
+RUN sudo apt install net-tools
+
+CMD /home/streamer/bin/scheduler -config=/home/streamer/conf/scheduler_config.json

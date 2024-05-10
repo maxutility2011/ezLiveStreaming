@@ -18,4 +18,5 @@ EXPOSE 1080
 EXPOSE 4080
 
 USER streamer
+RUN sudo apt install net-tools
 CMD /home/streamer/bin/api_server_main -config=/home/streamer/conf/apt_server_config.json
