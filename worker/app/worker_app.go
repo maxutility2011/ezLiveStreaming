@@ -663,7 +663,8 @@ func main() {
     }()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
-	worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerPort
+	//worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerPort
+	worker_app_addr := "0.0.0.0" + ":" + worker_app_config.WorkerPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
     err := http.ListenAndServe(worker_app_addr, nil)
