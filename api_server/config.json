@@ -1,12 +1,12 @@
 {
     "Api_server_hostname": "0.0.0.0",
     "Api_server_port": "1080",
-    "Drm_key_server_url": "http://ec2-34-202-195-77.compute-1.amazonaws.com:5080/keys/",
+    "Drm_key_server_url": "http://key_server:5080/keys/",
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"
     },
     "Redis": {
-        "RedisIp": "127.0.0.1",
+        "RedisIp": "redis",
         "RedisPort": "6379"
     }
 }

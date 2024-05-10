@@ -1,0 +1,36 @@
+services:
+  api_server:
+    image: maxutility2011/ezlivestreaming_apiserver
+    build: 
+      context: .
+      dockerfile: Dockerfile.server
+    volumes:
+      - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+    ports:
+      - "1080:1080"
+      - "4080:4080"
+    links:
+      - "redis:redis"
+      - "key_server:key_server"
+  scheduler:
+    image: maxutility2011/ezlivestreaming_scheduler
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    volumes:
+      - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+    ports:
+      - "3080:3080"
+    links:
+      - "redis:redis"
+  key_server:
+    image: maxutility2011/ezlivestreaming_keyserver
+    build:
+      context: .
+      dockerfile: Dockerfile.keyserver
+    ports:
+      - "5080:5080"
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"

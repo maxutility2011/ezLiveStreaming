@@ -6,31 +6,16 @@ RUN mkdir /home/streamer/src \
     && cd /home/streamer/src \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
 
-RUN cd /home/streamer/src/ezLiveStreaming/api_server \
-    && /usr/local/go/bin/go build api_server_main.go \
-    && cp /home/streamer/src/ezLiveStreaming/api_server/api_server_main /home/streamer/bin/ \
-    && cp /home/streamer/src/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
-    && cd ..
-
-RUN cd /home/streamer/src/ezLiveStreaming/scheduler \
-    && /usr/local/go/bin/go build scheduler.go \
-    && cp /home/streamer/src/ezLiveStreaming/scheduler/scheduler /home/streamer/bin/ \
-    && cp /home/streamer/src/ezLiveStreaming/scheduler/config.json /home/streamer/conf/scheduler_config.json \
-    && cd ..
-
 RUN cd /home/streamer/src/ezLiveStreaming/drm_key_server \
     && /usr/local/go/bin/go build ezKey_server.go \
     && cp /home/streamer/src/ezLiveStreaming/drm_key_server/ezKey_server /home/streamer/bin/ \
     && cp /home/streamer/src/ezLiveStreaming/drm_key_server/config.json /home/streamer/conf/drm_key_server_config.json \
     && cd ..
 
-RUN cp /home/streamer/src/ezLiveStreaming/start_server.sh /home/streamer/bin/
-
 ENV PATH="${PATH}:/home/streamer/bin"
 
-EXPOSE 1080
-EXPOSE 4080
+EXPOSE 5080
 
 USER streamer
 RUN sudo apt install net-tools
-CMD /home/streamer/bin/start_server.sh
+CMD /home/streamer/bin/ezKey_server -config=/home/streamer/conf/drm_key_server_config.json
