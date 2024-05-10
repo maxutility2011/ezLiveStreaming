@@ -181,7 +181,7 @@ func main() {
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
 	server_addr := key_server_config.Server_hostname + ":" + key_server_config.Server_port
-    fmt.Println("API server listening on: ", server_addr)
+    fmt.Println("DRM key server listening on: ", server_addr)
 	http.HandleFunc("/", main_server_handler)
     http.ListenAndServe(server_addr, nil)
 }
