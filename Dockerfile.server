@@ -1,7 +1,5 @@
 FROM maxutility2011/ezlivestreaming_baseimage:v1 as base
 
-RUN su - streamer
-
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -14,10 +12,10 @@ RUN cd /home/streamer/src/ezLiveStreaming/api_server \
     && cp /home/streamer/src/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
 
-RUN cp /home/streamer/src/ezLiveStreaming/start_server.sh /home/streamer/bin/
-
 ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 1080
 EXPOSE 4080
-CMD /home/streamer/bin/start_server.sh
+
+USER streamer
+CMD /home/streamer/bin/api_server_main -config=/home/streamer/conf/apt_server_config.json
