@@ -301,10 +301,11 @@ export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
 
 Please remember to create your own SQS queue first, and put the queue name in the api_server and scheduler config file.
 
-Additionally, depending on where you install your worker_transcoder and ffmpeg executable, you need to specify the path to the executable by configure the following environment variables,
+Additionally, depending on where you install your worker_transcoder, ffmpeg and Shaka packager executables, you need to specify the path to the executable by configure the following environment variables,
 ```
 export PATH=[path_to_your_worker_transcoder_binary]:$PATH
 export PATH=[path_to_your_ffmpeg_binary]:$PATH
+export PATH=[path_to_your_shaka_packager_binary]:$PATH
 ```
 
 You may also configure path to api_server and job scheduler.
