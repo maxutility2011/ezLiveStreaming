@@ -7,6 +7,7 @@ RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/conf \
     && cd /home/streamer/src \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git \
+    && git checkout -t remotes/origin/docker \
     && cd /home/streamer/src/ezLiveStreaming
 
 RUN cd /home/streamer/src/ezLiveStreaming/api_server \
