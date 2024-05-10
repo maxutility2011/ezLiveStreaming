@@ -1,6 +1,6 @@
 {
-    "SchedulerUrl": "http://127.0.0.1:3080",
-    "WorkerAppIp": "ec2-34-202-195-77.compute-1.amazonaws.com",
+    "SchedulerUrl": "http://scheduler:3080",
+    "WorkerAppIp": "worker",
     "WorkerAppPort": "2080",
     "WorkerUdpPortBase": 10001
 }

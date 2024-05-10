@@ -1,19 +1,19 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v2 as base
+FROM maxutility2011/ezlivestreaming_worker_baseimage:v1 as base
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
     && cd /var/www/html/ \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
 
-RUN cd /var/www/html/ezLiveStreaming/api_server \
-    && /usr/local/go/bin/go build api_server_main.go \
-    && cp /var/www/html/ezLiveStreaming/api_server/api_server_main /home/streamer/bin/ \
-    && cp /var/www/html/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
-    && cd ..
+RUN cd /var/www/html/ezLiveStreaming/worker/app \
+    && /usr/local/go/bin/go build worker_app.go \
+    && cp /var/www/html/ezLiveStreaming/worker/app/worker_app /home/streamer/bin/ \
+    && cp /var/www/html/ezLiveStreaming/worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
 
-RUN cp /var/www/html/ezLiveStreaming/api_server/nginx.conf /etc/nginx/nginx.conf \
-    && cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
-    && chmod +x /home/streamer/bin/start_server.sh
+RUN cd /var/www/html/ezLiveStreaming/worker/transcoder \
+    && /usr/local/go/bin/go build worker_transcoder.go \
+    && cp /var/www/html/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bin/ \
+    && cp /var/www/html/ezLiveStreaming/worker/transcoder/packager /home/streamer/bin/
 
 ENV PATH="${PATH}:/home/streamer/bin"
 
@@ -22,4 +22,4 @@ EXPOSE 4080
 
 USER streamer
 RUN sudo apt install net-tools
-CMD /home/streamer/bin/start_server.sh
+CMD /home/streamer/bin/worker_app -config=/home/streamer/conf/worker_app_config.json
