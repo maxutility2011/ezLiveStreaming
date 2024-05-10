@@ -23,8 +23,8 @@ import (
 
 type WorkerAppConfig struct {
 	SchedulerUrl string
-	WorkerAppIp string
-	WorkerAppPort string
+	WorkerHostname string
+	WorkerPort string
 	WorkerUdpPortBase int
 }
 
@@ -529,7 +529,7 @@ func registerWorker(conf WorkerAppConfig) error {
 	register_new_worker_url := job_scheduler_url + "/" + "workers"
 	var new_worker_request models.WorkerInfo
 	new_worker_request.ServerIp = conf.WorkerHostname
-	new_worker_request.ServerPort = conf.WorkerAppPort
+	new_worker_request.ServerPort = conf.WorkerPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
 	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
@@ -663,7 +663,7 @@ func main() {
     }()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
-	worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerAppPort
+	worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
     err := http.ListenAndServe(worker_app_addr, nil)
