@@ -15,7 +15,7 @@ RUN cd /home/streamer/src/ezLiveStreaming/drm_key_server \
     && cp /home/streamer/src/ezLiveStreaming/drm_key_server/config.json /home/streamer/conf/drm_key_server_config.json \
     && cd ..
 
-RUN cp /home/streamer/src/ezLiveStreaming/api_server/start_key_server.sh /home/streamer/bin/ \
+RUN cp /home/streamer/src/ezLiveStreaming/drm_key_server/start_key_server.sh /home/streamer/bin/ \
     && chmod +x /home/streamer/bin/start_key_server.sh
 
 ENV PATH="${PATH}:/home/streamer/bin"
