@@ -18,8 +18,6 @@ RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bin/ \
     && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/packager /home/streamer/bin/
 
-RUN sudo apt install ffmpeg -y
-
 ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 1080
