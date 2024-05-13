@@ -49,7 +49,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
     ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posColon + 1: ]
 
     ffmpegArgs = append(ffmpegArgs, "-i")
-    ffmpegArgs = append(ffmpegArgs, j.Input.Url)
+    ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
 	kf := "expr:gte(t,n_forced*"
 	kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
