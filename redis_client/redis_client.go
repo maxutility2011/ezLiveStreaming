@@ -49,7 +49,6 @@ func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.C
 func (rc RedisClient) HSetStruct(htable string, k string, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
-		fmt.Println("Failed to marshal JSON in redis client")
 		return err
 	}	
 
@@ -112,7 +111,6 @@ func (rc RedisClient) HKeys(htable string) ([]string, error) {
 func (rc RedisClient) SetKVStruct(k string, v any, timeout time.Duration) error {
 	b, err := json.Marshal(v)
 	if err != nil {
-		fmt.Println("Failed to marshal JSON in redis client")
 		return err
 	}
 
@@ -154,7 +152,6 @@ func (rc RedisClient) HDelAll(htable string) error {
 func (rc RedisClient) QPushStruct(qname string, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
-		fmt.Println("Failed to marshal JSON in redis client")
 		return err
 	}
 

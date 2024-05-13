@@ -1,7 +1,6 @@
 package job_sqs
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -27,17 +26,12 @@ func (sender SqsSender) GetQueueURL(queue *string) (*sqs.GetQueueUrlOutput, erro
 func (sender SqsSender) SendMsg(data string, dedupId string) error {
 	result, err := sender.GetQueueURL(&sender.QueueName)
 	if err != nil {
-		fmt.Println("Got an error getting the queue URL:")
-		fmt.Println(err)
 		return err
 	}
 
 	queueURL := result.QueueUrl
-	//fmt.Println("Queue URL: ", *queueURL)
-	fmt.Println("Sending job to queue...")
 
 	_, err1 := sender.SqsClient.SendMessage(&sqs.SendMessageInput{
-		//DelaySeconds: aws.Int64(10),
 		MessageAttributes: map[string]*sqs.MessageAttributeValue{
 			"Title": &sqs.MessageAttributeValue{
 				DataType:    aws.String("String"),
@@ -54,12 +48,10 @@ func (sender SqsSender) SendMsg(data string, dedupId string) error {
 		},
 		MessageGroupId: aws.String("livejob"),
 		MessageBody: aws.String(data),
-		//MessageDeduplicationId: aws.String(dedupId),
 		QueueUrl:    queueURL,
 	})
 	
 	if err1 != nil {
-		fmt.Println("Failed to send message: ", err1)
 		return err1
 	}
 

@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+    "log"
     "os"
     "errors"
     "time"
@@ -13,7 +14,6 @@ import (
     "os/signal"
     "syscall"
 	"io/ioutil"
-    "log"
     "flag"
     "github.com/fsnotify/fsnotify"
     "container/list"

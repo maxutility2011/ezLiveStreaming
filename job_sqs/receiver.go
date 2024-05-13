@@ -1,7 +1,6 @@
 package job_sqs
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -27,16 +26,10 @@ func (receiver SqsReceiver) GetQueueURL(queue *string) (*sqs.GetQueueUrlOutput, 
 func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 	urlResult, err := receiver.GetQueueURL(&receiver.QueueName)
 	if err != nil {
-		fmt.Println("Got an error getting the queue URL:")
-		fmt.Println(err)
 		return nil, err
 	}
 
 	queueURL := urlResult.QueueUrl
-	//fmt.Println("Polling job queue for new jobs...")
-
-	//var timeout int64
-	//timeout = 60
 	msgResult, err1 := receiver.SqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
 		AttributeNames: []*string{
 			aws.String(sqs.MessageSystemAttributeNameSentTimestamp),
@@ -46,11 +39,9 @@ func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 		},
 		QueueUrl:            queueURL,
 		MaxNumberOfMessages: aws.Int64(1),
-		//VisibilityTimeout:   &timeout,
 	})
 	
 	if err1 != nil {
-		fmt.Println("Job queue Receive failed")
 		return nil, err1
 	}
 
@@ -60,8 +51,6 @@ func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 func (receiver SqsReceiver) DeleteMsg(messageHandle *string) error {
 	urlResult, err := receiver.GetQueueURL(&receiver.QueueName)
 	if err != nil {
-		fmt.Println("Got an error getting the queue URL:")
-		fmt.Println(err)
 		return err
 	}
 
@@ -72,7 +61,6 @@ func (receiver SqsReceiver) DeleteMsg(messageHandle *string) error {
 	})
 	
 	if err1 != nil {
-		fmt.Println("Failed to delete message")
 		return err1
 	}
 

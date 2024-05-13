@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"log"
     "os"
 	"net/http"
 	"encoding/json"
@@ -63,20 +64,20 @@ func randomAssign(j job.LiveJob) (string, bool) {
 	var r string
 	workers, err := getAllAvailableWorkers()
 	if err != nil {
-		fmt.Println("Failed to getAllAvailableWorkers. Error: ", err)
+		Log.Println("Failed to getAllAvailableWorkers. Error: ", err)
 		return r, false
 	}
 
 	num_workers := len(workers)
 	if num_workers < 0 {
-		fmt.Println("Failed to roundRobinAssign: Invalid num_workers (roundRobinAssign): ", num_workers)
+		Log.Println("Failed to roundRobinAssign: Invalid num_workers (roundRobinAssign): ", num_workers)
 		return "", false
 	} else if num_workers == 0 {
-		fmt.Println("Failed to roundRobinAssign: No worker available. num_workers=", num_workers)
+		Log.Println("Failed to roundRobinAssign: No worker available. num_workers=", num_workers)
 		return "", false
 	}
 
-	fmt.Println("Number of available workers: ", num_workers)
+	Log.Println("Number of available workers: ", num_workers)
 	rn := rand.Intn(num_workers)
 	for i, w := range workers {
 		if i == rn {
@@ -84,7 +85,7 @@ func randomAssign(j job.LiveJob) (string, bool) {
 		}
 	}
 
-	fmt.Println("Assign job id=", j.Id, " to worker id=", r)
+	Log.Println("Assign job id=", j.Id, " to worker id=", r)
 	return r, true
 }
 
@@ -100,7 +101,7 @@ func assignWorker(j job.LiveJob) (string, bool) {
 func createUpdateJob(j job.LiveJob) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to create/update job id=", j.Id, ". Error: ", err)
+		Log.Println("Failed to create/update job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -110,20 +111,20 @@ func createUpdateJob(j job.LiveJob) error {
 func pollJobQueue(sqs_receiver job_sqs.SqsReceiver) error {
 	msgResult, err := sqs_receiver.ReceiveMsg()
 	if err != nil {
-		fmt.Println(err)
+		Log.Println(err)
 		return err
 	}
 
 	for i := range msgResult.Messages {
-		fmt.Println("----------------------------------------")
-		fmt.Println("Message ID:     " + *msgResult.Messages[i].MessageId)
-		fmt.Println("Message body:     " + *msgResult.Messages[i].Body)
-		//fmt.Println("Message receipt handler:     " + *msgResult.Messages[i].ReceiptHandle) 
+		Log.Println("----------------------------------------")
+		Log.Println("Message ID:     " + *msgResult.Messages[i].MessageId)
+		Log.Println("Message body:     " + *msgResult.Messages[i].Body)
+		//Log.Println("Message receipt handler:     " + *msgResult.Messages[i].ReceiptHandle) 
 
 		var job job.LiveJob
 		e := json.Unmarshal([]byte(*msgResult.Messages[i].Body), &job)
 		if e != nil {
-            fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            Log.Println("Error happened in JSON marshal. Err: %s", e)
             return e
         }
 
@@ -151,7 +152,7 @@ func getWorkerLoadById(wid string) string {
 	v, e := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
 	var r string
 	if e != nil {
-		fmt.Println("Warning: Load of worker id=", wid, " NOT found")
+		Log.Println("Warning: Load of worker id=", wid, " NOT found")
 	} else {
 		r = v
 	}
@@ -162,7 +163,7 @@ func getWorkerLoadById(wid string) string {
 func createUpdateWorkerLoad(wid string, load models.WorkerLoad) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_WORKER_LOADS, wid, load)
 	if err != nil {
-		fmt.Println("Failed to add load for worker id = ", wid, ". Error: ", err)
+		Log.Println("Failed to add load for worker id = ", wid, ". Error: ", err)
 	}
 
 	return err
@@ -178,7 +179,7 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	if v != "" {
 		err := json.Unmarshal([]byte(v), &w_load)
 		if err != nil {
-			fmt.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
+			Log.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
 			return err // Found worker load in Redis but got bad data
 		}
 	}
@@ -189,16 +190,16 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	var j_load models.JobLoad
 	j_load.Id = j.Id
 	j_load.CpuLoad, j_load.BandwidthLoad = estimateJobLoad(j)
-	fmt.Println("Previous Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
-	fmt.Println("CPU load: ", w_load.CpuLoad)
-	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+	Log.Println("Previous Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
+	Log.Println("CPU load: ", w_load.CpuLoad)
+	Log.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
 	w_load.Id = w.Id
 	w_load.CpuLoad += j_load.CpuLoad
 	w_load.BandwidthLoad += j_load.BandwidthLoad
-	fmt.Println("New Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
-	fmt.Println("CPU load: ", w_load.CpuLoad)
-	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+	Log.Println("New Worker Load (worker id = ", w.Id, ") in addNewJobLoad: ")
+	Log.Println("CPU load: ", w_load.CpuLoad)
+	Log.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
 	w_load.Jobs = append(w_load.Jobs, j_load)
 	createUpdateWorkerLoad(w.Id, w_load)
@@ -206,7 +207,7 @@ func addNewJobLoad(w models.LiveWorker, j job.LiveJob) error {
 	w.State = models.WORKER_STATE_LOADED
 	e := createUpdateWorker(w)
 	if e != nil {
-		fmt.Println("Failed to update worker load: worker id = ", w.Id, ", job id = ", j.Id, e)
+		Log.Println("Failed to update worker load: worker id = ", w.Id, ", job id = ", j.Id, e)
 		return e
 	}
 
@@ -219,11 +220,11 @@ func updateWorkerLoad(wid string, a_stopped_job_id string) error {
 	if v != "" {
 		err := json.Unmarshal([]byte(v), &w_load)
 		if err != nil {
-			fmt.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
+			Log.Println("Failed to unmarshal Redis result (addNewJobLoad). Error: ", err)
 			return err // Found worker load in Redis but got bad data
 		}
 	} else {
-		fmt.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerLoad)")
+		Log.Println("Error: Worker id = ", wid, " not found in worker_loads (updateWorkerLoad)")
 		return errors.New("WorkerNotFound")
 	}
 
@@ -240,20 +241,20 @@ func updateWorkerLoad(wid string, a_stopped_job_id string) error {
 	}
 
 	if !j_load_found {
-		fmt.Println("Load of job id = ", a_stopped_job_id, " was NOT found assigned to worker id = ", wid)
+		Log.Println("Load of job id = ", a_stopped_job_id, " was NOT found assigned to worker id = ", wid)
 		return errors.New("JobLoadNotFound")
 	}
 
-	fmt.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
-	fmt.Println("CPU load: ", w_load.CpuLoad)
-	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+	Log.Println("Previous Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
+	Log.Println("CPU load: ", w_load.CpuLoad)
+	Log.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
 	w_load.CpuLoad -= j_load.CpuLoad
 	w_load.BandwidthLoad -= j_load.BandwidthLoad
 
-	fmt.Println("New Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
-	fmt.Println("CPU load: ", w_load.CpuLoad)
-	fmt.Println("Bandwidth load: ", w_load.BandwidthLoad)
+	Log.Println("New Worker Load (worker id = ", wid, ") in updateWorkerLoad: ")
+	Log.Println("CPU load: ", w_load.CpuLoad)
+	Log.Println("Bandwidth load: ", w_load.BandwidthLoad)
 
 	// Delete job "a_stopped_job_id" from w_load.Jobs
 	w_load.Jobs = append(w_load.Jobs[:index], w_load.Jobs[index+1:]...)
@@ -264,7 +265,7 @@ func updateWorkerLoad(wid string, a_stopped_job_id string) error {
 func sendJobToWorker(j job.LiveJob, wid string) error {
 	worker, ok := getWorkerById(wid)
 	if !ok {
-		fmt.Println("Failed to getWorkerById")
+		Log.Println("Failed to getWorkerById")
 		return errors.New("WorkerNotFound")
 	}
 
@@ -273,10 +274,10 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	var err error
 	if !(j.Stop || j.Delete) { // create_job or resume_job
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
+		Log.Println("Sending job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
 		req, err = http.NewRequest(http.MethodPost, worker_url, bytes.NewReader(b))
     	if err != nil {
-        	fmt.Println("Error: Failed to POST to: ", worker_url)
+        	Log.Println("Error: Failed to POST to: ", worker_url)
 			// TODO: Need to retry registering new worker instead of giving up
         	return err
     	}
@@ -285,10 +286,10 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		worker_url += j.Id
 		worker_url += "/stop"
 		b, _ := json.Marshal(j)
-		fmt.Println("Sending stop_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
+		Log.Println("Sending stop_job id=", j.Id, " to worker id=", worker.Id, " at url=", worker_url, " at time=", time.Now()) 
 		req, err = http.NewRequest(http.MethodPut, worker_url, bytes.NewReader(b))
     	if err != nil {
-        	fmt.Println("Error: Failed to PUT to: ", worker_url)
+        	Log.Println("Error: Failed to PUT to: ", worker_url)
 			// TODO: Need to retry registering new worker instead of giving up
         	return err
     	}
@@ -297,7 +298,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	
 	resp, err1 := http.DefaultClient.Do(req)
     if err1 != nil {
-		fmt.Println("Failed to send job request to worker. Error: ", err1)
+		Log.Println("Failed to send job request to worker. Error: ", err1)
         return err1
     }
 	
@@ -305,12 +306,12 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 	//         (the job will be put back into "queue_jobs" and be retried later on)
 	// Case 2: Stop_job: response status code isn't 200. Return error then retry
 	if !(j.Stop || j.Delete) && resp.StatusCode != http.StatusCreated {
-		fmt.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
-		fmt.Println("Bad worker response status code: ", resp.StatusCode)
+		Log.Println("Job id=", j.Id, " failed to be launched on worker id=", worker.Id, " at time=", j.Time_received_by_worker)
+		Log.Println("Bad worker response status code: ", resp.StatusCode)
 		return errors.New("WorkerJobExecutionError")
 	} else if (j.Stop && resp.StatusCode != http.StatusOK) {
-		fmt.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
-		fmt.Println("Bad worker response status code: ", resp.StatusCode)
+		Log.Println("Job id=", j.Id, " failed to be stopped on worker id=", worker.Id)
+		Log.Println("Bad worker response status code: ", resp.StatusCode)
 		if resp.StatusCode == http.StatusNotFound {
 			return errors.New("jobNotFound")
 		} else {
@@ -325,7 +326,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
     	defer resp.Body.Close()
     	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
     	if err2 != nil {
-        	fmt.Println("Error: Failed to read response body. Error: ", err2)
+        	Log.Println("Error: Failed to read response body. Error: ", err2)
         	return err2
     	}
 
@@ -348,9 +349,9 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 			   		select {
 						case <-ticker.C: {
 							e = addNewJobLoad(worker, j2) 
-							fmt.Println("Retrying worker load update...")
+							Log.Println("Retrying worker load update...")
 							if e == nil {
-								fmt.Println("Worker load update retried and succeeded!")
+								Log.Println("Worker load update retried and succeeded!")
 								quit <- true
 							}
 						}
@@ -364,7 +365,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		}
 		*/
 
-		fmt.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
+		Log.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
 	} else if j.Stop { // The assigned worker confirmed the success of job stop, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
 		j.State = job.JOB_STATE_STOPPED
 		j.Assigned_worker_id = "" // A different worker will be assigned when the job is resumed later on
@@ -372,7 +373,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		j.Stop = false // Reset the flag
 		// j.Id and j.StreamKey will remain the same when the job is resumed
 		createUpdateJob(j)
-		fmt.Println("Job id = ", j.Id, " is successfully stopped on worker id = ", wid)
+		Log.Println("Job id = ", j.Id, " is successfully stopped on worker id = ", wid)
 	} // else if j.Delete {
 	//}
 
@@ -390,7 +391,7 @@ func scheduleOneJob() {
 		var j job.LiveJob
 		err = json.Unmarshal([]byte(e), &j)
 		if err != nil {
-			fmt.Println("Failed to unmarshal job (scheduleOneJob). Error: ", err)
+			Log.Println("Failed to unmarshal job (scheduleOneJob). Error: ", err)
 			return
 		}
 
@@ -399,14 +400,14 @@ func scheduleOneJob() {
 		if !(j.Stop || j.Delete) { // create_job or resume_job
 			assigned_worker_id, ok := assignWorker(j)
 			if !ok {
-				fmt.Println("Failed to assign job id=", j.Id, " to a worker")
+				Log.Println("Failed to assign job id=", j.Id, " to a worker")
 				bufferJob(j) // Add failed jobs back to the queue and retry later
 				return
 			}
 
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
-				fmt.Println("Failed to send job to a worker")
+				Log.Println("Failed to send job to a worker")
 				if err.Error() != "jobNotFound" {
 					bufferJob(j)
 				} 
@@ -414,7 +415,7 @@ func scheduleOneJob() {
 		} else if j.Stop {
 			// When a job was already stopped, j.Assigned_worker_id was cleared. 
 			if (j.Assigned_worker_id == "") {
-				fmt.Println("Cannot stop Job id = ", j.Id, " because it has no assigned worker. Is it already stopped?")
+				Log.Println("Cannot stop Job id = ", j.Id, " because it has no assigned worker. Is it already stopped?")
 				return 
 			}
 
@@ -422,13 +423,13 @@ func scheduleOneJob() {
 			// j.Assigned_worker_id may have gone already. If so, there is no need to send this stop_job to it.
 			_, ok := getWorkerById(assigned_worker_id)
 			if !ok {
-				fmt.Println("Stop_job id = ", j.Id, " NOT sent to Worker id = ", assigned_worker_id, ". The worker was NOT found. It might have already stopped.")
+				Log.Println("Stop_job id = ", j.Id, " NOT sent to Worker id = ", assigned_worker_id, ". The worker was NOT found. It might have already stopped.")
 				return
 			}
 
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
-				fmt.Println("Failed to send job to a worker")
+				Log.Println("Failed to send job to a worker")
 				bufferJob(j) 
 			}
 		} // else if j.Delete {
@@ -439,7 +440,7 @@ func scheduleOneJob() {
 func bufferJob(j job.LiveJob) error {
 	err := redis.QPushStruct(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, j)
 	if err != nil {
-		fmt.Println("Failed to buffer job id=", j.Id, ". Error: ", err)
+		Log.Println("Failed to buffer job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -449,7 +450,7 @@ func popBufferedJob() (string, error) {
 	j, err := redis.QPop(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
 	var r string
 	if err != nil {
-		fmt.Println("Failed to pop from ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
+		Log.Println("Failed to pop from ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
 	} else {
 		r = j
 	}
@@ -461,7 +462,7 @@ func getJobBufferFront() (string, error) {
 	j, err := redis.QFront(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
 	var r string
 	if err != nil {
-		fmt.Println("Failed to get front job in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
+		Log.Println("Failed to get front job in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
 	} else {
 		r = j
 	}
@@ -473,7 +474,7 @@ func getJobBufferFront() (string, error) {
 func getBufferedJobCount() int {
 	count, err := redis.QLen(redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS)
 	if err != nil {
-		fmt.Println("Failed to get buffered job count in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
+		Log.Println("Failed to get buffered job count in ", redis_client.REDIS_KEY_SCHEDULER_QUEUED_JOBS, ". Error: ", err)
 	}
 
 	return count
@@ -482,7 +483,7 @@ func getBufferedJobCount() int {
 func createUpdateWorker(w models.LiveWorker) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLWORKERS, w.Id, w)
 	if err != nil {
-		fmt.Println("Failed to update worker id=", w.Id, ". Error: ", err)
+		Log.Println("Failed to update worker id=", w.Id, ". Error: ", err)
 	}
 
 	return err
@@ -491,7 +492,7 @@ func createUpdateWorker(w models.LiveWorker) error {
 func createWorker(wkr models.WorkerInfo) (error, string) {
 	var w models.LiveWorker
 	w.Id = uuid.New().String()
-	fmt.Println("Generating a random worker ID: ", w.Id)
+	Log.Println("Generating a random worker ID: ", w.Id)
 
 	w.Registered_at = time.Now()
 	w.Info = wkr
@@ -500,17 +501,17 @@ func createWorker(wkr models.WorkerInfo) (error, string) {
 
 	e := createUpdateWorker(w)
 	if e != nil {
-		fmt.Println("Error: Failed to create/update worker ID: ", w.Id)
+		Log.Println("Error: Failed to create/update worker ID: ", w.Id)
 		return e, ""
 	}
 
 	w2, ok := getWorkerById(w.Id) 
 	if !ok {
-		fmt.Println("Error: Failed to find worker ID: ", w.Id)
+		Log.Println("Error: Failed to find worker ID: ", w.Id)
 		return e, ""
 	} 
 
-	fmt.Printf("New worker created: %+v\n", w2)
+	Log.Printf("New worker created: %+v\n", w2)
 	return nil, w2.Id
 }
 
@@ -518,13 +519,13 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
 	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
 	if e != nil {
-		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
+		Log.Println("Failed to find job id=", jid, ". Error: ", e)
 		return j, false
 	}
 
 	e = json.Unmarshal([]byte(v), &j)
 	if e != nil {
-		fmt.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
+		Log.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
 		return j, false
 	}
 
@@ -535,14 +536,14 @@ func getJobById(jid string) (job.LiveJob, bool) {
 func stopWorkerJobs(wid string) error {
 	w, err := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
 	if err != nil {
-		fmt.Println("Load of worker id = ", wid, " is NOT found in Redis::worker_loads table (stopWorkerJobs). The worker is NOT loaded with any job. No need to stop jobs.")
+		Log.Println("Load of worker id = ", wid, " is NOT found in Redis::worker_loads table (stopWorkerJobs). The worker is NOT loaded with any job. No need to stop jobs.")
 		return nil // Not an error
 	}
 
 	var w_load models.WorkerLoad
 	err = json.Unmarshal([]byte(w), &w_load)
 	if err != nil {
-		fmt.Println("Failed to unmarshal load of worker id = ", wid, " in stopWorkerJobs")
+		Log.Println("Failed to unmarshal load of worker id = ", wid, " in stopWorkerJobs")
 		return err
 	}
 
@@ -554,18 +555,18 @@ func stopWorkerJobs(wid string) error {
 			createUpdateJob(j)
 			stopped_jobs_count++
 		} else {
-			fmt.Println("Failed to get job id = ", j_load.Id, " in stopWorkerJobs")
+			Log.Println("Failed to get job id = ", j_load.Id, " in stopWorkerJobs")
 		}
 	}
 
-	fmt.Println("Stopped ", stopped_jobs_count, " jobs that were running on worker id = ", wid)
+	Log.Println("Stopped ", stopped_jobs_count, " jobs that were running on worker id = ", wid)
 	return nil
 }
 
 func removeWorker(wid string) (error, string) {
 	err := redis.HDelOne(redis_client.REDIS_KEY_ALLWORKERS, wid)
 	if err != nil {
-		fmt.Println("Failed to delete worker id=", wid, ". Error: ", err)
+		Log.Println("Failed to delete worker id=", wid, ". Error: ", err)
 	}
 
 	return err, wid
@@ -574,7 +575,7 @@ func removeWorker(wid string) (error, string) {
 func getAllWorkerIds() ([]string, error) {
 	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
 	if err != nil {
-		fmt.Println("Failed to get all worker IDs. Error: ", err)
+		Log.Println("Failed to get all worker IDs. Error: ", err)
 	}
 
 	return wids, err
@@ -583,7 +584,7 @@ func getAllWorkerIds() ([]string, error) {
 func getAllWorkers() ([]string, error) {
 	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
 	if err != nil {
-		fmt.Println("Failed to get all worker IDs. Error: ", err)
+		Log.Println("Failed to get all worker IDs. Error: ", err)
 	}
 
 	var workers []string
@@ -602,7 +603,7 @@ func getAllWorkers() ([]string, error) {
 func getAllAvailableWorkers() ([]models.LiveWorker, error) {
 	wids, err := redis.HKeys(redis_client.REDIS_KEY_ALLWORKERS)
 	if err != nil {
-		fmt.Println("Failed to get all worker IDs. Error: ", err)
+		Log.Println("Failed to get all worker IDs. Error: ", err)
 	}
 
 	var workers []models.LiveWorker
@@ -615,7 +616,7 @@ func getAllAvailableWorkers() ([]models.LiveWorker, error) {
 		var worker models.LiveWorker
 		err = json.Unmarshal([]byte(w), &worker)
 		if err != nil {
-			fmt.Println("Failed to unmarshal worker (getAllAvailableWorkers). Error: ", err)
+			Log.Println("Failed to unmarshal worker (getAllAvailableWorkers). Error: ", err)
 			return workers, err
 		}
 
@@ -631,13 +632,13 @@ func getWorkerById(wid string) (models.LiveWorker, bool) {
 	var w models.LiveWorker
 	v, e := redis.HGet(redis_client.REDIS_KEY_ALLWORKERS, wid)
 	if e != nil {
-		fmt.Println("Failed to find worker id=", wid, ". Error: ", e)
+		Log.Println("Failed to find worker id=", wid, ". Error: ", e)
 		return w, false
 	}
 
 	e = json.Unmarshal([]byte(v), &w)
 	if e != nil {
-		fmt.Println("Failed to unmarshal Redis result (getWorkerById). Error: ", e)
+		Log.Println("Failed to unmarshal Redis result (getWorkerById). Error: ", e)
 		return w, false
 	}
 
@@ -647,7 +648,7 @@ func getWorkerById(wid string) (models.LiveWorker, bool) {
 func updateNumWorkers(n int) error {
 	err := redis.SetKVStruct(redis_client.REDIS_KEY_NUMWORKERS, n, 0)
 	if err != nil {
-		fmt.Println("Failed to update num_workers. Error: ", err)
+		Log.Println("Failed to update num_workers. Error: ", err)
 	}
 
 	return err
@@ -656,13 +657,13 @@ func updateNumWorkers(n int) error {
 func getNumWorkers() int {
 	n, err := redis.GetKV(redis_client.REDIS_KEY_NUMWORKERS)
 	if err != nil {
-		fmt.Println("Failed to get num_workers. Error: ", err)
+		Log.Println("Failed to get num_workers. Error: ", err)
 		return -1
 	}
 
 	r, err := strconv.Atoi(n)
 	if err != nil {
-		fmt.Println("Failed to strconv.Atoi (getNumWorkers). Error: ", err)
+		Log.Println("Failed to strconv.Atoi (getNumWorkers). Error: ", err)
 		return -1
 	}
 
@@ -673,7 +674,7 @@ func getNumWorkers() int {
 func check_worker_heartbeat() error {
 	workers, err := getAllWorkers()
 	if err != nil {
-		fmt.Println("Failed to check worker heartbeat. Error: Failed to getAllWorkers: ", err)
+		Log.Println("Failed to check worker heartbeat. Error: Failed to getAllWorkers: ", err)
 		return err
 	}
 
@@ -681,7 +682,7 @@ func check_worker_heartbeat() error {
 		var w models.LiveWorker
 		err = json.Unmarshal([]byte(e), &w)
 		if err != nil {
-			fmt.Println("Failed to check worker heartbeat. Error: Failed to unmarshal workers: ", err)
+			Log.Println("Failed to check worker heartbeat. Error: Failed to unmarshal workers: ", err)
 			return err
 		}
 
@@ -689,8 +690,8 @@ func check_worker_heartbeat() error {
 		time_now := time.Now().UnixMilli()
 		time_lastHeartbeat := w.LastHeartbeatTime.UnixMilli()
 
-		//fmt.Println("time elapsed since last heartbeat: ", time_now - time_lastHeartbeat)
-		//fmt.Println("max time allowed no heartbeat: ", int64(max_missing_heartbeats_before_suspension * hbinterval / 1000000))
+		//Log.Println("time elapsed since last heartbeat: ", time_now - time_lastHeartbeat)
+		//Log.Println("max time allowed no heartbeat: ", int64(max_missing_heartbeats_before_suspension * hbinterval / 1000000))
 		if (time_lastHeartbeat != 0 && time_now - time_lastHeartbeat > int64(max_missing_heartbeats_before_suspension * hbinterval * 1000)) {
 			w.State = models.WORKER_STATE_NOTAVAILABLE
 		} 
@@ -702,10 +703,10 @@ func check_worker_heartbeat() error {
 			if e != nil {
 				// Worker removal failed. Let's try again in the next event. 
 				// Meanwhile, let's reassure it is set as "not available" so no job is assigned to it.
-				fmt.Println("Failed to remove worker id = ", wid, ". Error: ", err)
+				Log.Println("Failed to remove worker id = ", wid, ". Error: ", err)
 				w.State = models.WORKER_STATE_NOTAVAILABLE
 			} else {
-				fmt.Println("Removed worker id = ", wid, " due to missing heartbeat")
+				Log.Println("Removed worker id = ", wid, " due to missing heartbeat")
 			}
 		}
 	}
@@ -717,11 +718,12 @@ func check_worker_heartbeat() error {
 var server_hostname = "0.0.0.0"
 var server_port = "80" 
 var server_addr string
+var Log *log.Logger
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
-    fmt.Println("----------------------------------------")
-    fmt.Println("Received new request:")
-    fmt.Println(r.Method, r.URL.Path)
+    Log.Println("----------------------------------------")
+    Log.Println("Received new request:")
+    Log.Println(r.Method, r.URL.Path)
 
     posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
     UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
@@ -736,7 +738,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(r.URL.Path, workersEndpoint) {
 		if !(r.Method == "POST" || r.Method == "GET")  {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
@@ -744,7 +746,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" && UrlLastPart == workersEndpoint {
 			if r.Body == nil {
             	res := "Error: Register worker without worker specification"
-            	fmt.Println("Error: Register worker without worker specification")
+            	Log.Println("Error: Register worker without worker specification")
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -753,21 +755,21 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			e := json.NewDecoder(r.Body).Decode(&wkr)
 			if e != nil {
             	res := "Failed to decode worker request"
-            	fmt.Println("Error happened in JSON marshal. Err: %s", e)
+            	Log.Println("Error happened in JSON marshal. Err: %s", e)
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
 
 			e1, wid := createWorker(wkr)
 			if e1 != nil {
-				fmt.Println("Failed to create new worker. Err: %s", e)
+				Log.Println("Failed to create new worker. Err: %s", e)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
 
 			worker, ok := getWorkerById(wid)
 			if !ok {
-				fmt.Println("Failed to register worker id=", wid)
+				Log.Println("Failed to register worker id=", wid)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
@@ -785,7 +787,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				workers, err := getAllWorkers()
 				if err != nil {
-					fmt.Println("Failed to handle request: GET /workers. Error: ", err)
+					Log.Println("Failed to handle request: GET /workers. Error: ", err)
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 					return
 				}
@@ -800,7 +802,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         			w.WriteHeader(http.StatusOK)
         			json.NewEncoder(w).Encode(worker)
 				} else {
-					fmt.Println("Non-existent worker id: ", UrlLastPart)
+					Log.Println("Non-existent worker id: ", UrlLastPart)
                     http.Error(w, "Non-existent worker id: " + UrlLastPart, http.StatusNotFound)
 				}
 			}
@@ -808,14 +810,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.Contains(r.URL.Path, heartbeatEndpoint) {
 		if !(r.Method == "POST")  {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
 		if r.Body == nil {
 			res := "Error: bad heartbeat received"
-			fmt.Println("Error: bad heartbeat received")
+			Log.Println("Error: bad heartbeat received")
 			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 			return
 		}
@@ -824,14 +826,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		e := json.NewDecoder(r.Body).Decode(&hb)
 		if e != nil {
 			res := "Failed to decode worker heartbeat"
-			fmt.Println("Failed to decode worker heartbeat. Err: %s", e)
+			Log.Println("Failed to decode worker heartbeat. Err: %s", e)
 			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 			return
 		}
 
 		worker, ok := getWorkerById(hb.Worker_id)
 		if !ok {
-			fmt.Println("Heartbeart worker id =", hb.Worker_id, " does not match any worker in Redis")
+			Log.Println("Heartbeart worker id =", hb.Worker_id, " does not match any worker in Redis")
 			http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 			return
 		}
@@ -846,14 +848,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.Contains(r.URL.Path, jobStatusEndpoint) {
 		if !(r.Method == "POST")  {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
 		if r.Body == nil {
 			res := "Error: bad job status report received"
-			fmt.Println(res)
+			Log.Println(res)
 			http.Error(w, "400 bad request\n Error: " + res, http.StatusBadRequest)
 			return
 		}
@@ -862,7 +864,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		e := json.NewDecoder(r.Body).Decode(&report)
 		if e != nil {
 			res := "Failed to decode worker job report"
-			fmt.Println("Failed to decode worker job report. Err: %s", e)
+			Log.Println("Failed to decode worker job report. Err: %s", e)
 			http.Error(w, "400 bad request\n Error: " + res, http.StatusBadRequest)
 			return
 		}
@@ -876,14 +878,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				j.State = job.JOB_STATE_STOPPED
 				createUpdateJob(j)
 			} else {
-				fmt.Println("Failed to get job id = ", jid, " when handling new job status request from worker id=", report.WorkerId)
+				Log.Println("Failed to get job id = ", jid, " when handling new job status request from worker id=", report.WorkerId)
 			}
 
 			e := updateWorkerLoad(report.WorkerId, jid)
 			if e == nil {
-				fmt.Println("Successfully deleted stopped job id = ", j, " and updated load of worker id = ", report.WorkerId)
+				Log.Println("Successfully deleted stopped job id = ", j, " and updated load of worker id = ", report.WorkerId)
 			} else {
-				fmt.Println("Failed to delete stopped job id = ", j, " or failed to update load of worker id = ", report.WorkerId, " Error: ", e)
+				Log.Println("Failed to delete stopped job id = ", j, " or failed to update load of worker id = ", report.WorkerId, " Error: ", e)
 			}
 		}
 
@@ -906,6 +908,13 @@ func main() {
 	redis.RedisIp = scheduler_config.Redis.RedisIp
 	redis.RedisPort = scheduler_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
+
+	var logfile, err1 = os.Create("/tmp/scheduler.log")
+    if err1 != nil {
+        panic(err1)
+    }
+
+	Log = log.New(logfile, "", log.LstdFlags)
 
 	d, _ := time.ParseDuration(job_scheduling_interval)
 	var sqs_poll_timer_counter = 0

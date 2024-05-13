@@ -50,27 +50,27 @@ func createDrmKey(jid string) (models.CreateKeyResponse, error) {
 	b, _ := json.Marshal(ckreq)
 	req, err := http.NewRequest(http.MethodPost, server_config.Drm_key_server_url, bytes.NewReader(b))
     if err != nil {
-        fmt.Println("Error: Failed to POST to: ", server_config.Drm_key_server_url)
+        Log.Println("Error: Failed to POST to: ", server_config.Drm_key_server_url)
 		// TODO: Need to retry when failed
         return ckresp, errors.New("StatusReportFailure_fail_to_post")
     }
 	
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        fmt.Println("Failed to POST to: ", server_config.Drm_key_server_url)
+        Log.Println("Failed to POST to: ", server_config.Drm_key_server_url)
 		return ckresp, err
     }
 
 	// TODO: Need to handle error response (other than http code 201)
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Println("Bad response from DRM key server for CreateKeyRequest")
+		Log.Println("Bad response from DRM key server for CreateKeyRequest")
         return ckresp, errors.New("StatusReportFailure_fail_to_read_key_server_response")
 	}
 	
 	defer resp.Body.Close()
     bodyBytes, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        fmt.Println("Error: Failed to read response body (createDrmKey)")
+        Log.Println("Error: Failed to read response body (createDrmKey)")
         return ckresp, errors.New("http_post_response_parsing_failure")
     }
 
@@ -82,27 +82,27 @@ func getDrmKey(key_id string) (models.KeyInfo, error) {
 	var k models.KeyInfo
 	req, err := http.NewRequest(http.MethodGet, server_config.Drm_key_server_url + key_id, nil)
     if err != nil {
-        fmt.Println("Error: Failed to GET: ", server_config.Drm_key_server_url)
+        Log.Println("Error: Failed to GET: ", server_config.Drm_key_server_url)
 		// TODO: Need to retry when failed
         return k, errors.New("StatusReportFailure_fail_to_get")
     }
 	
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        fmt.Println("Failed to GET: ", server_config.Drm_key_server_url)
+        Log.Println("Failed to GET: ", server_config.Drm_key_server_url)
 		return k, err
     }
 
 	// TODO: Need to handle error response (other than http code 200)
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Bad response from DRM key server for GetKeyRequest")
+		Log.Println("Bad response from DRM key server for GetKeyRequest")
         return k, errors.New("StatusReportFailure_fail_to_read_key_server_response")
 	}
 	
 	defer resp.Body.Close()
     bodyBytes, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        fmt.Println("Error: Failed to read response body (getDrmKey)")
+        Log.Println("Error: Failed to read response body (getDrmKey)")
         return k, errors.New("http_post_response_parsing_failure")
     }
 
@@ -113,7 +113,7 @@ func getDrmKey(key_id string) (models.KeyInfo, error) {
 func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
-	fmt.Println("Generating a random job ID: ", lj.Id)
+	Log.Println("Generating a random job ID: ", lj.Id)
 	
 	lj.StreamKey = assignJobInputStreamId()
 	if j.Output.Stream_type == job.DASH {
@@ -143,37 +143,37 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 			k, err_get_key = getDrmKey(create_key_resp.Key_id)
 			if err_get_key == nil {
 				lj.DrmEncryptionKeyInfo = k
-				fmt.Printf("DRM Key INFO: key_id: %s, key: %s, content_id: %s\n", lj.DrmEncryptionKeyInfo.Key_id, lj.DrmEncryptionKeyInfo.Key, lj.DrmEncryptionKeyInfo.Content_id)
+				Log.Printf("DRM Key INFO: key_id: %s, key: %s, content_id: %s\n", lj.DrmEncryptionKeyInfo.Key_id, lj.DrmEncryptionKeyInfo.Key, lj.DrmEncryptionKeyInfo.Content_id)
 			} else {
-				fmt.Printf("Failed to get DRM info. Do not protect the live stream")
+				Log.Printf("Failed to get DRM info. Do not protect the live stream")
 			}
 		} else {
-			fmt.Printf("Failed to create DRM key. Do not protect the live stream")
+			Log.Printf("Failed to create DRM key. Do not protect the live stream")
 		}
 	} else {
-		fmt.Printf("DRM is not configured. Do not protect the live stream")
+		Log.Printf("DRM is not configured. Do not protect the live stream")
 	}
 
 	e := createUpdateJob(lj)
 	if e != nil {
-		fmt.Println("Error: Failed to create/update job ID: ", lj.Id)
+		Log.Println("Error: Failed to create/update job ID: ", lj.Id)
 		return e, lj
 	}
 
 	j2, ok := getJobById(lj.Id) 
 	if !ok {
-		fmt.Println("Error: Failed to find job ID: ", lj.Id)
+		Log.Println("Error: Failed to find job ID: ", lj.Id)
 		return e, lj
 	} 
 
-	fmt.Printf("New job created: %+v\n", j2)
+	Log.Printf("New job created: %+v\n", j2)
 	return nil, j2
 }
 
 func createUpdateJob(j job.LiveJob) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to update job id=", j.Id, ". Error: ", err)
+		Log.Println("Failed to update job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -183,7 +183,7 @@ func stopJob(j job.LiveJob) error {
 	j.Stop = true
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to stop job id=", j.Id, ". Error: ", err)
+		Log.Println("Failed to stop job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -193,7 +193,7 @@ func resumeJob(j job.LiveJob) error {
 	j.Stop = false
 	err := redis.HSetStruct(redis_client.REDIS_KEY_ALLJOBS, j.Id, j)
 	if err != nil {
-		fmt.Println("Failed to stop job id=", j.Id, ". Error: ", err)
+		Log.Println("Failed to stop job id=", j.Id, ". Error: ", err)
 	}
 
 	return err
@@ -203,13 +203,13 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	var j job.LiveJob
 	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
 	if e != nil {
-		fmt.Println("Failed to find job id=", jid, ". Error: ", e)
+		Log.Println("Failed to find job id=", jid, ". Error: ", e)
 		return j, false
 	}
 
 	e = json.Unmarshal([]byte(v), &j)
 	if e != nil {
-		fmt.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
+		Log.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
 		return j, false
 	}
 
@@ -222,7 +222,7 @@ func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 	var jobs []job.LiveJob
 	jobsString, e := redis.HGetAll(htable)
 	if e != nil {
-		fmt.Println("Failed to get all jobs. Error: ", e)
+		Log.Println("Failed to get all jobs. Error: ", e)
 		return jobs, false
 	}
 
@@ -231,7 +231,7 @@ func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 		e = json.Unmarshal([]byte(j_string), &j)
 		if e != nil {
 			jobs = nil
-			fmt.Println("Failed to unmarshal Redis results (getJobsByTable). Error: ", e)
+			Log.Println("Failed to unmarshal Redis results (getJobsByTable). Error: ", e)
 			return jobs, false
 		}
 
@@ -249,23 +249,23 @@ var liveFeedCmd *exec.Cmd
 //       ffmpeg -i in.mp4 -vf "drawtext=fontfile=/usr/share/fonts/truetype/DroidSans.ttf: timecode='09\:57\:00\:00': r=25: \x=(w-tw)/2: y=h-(2*lh): fontcolor=white: box=1: boxcolor=0x00000000@1" -an
 func start_ffmpeg_live_contribution(spec demo.CreateLiveFeedSpec) error {
 	if isLiveFeeding {
-		fmt.Println("Live feeder is already up")
+		Log.Println("Live feeder is already up")
 		return errors.New("DuplicateLiveFeeding")
 	}
 
 	//liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-vf", "drawtext=fontfile=/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf:text='%{localtime}':fontcolor=white@0.8:x=7:y=7", "-an", "-f", "flv", spec.RtmpIngestUrl)
 	liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-f", "flv", spec.RtmpIngestUrl)
-	/*fmt.Printf("Path: " + ffmpeg.Path + " ")
+	/*Log.Printf("Path: " + ffmpeg.Path + " ")
 	for _, arg := range ffmpeg.Args {
-		fmt.Printf(arg + " ")
+		Log.Printf(arg + " ")
 	}
-	fmt.Printf("\n")*/
+	Log.Printf("\n")*/
 
-	fmt.Println("!!!Starting live feeding...")
+	Log.Println("!!!Starting live feeding...")
 	go func() {
 		err := liveFeedCmd.Start() 
 		if err != nil {
-			fmt.Println("Could not start live feeding: ", err)
+			Log.Println("Could not start live feeding: ", err)
 			return
 		} else {
 			isLiveFeeding = true
@@ -277,20 +277,20 @@ func start_ffmpeg_live_contribution(spec demo.CreateLiveFeedSpec) error {
 
 func stop_ffmpeg_live_contribution() {
 	if liveFeedCmd == nil {
-		fmt.Println("Live feeder isn't running")
+		Log.Println("Live feeder isn't running")
 		return
 	}
 	
 	process, err1 := os.FindProcess(int(liveFeedCmd.Process.Pid))
 	if err1 != nil {
-		fmt.Printf("Process id = %d not found. Error: %v\n", liveFeedCmd.Process.Pid, err1)
+		Log.Printf("Process id = %d not found. Error: %v\n", liveFeedCmd.Process.Pid, err1)
 		return
 	} else {
 		err2 := process.Signal(syscall.Signal(syscall.SIGINT))
-		fmt.Printf("process.Signal.SIGINT on pid %d returned: %v\n", liveFeedCmd.Process.Pid,  err2)
+		Log.Printf("process.Signal.SIGINT on pid %d returned: %v\n", liveFeedCmd.Process.Pid,  err2)
 		if err2 == nil {
 			isLiveFeeding = false
-			fmt.Println("Live feed stopped successfully!")
+			Log.Println("Live feed stopped successfully!")
 		}
 	}
 }
@@ -305,9 +305,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("----------------------------------------")
-    fmt.Println("Received new request:")
-    fmt.Println(r.Method, r.URL.Path)
+    Log.Println("----------------------------------------")
+    Log.Println("Received new request:")
+    Log.Println(r.Method, r.URL.Path)
 
     posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
     UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
@@ -322,19 +322,19 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
 		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "PUT" || r.Method == "DELETE") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
 
 		if r.Method == "POST" && UrlLastPart != liveJobsEndpoint {
 			res := "POST to " + r.URL.Path + "is not allowed"
-			fmt.Println(res)
+			Log.Println(res)
 			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 		} else if r.Method == "POST" && UrlLastPart == liveJobsEndpoint {
 			if r.Body == nil {
             	res := "Error New live job without job specification"
-            	fmt.Println("Error New live job without job specifications")
+            	Log.Println("Error New live job without job specifications")
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -343,7 +343,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			e := json.NewDecoder(r.Body).Decode(&job)
 			if e != nil {
             	res := "Failed to decode job request"
-            	fmt.Println("Error happened in JSON marshal. Err: ", e)
+            	Log.Println("Error happened in JSON marshal. Err: ", e)
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -360,7 +360,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 			b, e2 := json.Marshal(j)
 			if e2 != nil {
-				fmt.Println("Failed to marshal new job to SQS message. Error: ", e2)
+				Log.Println("Failed to marshal new job to SQS message. Error: ", e2)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
@@ -373,7 +373,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			jobMsg := string(b[:])
 			e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 			if e2 != nil {
-				fmt.Println("Failed to send SQS message (New job). Error: ", e2)
+				Log.Println("Failed to send SQS message (New job). Error: ", e2)
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
@@ -409,7 +409,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         			json.NewEncoder(w).Encode(j)
 					return
 				} else {
-					fmt.Println("Non-existent job id: ", jid)
+					Log.Println("Non-existent job id: ", jid)
                     http.Error(w, "Non-existent job id: " + jid, http.StatusNotFound)
 					return
 				}
@@ -417,20 +417,20 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		} else if r.Method == "PUT" {
 			if UrlLastPart == liveJobsEndpoint {
 				res := "A job id must be provided when updating a job. "
-				fmt.Println(res, "Err: ", res)
+				Log.Println(res, "Err: ", res)
             	http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
             	return
 			} else if strings.Contains(r.URL.Path, "stop") {
 				begin := strings.Index(r.URL.Path, liveJobsEndpoint) + len(liveJobsEndpoint) + 1
 				end := strings.Index(r.URL.Path, "stop") - 1
 				jid := r.URL.Path[begin:end]
-				fmt.Println(jid)
+				Log.Println(jid)
 
 				j, ok := getJobById(jid) 
 				if ok {
 					if j.State == job.JOB_STATE_STOPPED {
 						res := "Trying to stop a already stopped job id: " + jid
-						fmt.Println(res)
+						Log.Println(res)
 						http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 						return
 					}
@@ -446,7 +446,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		
 					b, e2 := json.Marshal(j)
 					if e2 != nil {
-						fmt.Println("Failed to marshal stop_job to SQS message. Error: ", e2)
+						Log.Println("Failed to marshal stop_job to SQS message. Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
@@ -455,7 +455,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					jobMsg := string(b[:])
 					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 					if e2 != nil {
-						fmt.Println("Failed to send SQS message (Stop job). Error: ", e2)
+						Log.Println("Failed to send SQS message (Stop job). Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
@@ -463,7 +463,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					return
 				} else {
 					res := "Trying to stop a non-existent job id: " + jid
-					fmt.Println(res)
+					Log.Println(res)
                     http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 					return
 				}
@@ -471,13 +471,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				begin := strings.Index(r.URL.Path, liveJobsEndpoint) + len(liveJobsEndpoint) + 1
 				end := strings.Index(r.URL.Path, "resume") - 1
 				jid := r.URL.Path[begin:end]
-				fmt.Println(jid)
+				Log.Println(jid)
 
 				j, ok := getJobById(jid) 
 				if ok {
 					if j.State == job.JOB_STATE_RUNNING || j.State == job.JOB_STATE_STREAMING {
 						res := "Trying to resume an active job id: " + jid
-						fmt.Println(res)
+						Log.Println(res)
 						http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 						return
 					}
@@ -493,7 +493,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 					b, e2 := json.Marshal(j)
 					if e2 != nil {
-						fmt.Println("Failed to marshal resume_job to SQS message. Error: ", e2)
+						Log.Println("Failed to marshal resume_job to SQS message. Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
@@ -502,7 +502,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					jobMsg := string(b[:])
 					e2 = sqs_sender.SendMsg(jobMsg, j.Id)
 					if e2 != nil {
-						fmt.Println("Failed to send SQS message (Stop job). Error: ", e2)
+						Log.Println("Failed to send SQS message (Stop job). Error: ", e2)
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 						return
 					}
@@ -510,7 +510,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					return
 				} else {
 					res := "Trying to resume a non-existent job id: " + jid
-					fmt.Println(res)
+					Log.Println(res)
                     http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
 					return
 				}
@@ -519,7 +519,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.Contains(r.URL.Path, "feed") { // Demo ONLY!!!
 		if !(r.Method == "POST" || r.Method == "DELETE") {
 			err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-			fmt.Println(err)
+			Log.Println(err)
 			http.Error(w, "405 method not allowed\n  Error: "+err, http.StatusMethodNotAllowed)
 			return
 		}
@@ -527,7 +527,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			if r.Body == nil {
 				res := "Error: Trying to create live feed without input"
-				fmt.Println(res)
+				Log.Println(res)
 				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 				return
 			}
@@ -536,7 +536,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			e := json.NewDecoder(r.Body).Decode(&live_feed_spec)
 			if e != nil {
 				res := "Failed to decode live feed spec"
-				fmt.Println("Error happened in JSON marshal (CreateLiveFeedSpec). Err: ", e)
+				Log.Println("Error happened in JSON marshal (CreateLiveFeedSpec). Err: ", e)
 				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 				return
 			}
@@ -546,7 +546,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		} else if r.Method == "DELETE" {
 			if !isLiveFeeding {
 				res := "Live feeder isn't running. Cannot stop!"
-				fmt.Println(res)
+				Log.Println(res)
 				http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
 			}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+    "log"
     "os"
     "time"
     "encoding/json"
@@ -19,6 +20,7 @@ type KeyServerConfig struct {
 	Redis redis_client.RedisConfig
 }
 
+var Log *log.Logger
 var server_hostname string
 var server_port string
 var key_endpoint = "keys"
@@ -30,7 +32,7 @@ var key_server_config KeyServerConfig
 func createUpdateDrmKey(k models.KeyInfo) error {
 	err := redis.HSetStruct(redis_client.REDIS_KEY_DRM_KEYS, k.Key_id, k)
 	if err != nil {
-		fmt.Println("Failed to create/update DRM key id=", k.Key_id, ". Error: ", err)
+		Log.Println("Failed to create/update DRM key id=", k.Key_id, ". Error: ", err)
 	}
 
 	return err
@@ -40,13 +42,13 @@ func getKeyById(kid string) (models.KeyInfo, bool) {
 	var k models.KeyInfo
 	v, err := redis.HGet(redis_client.REDIS_KEY_DRM_KEYS, kid)
 	if err != nil {
-		fmt.Println("Failed to find key id=", kid, ". Error: ", err)
+		Log.Println("Failed to find key id=", kid, ". Error: ", err)
 		return k, false
 	}
 
 	err = json.Unmarshal([]byte(v), &k)
 	if err != nil {
-		fmt.Println("Failed to unmarshal Redis result (getKeyById). Error: ", err)
+		Log.Println("Failed to unmarshal Redis result (getKeyById). Error: ", err)
 		return k, false
 	}
 
@@ -63,9 +65,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("----------------------------------------")
-    fmt.Println("Received new request:")
-    fmt.Println(r.Method, r.URL.Path)
+    Log.Println("----------------------------------------")
+    Log.Println("Received new request:")
+    Log.Println(r.Method, r.URL.Path)
 
     posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
     UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
@@ -80,7 +82,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(r.URL.Path, key_endpoint) {
 		if !(r.Method == "GET" || r.Method == "POST") {
             err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            fmt.Println(err)
+            Log.Println(err)
             http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
             return
         }
@@ -88,7 +90,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
             if r.Body == nil {
             	res := "Error New DRM key request without body"
-            	fmt.Println(res)
+            	Log.Println(res)
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -97,7 +99,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			err := json.NewDecoder(r.Body).Decode(&kr)
 			if err != nil {
             	res := "Failed to decode create key request"
-            	fmt.Println(res)
+            	Log.Println(res)
             	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
             	return
         	}
@@ -125,13 +127,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
                 json.NewEncoder(w).Encode(resp)
             } else {
                 res := "Error: Failed to create new DRM key."
-                fmt.Println(res)
+                Log.Println(res)
                 http.Error(w, "500 internal server error\n Error: " + res, http.StatusInternalServerError)
             }
         } else if r.Method == "GET" { // Get one key: /keys/[key_id]
             if UrlLastPart == key_endpoint {
                 res := "Error: A valid key ID must be provided"
-            	fmt.Println(res)
+            	Log.Println(res)
                 http.Error(w, "400 bad request\n Error: " + res, http.StatusBadRequest)
 				return
             }
@@ -146,7 +148,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
                 return
             } else {
                 res := "Error: Non-existent key id: " + kid
-                fmt.Println(res)
+                Log.Println(res)
                 http.Error(w, res, http.StatusNotFound)
                 return
             }
@@ -179,6 +181,13 @@ func main() {
     redis.RedisIp = key_server_config.Redis.RedisIp
 	redis.RedisPort = key_server_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
+
+    var logfile, err1 = os.Create("/tmp/key_server.log")
+    if err1 != nil {
+        panic(err1)
+    }
+
+    Log = log.New(logfile, "", log.LstdFlags)
 
 	server_addr := key_server_config.Server_hostname + ":" + key_server_config.Server_port
     fmt.Println("DRM key server listening on: ", server_addr)
