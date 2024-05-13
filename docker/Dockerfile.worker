@@ -3,19 +3,20 @@ FROM maxutility2011/ezlivestreaming_baseimage:v5
 USER streamer
 
 RUN mkdir /home/streamer/bin \
+    && mkdir /home/streamer/src \
     && mkdir /home/streamer/conf \
-    && cd /var/www/html/ \
+    && cd /home/streamer/src/ \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
 
-RUN cd /var/www/html/ezLiveStreaming/worker/app \
+RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
     && /usr/local/go/bin/go build worker_app.go \
-    && cp /var/www/html/ezLiveStreaming/worker/app/worker_app /home/streamer/bin/ \
-    && cp /var/www/html/ezLiveStreaming/worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
+    && cp /home/streamer/src/ezLiveStreaming/worker/app/worker_app /home/streamer/bin/ \
+    && cp /home/streamer/src/ezLiveStreaming/worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
 
-RUN cd /var/www/html/ezLiveStreaming/worker/transcoder \
+RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && /usr/local/go/bin/go build worker_transcoder.go \
-    && cp /var/www/html/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bin/ \
-    && cp /var/www/html/ezLiveStreaming/worker/transcoder/packager /home/streamer/bin/
+    && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bin/ \
+    && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/packager /home/streamer/bin/
 
 RUN sudo apt install ffmpeg -y
 

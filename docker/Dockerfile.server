@@ -4,16 +4,18 @@ USER streamer
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
-    && cd /var/www/html/ \
-    && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
+    && mkdir /home/streamer/src \
+    && cd /home/streamer/src \
+    && git clone https://github.com/maxutility2011/ezLiveStreaming.git \
+    && sudo cp -rf /home/streamer/src/ezLiveStreaming/demo /var/www/html/
 
-RUN cd /var/www/html/ezLiveStreaming/api_server \
+RUN cd /home/streamer/src/ezLiveStreaming/api_server \
     && /usr/local/go/bin/go build api_server_main.go \
-    && cp /var/www/html/ezLiveStreaming/api_server/api_server_main /home/streamer/bin/ \
-    && cp /var/www/html/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
+    && cp /home/streamer/src/ezLiveStreaming/api_server/api_server_main /home/streamer/bin/ \
+    && cp /home/streamer/src/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
 
-RUN cp /var/www/html/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
+RUN cp /home/streamer/src/ezLiveStreaming/api_server/start_server.sh /home/streamer/bin/ \
     && chmod +x /home/streamer/bin/start_server.sh
 
 ENV PATH="${PATH}:/home/streamer/bin"
