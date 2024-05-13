@@ -23,4 +23,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 EXPOSE 1080
 EXPOSE 4080
 
-CMD /home/streamer/bin/start_server.sh
+#CMD /home/streamer/bin/start_server.sh
