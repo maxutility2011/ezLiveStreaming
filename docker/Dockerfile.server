@@ -1,10 +1,11 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v5
+FROM maxutility2011/ezlivestreaming_baseimage:v5.1
 
 USER streamer
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
     && mkdir /home/streamer/src \
+    && mkdir /home/streamer/log \
     && cd /home/streamer/src \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git \
     && sudo cp -rf /home/streamer/src/ezLiveStreaming/demo /var/www/html/
@@ -23,4 +24,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 EXPOSE 1080
 EXPOSE 4080
 
-#CMD /home/streamer/bin/start_server.sh
+CMD /home/streamer/bin/start_server.sh

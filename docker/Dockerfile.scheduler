@@ -1,10 +1,11 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v5
+FROM maxutility2011/ezlivestreaming_baseimage:v5.1
 
 USER streamer
 
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
+    && mkdir /home/streamer/log \
     && cd /home/streamer/src \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
 
