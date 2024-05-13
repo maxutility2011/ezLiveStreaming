@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v4
+FROM maxutility2011/ezlivestreaming_baseimage:v5
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
