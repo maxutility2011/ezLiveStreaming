@@ -3,6 +3,7 @@ FROM maxutility2011/ezlivestreaming_baseimage:v1 as base
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
+    && mkdir /home/streamer/log \
     && cd /home/streamer/src \
     && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
 

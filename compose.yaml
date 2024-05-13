@@ -6,6 +6,7 @@ services:
       dockerfile: ./docker/Dockerfile.server
     volumes:
       - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+      - ./log:/home/streamer/log
     ports:
       - "1080:1080"
       - "4080:4080"
@@ -19,6 +20,7 @@ services:
       dockerfile: ./docker/Dockerfile.scheduler
     volumes:
       - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+      - ./log:/home/streamer/log
     ports:
       - "3080:3080"
     links:
@@ -28,10 +30,14 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.keyserver
+    volumes:
+      - ./log:/home/streamer/log
     ports:
       - "5080:5080"
   redis:
     image: redis
+    volumes:
+      - ./log:/home/streamer/log
     ports:
       - "6379:6379"
   worker:
@@ -41,6 +47,7 @@ services:
       dockerfile: ./docker/Dockerfile.worker
     volumes:
       - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+      - ./log:/home/streamer/log
     ports:
       - "2080:2080"
       - "1935-1950:1935-1950"
