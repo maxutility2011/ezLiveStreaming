@@ -336,7 +336,7 @@ func main() {
         return
     }
 
-    logName := "/tmp/worker_transcoder_" + *jobIdPtr + ".log"
+    logName := "/home/streamer/log/worker_transcoder_" + *jobIdPtr + ".log"
     var logfile, err1 = os.Create(logName)
     if err1 != nil {
         fmt.Println("Exiting... Failed to create log file (worker_transcoder)")

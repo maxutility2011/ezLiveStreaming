@@ -909,7 +909,7 @@ func main() {
 	redis.RedisPort = scheduler_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
-	var logfile, err1 = os.Create("/tmp/scheduler.log")
+	var logfile, err1 = os.Create("/home/streamer/log/scheduler.log")
     if err1 != nil {
         panic(err1)
     }

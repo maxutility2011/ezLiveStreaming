@@ -182,7 +182,7 @@ func main() {
 	redis.RedisPort = key_server_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
 
-    var logfile, err1 = os.Create("/tmp/key_server.log")
+    var logfile, err1 = os.Create("/home/streamer/log/key_server.log")
     if err1 != nil {
         panic(err1)
     }

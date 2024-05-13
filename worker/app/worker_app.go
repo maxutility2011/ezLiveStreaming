@@ -564,7 +564,7 @@ func registerWorker(conf WorkerAppConfig) error {
 }
 
 func main() {
-	var logfile, err1 = os.Create("/tmp/worker_app.log")
+	var logfile, err1 = os.Create("/home/streamer/log/worker_app.log")
     if err1 != nil {
         panic(err1)
     }

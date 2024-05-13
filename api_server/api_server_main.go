@@ -584,7 +584,7 @@ func main() {
 		server_config_file_path = *configPtr
 	}
 
-	var logfile, err1 = os.Create("/tmp/api_server.log")
+	var logfile, err1 = os.Create("/home/streamer/log/api_server.log")
     if err1 != nil {
         panic(err1)
     }
