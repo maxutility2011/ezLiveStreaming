@@ -1,5 +1,7 @@
 FROM maxutility2011/ezlivestreaming_baseimage:v5
 
+USER streamer
+
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -15,6 +17,5 @@ RUN cd /home/streamer/src/ezLiveStreaming/scheduler \
 ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 3080
-USER streamer
 
 CMD /home/streamer/bin/scheduler -config=/home/streamer/conf/scheduler_config.json

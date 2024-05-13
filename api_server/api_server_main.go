@@ -584,6 +584,7 @@ func main() {
 		server_config_file_path = *configPtr
 	}
 
+	// cron will schedule logrotate to automatically rotate all ezlivestreaming log files (logs that are under /home/streamer/logs/) every day. 
 	var logfile, err1 = os.Create("/home/streamer/log/api_server.log")
     if err1 != nil {
         panic(err1)

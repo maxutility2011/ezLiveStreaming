@@ -1,5 +1,7 @@
 FROM maxutility2011/ezlivestreaming_baseimage:v5
 
+USER streamer
+
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -16,5 +18,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 5080
 
-USER streamer
 CMD /home/streamer/bin/ezKey_server -config=/home/streamer/conf/drm_key_server_config.json

@@ -1,5 +1,7 @@
 FROM maxutility2011/ezlivestreaming_baseimage:v5
 
+USER streamer
+
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
     && cd /var/www/html/ \
@@ -19,5 +21,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 EXPOSE 1080
 EXPOSE 4080
 
-USER streamer
 CMD /home/streamer/bin/start_server.sh
