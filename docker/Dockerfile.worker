@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_worker_baseimage:v1 as base
+FROM maxutility2011/ezlivestreaming_worker_baseimage:v3
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -16,11 +16,13 @@ RUN cd /var/www/html/ezLiveStreaming/worker/transcoder \
     && cp /var/www/html/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bin/ \
     && cp /var/www/html/ezLiveStreaming/worker/transcoder/packager /home/streamer/bin/
 
+RUN sudo apt install ffmpeg -y
+
 ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 1080
 EXPOSE 4080
 
 USER streamer
-RUN sudo apt install net-tools
+#RUN sudo apt install net-tools -y
 CMD /home/streamer/bin/worker_app -config=/home/streamer/conf/worker_app_config.json

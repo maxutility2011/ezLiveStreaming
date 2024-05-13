@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v2 as base
+FROM maxutility2011/ezlivestreaming_baseimage:v3
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -21,5 +21,5 @@ EXPOSE 1080
 EXPOSE 4080
 
 USER streamer
-RUN sudo apt install net-tools
+#RUN sudo apt install net-tools -y
 CMD /home/streamer/bin/start_server.sh
