@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v3
+FROM maxutility2011/ezlivestreaming_baseimage:v4
 
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
@@ -17,5 +17,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 EXPOSE 5080
 
 USER streamer
-#RUN sudo apt install net-tools -y
 CMD /home/streamer/bin/ezKey_server -config=/home/streamer/conf/drm_key_server_config.json

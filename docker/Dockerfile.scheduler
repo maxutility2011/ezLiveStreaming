@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v3
+FROM maxutility2011/ezlivestreaming_baseimage:v4
 
 RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/bin \
@@ -16,7 +16,5 @@ ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 3080
 USER streamer
-
-#RUN sudo apt install net-tools -y
 
 CMD /home/streamer/bin/scheduler -config=/home/streamer/conf/scheduler_config.json

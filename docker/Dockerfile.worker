@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v3
+FROM maxutility2011/ezlivestreaming_baseimage:v4
 
 RUN mkdir /home/streamer/bin \
     && mkdir /home/streamer/conf \
@@ -23,5 +23,4 @@ EXPOSE 1080
 EXPOSE 4080
 
 USER streamer
-#RUN sudo apt install net-tools -y
 CMD /home/streamer/bin/worker_app -config=/home/streamer/conf/worker_app_config.json
