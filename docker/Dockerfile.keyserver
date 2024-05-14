@@ -22,5 +22,4 @@ ENV PATH="${PATH}:/home/streamer/bin"
 
 EXPOSE 5080
 
-#CMD /home/streamer/bin/ezKey_server -config=/home/streamer/conf/drm_key_server_config.json
-CMD /home/streamer/bin/start_key_server.sh
+CMD /home/streamer/bin/ezKey_server -config=/home/streamer/conf/drm_key_server_config.json
