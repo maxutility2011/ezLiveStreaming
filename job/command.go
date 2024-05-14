@@ -44,9 +44,9 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
     // In the input URL, replace external hostname with anyaddr (0.0.0.0) 
     // The live contribution encoder must use an input URL with external hostname, e.g., rtmp://ec2-34-202-195-77.compute-1.amazonaws.com:1935/live/app.
     // However, FFmpeg transcoder running in docker must listen on anyaddr (0.0.0.0).
-    posColon := strings.Index(j.Input.Url, ":")
+    posLastColon := strings.LastIndex(j.Input.Url, ":")
     ffmpegListeningUrl := "http://0.0.0.0:"
-    ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posColon + 1: ]
+    ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posLastColon + 1: ]
 
     ffmpegArgs = append(ffmpegArgs, "-i")
     ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
