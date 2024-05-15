@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.server
     volumes:
-      - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+      - $HOME/.aws/:/home/streamer/.aws/:ro
     ports:
       - "1080:1080"
       - "4080:4080"
@@ -18,7 +18,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.scheduler
     volumes:
-      - $HOME/.aws/credentials:/home/streamer/.aws/credentials:ro
+      - $HOME/.aws/:/home/streamer/.aws/:ro
     ports:
       - "3080:3080"
     links:
