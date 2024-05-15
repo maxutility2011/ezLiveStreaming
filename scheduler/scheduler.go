@@ -774,6 +774,10 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			host := r.Header.Get("Host")
+			forwarded_for := r.Header.Get("X-Forwarded-For")
+			Log.Printf("Host: %s, X-Forwarded-For: %s\n", host, forwarded_for)
+
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
