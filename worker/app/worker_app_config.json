@@ -1,5 +1,6 @@
 {
     "SchedulerUrl": "http://ec2-34-202-195-77.compute-1.amazonaws.com:3080",
+    "GetPublicIpUrl" : "https://api.ipify.org?format=json",
     "WorkerPort": "2080",
     "WorkerUdpPortBase": 10001
 }

@@ -1,5 +1,6 @@
 {
     "SchedulerUrl": "http://172.17.0.2:3080",
+    "GetPublicIpUrl" : "https://api.ipify.org?format=json",
     "WorkerPort": "2081",
     "UdpPortBase": 10001
 }

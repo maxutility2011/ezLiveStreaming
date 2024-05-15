@@ -20,10 +20,13 @@ import (
 	"ezliveStreaming/models"
 	"ezliveStreaming/job"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 type WorkerAppConfig struct {
 	SchedulerUrl string
+	GetPublicIpUrl string
 	WorkerPort string
 	WorkerUdpPortBase int
 }
@@ -33,7 +36,12 @@ type RunningJob struct {
 	Command *exec.Cmd
 }
 
+type IPIFY_RESPONSE struct {
+	Ip string `json:"ip"`
+}
+
 var liveJobsEndpoint = "jobs"
+var get_public_ip_url = "https://api.ipify.org?format=json"
 
 func createJob(j job.LiveJob) (error, string) {
 	j.Time_received_by_worker = time.Now()
@@ -526,9 +534,54 @@ func sendHeartbeat() error {
 	return nil
 }
 
+func getPublicIp() (string, error) {
+	var public_ip string
+	if worker_app_config.GetPublicIpUrl != "" {
+		get_public_ip_url = worker_app_config.GetPublicIpUrl
+	}
+	 
+	Log.Println("Getting public IP from: ", get_public_ip_url) 
+	req, err1 := http.NewRequest(http.MethodGet, get_public_ip_url, nil)
+    if err1 != nil {
+        Log.Println("Error: Failed to create GET request to: ", get_public_ip_url)
+        return public_ip, errors.New("http_get_request_creation_failure")
+    }
+	
+    resp, err2 := http.DefaultClient.Do(req)
+    if err2 != nil {
+        Log.Println("Error: Failed to send GET to: ", get_public_ip_url)
+        return public_ip, errors.New("http_get_request_send_failure")
+    }
+	
+    defer resp.Body.Close()
+    bodyBytes, err3 := ioutil.ReadAll(resp.Body)
+    if err3 != nil {
+        Log.Println("Error: Failed to read response body from: ", get_public_ip_url)
+        return public_ip, errors.New("http_get_response_parsing_failure")
+    }
+
+	var ipify IPIFY_RESPONSE
+	err := json.Unmarshal(bodyBytes, &ipify)
+	if err != nil {
+		Log.Println("Failed to parse response from: ", get_public_ip_url)
+		return public_ip, err
+	}
+
+	public_ip = ipify.Ip
+	return public_ip, nil
+}
+
 func registerWorker(conf WorkerAppConfig) error {
 	register_new_worker_url := job_scheduler_url + "/" + "workers"
 	var new_worker_request models.WorkerInfo
+
+	public_ip, err := getPublicIp()
+	if err != nil {
+		Log.Println("Failed to get public IP from URL: ", get_public_ip_url)
+		return err
+	}
+
+	new_worker_request.ServerIp = public_ip
 	new_worker_request.ServerPort = conf.WorkerPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
@@ -537,21 +590,21 @@ func registerWorker(conf WorkerAppConfig) error {
 	b, _ := json.Marshal(new_worker_request)
 
 	Log.Println("Registering new worker at: ", register_new_worker_url, " at time = ", time.Now()) 
-	req, err := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
-    if err != nil {
+	req, err1 := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
+    if err1 != nil {
         Log.Println("Error: Failed to POST to: ", register_new_worker_url)
         return errors.New("http_post_request_creation_failure")
     }
 	
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
+    resp, err2 := http.DefaultClient.Do(req)
+    if err2 != nil {
         Log.Println("Error: Failed to POST to: ", register_new_worker_url)
         return errors.New("http_post_request_send_failure")
     }
 	
     defer resp.Body.Close()
-    bodyBytes, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
+    bodyBytes, err3 := ioutil.ReadAll(resp.Body)
+    if err3 != nil {
         Log.Println("Error: Failed to read response body")
         return errors.New("http_post_response_parsing_failure")
     }
@@ -565,16 +618,6 @@ func registerWorker(conf WorkerAppConfig) error {
 	my_public_ip = wkr.Info.ServerIp 
 	Log.Printf("Worker registered successfully with worker id: %s and my public IP is %s\n", my_worker_id, my_public_ip)
 	return nil
-}
-
-func describeEc2Instance() {
-	ec2Svc := ec2.New(sess)
-	result, err := ec2Svc.DescribeInstances(nil)
-	if err != nil {
-		fmt.Println("Error", err)
-	} else {
-		fmt.Println("Success", result)
-	}
 }
 
 func main() {
@@ -675,8 +718,6 @@ func main() {
 
         os.Exit(0)
     }()
-
-	describeEc2Instance()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := "0.0.0.0:" + worker_app_config.WorkerPort
