@@ -1,6 +1,5 @@
 {
-    "SchedulerUrl": "http://172.17.0.2:80",
-    "WorkerAppIp": "172.17.0.4",
-    "WorkerAppPort": "2081",
+    "SchedulerUrl": "http://172.17.0.2:3080",
+    "WorkerPort": "2081",
     "UdpPortBase": 10001
 }

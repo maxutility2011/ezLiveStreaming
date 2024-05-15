@@ -23,7 +23,6 @@ import (
 
 type WorkerAppConfig struct {
 	SchedulerUrl string
-	WorkerHostname string
 	WorkerPort string
 	WorkerUdpPortBase int
 }
@@ -243,7 +242,6 @@ func readConfig() {
 	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
-//var rtmp_ingest_port = 1935
 var rtmp_port_base = 1935 // TODO: Make this configurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var available_rtmp_ports *list.List
@@ -257,7 +255,8 @@ var job_scheduler_url string
 //       when the existing worker crashes.
 var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
 var running_jobs *list.List // Live jobs actively running on this worker
-var myWorkerId string
+var my_worker_id string
+var my_public_ip string
 var last_confirmed_heartbeat_time time.Time
 var worker_app_config WorkerAppConfig
 
@@ -298,7 +297,8 @@ func createIngestUrl(job job.LiveJob) error {
 		err = errors.New("NotEnoughRtmpIngestPort")
 	} else {
 		job.RtmpIngestPort = rtmp_ingest_port
-		job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerHostname + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+		//job.RtmpIngestUrl = "rtmp://" + worker_app_config.WorkerHostname + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
+		job.RtmpIngestUrl = "rtmp://" + my_public_ip + ":" + strconv.Itoa(rtmp_ingest_port) + "/live/" + job.StreamKey
 		// job.SrtIngestUrl = ...
 		// job.RtpIngestUrl = ...
 	}
@@ -446,7 +446,7 @@ func checkJobStatus() {
 	var jobProcessFound bool
 	var jobProcessRunning bool
 
-	job_report.WorkerId = myWorkerId
+	job_report.WorkerId = my_worker_id
 	prev_e = nil
 	jobProcessFound = false
 	jobProcessRunning = false
@@ -496,7 +496,7 @@ func checkJobStatus() {
 
 func sendHeartbeat() error {
 	var hb models.WorkerHeartbeat
-	hb.Worker_id = myWorkerId
+	hb.Worker_id = my_worker_id
 	hb.LastHeartbeatTime = time.Now()
 	b, _ := json.Marshal(hb)
 
@@ -528,7 +528,6 @@ func sendHeartbeat() error {
 func registerWorker(conf WorkerAppConfig) error {
 	register_new_worker_url := job_scheduler_url + "/" + "workers"
 	var new_worker_request models.WorkerInfo
-	new_worker_request.ServerIp = conf.WorkerHostname
 	new_worker_request.ServerPort = conf.WorkerPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
@@ -558,8 +557,12 @@ func registerWorker(conf WorkerAppConfig) error {
 
 	var wkr models.LiveWorker
 	json.Unmarshal(bodyBytes, &wkr)
-	myWorkerId = wkr.Id
-	Log.Println("Worker registered successfully with worker id =", myWorkerId)
+	my_worker_id = wkr.Id
+	// The public IP of the worker. This is the public IP of the host VM of the worker docker container. 
+	// For example, if the worker docker runs on an EC2 VM host, this is the public IP of that VM.
+	// We need to know the host VM's public IP for live ingesting.
+	my_public_ip = wkr.Info.ServerIp 
+	Log.Printf("Worker registered successfully with worker id: %s and my public IP is %s\n", my_worker_id, my_public_ip)
 	return nil
 }
 
@@ -602,7 +605,7 @@ func main() {
 		   select {
 			case <-ticker.C: {
 				// Worker ID is assigned by scheduler only when worker registration succeeded.
-				if myWorkerId == "" {
+				if my_worker_id == "" {
 					err1 = registerWorker(worker_app_config)
 					if err1 != nil {
 						Log.Println("Failed to register worker. Try again later.")
@@ -663,7 +666,6 @@ func main() {
     }()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
-	//worker_app_addr := worker_app_config.WorkerHostname + ":" + worker_app_config.WorkerPort
 	worker_app_addr := "0.0.0.0:" + worker_app_config.WorkerPort
 	http.HandleFunc("/", main_server_handler)
     fmt.Println("API server listening on: ", worker_app_addr)
