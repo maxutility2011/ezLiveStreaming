@@ -760,6 +760,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             	return
         	}
 
+			Log.Printf("RemoteAddr: %s\n", r.RemoteAddr)
+			posColon := strings.Index(r.RemoteAddr, ":")
+			wkr.ServerIp = r.RemoteAddr[: posColon-1]
 			e1, wid := createWorker(wkr)
 			if e1 != nil {
 				Log.Println("Failed to create new worker. Err: %s", e)
@@ -773,8 +776,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
 			}
-
-			Log.Printf("RemoteAddr: %s\n", r.RemoteAddr)
 
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
