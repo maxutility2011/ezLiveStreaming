@@ -19,6 +19,7 @@ import (
 	"container/list"
 	"ezliveStreaming/models"
 	"ezliveStreaming/job"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
 type WorkerAppConfig struct {
@@ -566,6 +567,16 @@ func registerWorker(conf WorkerAppConfig) error {
 	return nil
 }
 
+func describeEc2Instance() {
+	ec2Svc := ec2.New(sess)
+	result, err := ec2Svc.DescribeInstances(nil)
+	if err != nil {
+		fmt.Println("Error", err)
+	} else {
+		fmt.Println("Success", result)
+	}
+}
+
 func main() {
 	var logfile, err1 = os.Create("/home/streamer/log/worker_app.log")
     if err1 != nil {
@@ -664,6 +675,8 @@ func main() {
 
         os.Exit(0)
     }()
+
+	describeEc2Instance()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := "0.0.0.0:" + worker_app_config.WorkerPort
