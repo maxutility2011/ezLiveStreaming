@@ -763,6 +763,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			Log.Printf("RemoteAddr: %s\n", r.RemoteAddr)
 			posColon := strings.Index(r.RemoteAddr, ":")
 			wkr.ServerIp = r.RemoteAddr[: posColon-1]
+			Log.Printf("ServerIp: %s\n", wkr.ServerIp)
 			e1, wid := createWorker(wkr)
 			if e1 != nil {
 				Log.Println("Failed to create new worker. Err: %s", e)
