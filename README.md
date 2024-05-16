@@ -23,27 +23,27 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 ## Management workflow
 ![screenshot](diagrams/architecture_diagram.png)
 
-The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM configured, the API server requests DRM encrypt/decrypt key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
+The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server requests DRM encrypt/decrypt key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
-# Live stream data flow
+## Live stream data flow
 
 ![screenshot](diagrams/data_flow.png)
 
-The live stream data flow on a live worker VM is shown in the above diagram. To run a live channel, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs N number of output MPEG-TS streams, where N is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
+The live stream data flow on a live worker server is shown in the above diagram. To run a live channel, the worker launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends a live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs *N* number of output MPEG-TS streams, where *N* is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. The worker runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to the viewers via CDN.
 
 # Quickstart
 
-All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in few easy steps as follows. 
+All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. 
 
-## Minimum requirements:
+## Prerequisites:
 
-- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Platform. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own unitests. However, for a better demonstration, I would recommend two servers.
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I'm using a two server setup. 
 
-- You need to install docker, and git. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
+- You need to install docker, docker-compose and git. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
 
-- You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on a third machine.
+- You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on any machine with camera.
 
-- You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder.
+- You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
 
 ## Step 1: Launch the servers
 Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end EC2 instances (I use a t2-micro one which is free-tier eligible). The live worker services need to run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). 
