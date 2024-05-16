@@ -220,6 +220,12 @@ If you see the playback starts but has frequent player rebuffering, they could b
 4. The worker server (running ffmpeg and Shaka packager) does not have enough CPU power to transcode. You can look at the worker log (Step 11) for clues. If ffmpeg cannot transcode as fast as the real speed of the live video, it will log the errors and the errors are dumped to the worker log.
 5. It can be also likely that you run too many live channels on the single worker server, or your live channels are configured with too many output renditions and/or the video transcoding settings are too high. Try to run fewer jobs (no more than 3 jobs on a c5.large instance), configure fewer output renditions for a job, or reduce video resolution, bitrate, frame rate, or use h.264 as the video codec instead of h.265.
 
+For interesting users, a postman collection is included in this repository which contains sample internal/external API requests targetting individual services (api_server, job scheduler, worker, ezKey_server). You can also use redis-cli to view Redis tables. To access Redis, log into the management server container which hosts api_server, scheduler, ezKey_server and Redis, and run
+```
+redis-cli
+```
+ezLiveStreaming uses the default Redis port, 6379. A full list of all the Redis tables used by ezLiveStreaming is given in the end of this document.
+
 ![screenshot](diagrams/playback_nodrm.png)
 
 # List of API methods
