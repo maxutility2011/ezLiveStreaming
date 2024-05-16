@@ -33,7 +33,7 @@ The live stream data flow on a live worker server is shown in the above diagram.
 
 # Quickstart
 
-All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. 
+All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you may see terms like *live job*, *live channel* and "live stream*. They all roughly mean the same thing hence are used interchangeably.
 
 ## Prerequisites:
 
@@ -71,7 +71,7 @@ chmod 644 ~/.aws/credentials
 chmod 644 ~/.aws/config
 ```
 
-The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. 
+The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. Note that I chose to use volume mapping for granting AWS access to ezLiveStreaming services because it is simple while keeping my AWS secrets private. Granting AWS access is out of scope of this project.
 
 ## Step 4: Create live job queue on AWS SQS
 Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 3 to access the job queue.
@@ -99,7 +99,7 @@ List of public ports that need to be opened,
 | 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
 | 3080 | management | job scheduler | HTTP (TCP) | Used by job scheduler to communicate with workers | 
 | 4080 | management | Nginx | HTTP (TCP) | Used by Nginx to serve the demo UI. |
-| 1935-1940 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
+| 1935-1950 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
 
 The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same host server as api_server, port 5080 does not need to be made public.
 
@@ -185,28 +185,40 @@ The ffmpeg process is ready to receive your live RTMP input stream.
 ![screenshot](diagrams/verify_new_channel.png)
 
 ## Step 10: Feed your live channel
-On your PC, open OBS studio to broadcast a live RTMP contribution stream. Go to the demo UI and copy the *rtmp_ingest_url*, e.g., "rtmp://54.91.250.183:1936/live/5ae4760f-49a0-41a9-979d-005fe9c32834". In OBS, click "Settings", 
+On your PC, open OBS studio to broadcast a live RTMP stream that contributes to the worker service of ezLiveStreaming. Go to the demo UI and copy the *rtmp_ingest_url* (returned by api_server after creating your live channel in Step 9), e.g., "rtmp://54.91.250.183:1936/live/5ae4760f-49a0-41a9-979d-005fe9c32834". In OBS, click "Settings" then click "Stream", the following screen will show up. 
 
 ![screenshot](diagrams/obs_stream_setting.png)
 
-Copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.183:1936/live/" into the "Server" section, and the RTMP stream key, e.g., "5ae4760f-49a0-41a9-979d-005fe9c32834" into the "Stream Key" section. Click "OK" to save and apply the RTMP output settings. Then, click "Start Streaming" button to start live broadcasting to ezLiveStreaming. If OBS returns no error, that means the live broadcasting is up and running.
+In the above screen, copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.183:1936/live/" into the "Server" box, and the RTMP stream key, e.g., "5ae4760f-49a0-41a9-979d-005fe9c32834" into the "Stream Key" box. Click "OK" to save and apply the RTMP output settings. Then, click "Start Streaming" button in the main panel to start live broadcasting to ezLiveStreaming. If OBS returns no error, that means the live broadcasting is up and running. Otherwise, go back to Step 9 and verify if all the worker services are running. Failed OBS broadcasting has three possible causes,
+1. ffmpeg or Shaka packager fails to start in worker container.
+2. The TCP port (e.g., 1936) for RTMP ingest isn't open on the worker server. Please check your AWS EC2 security group for a list of open ports. A worker instance can run multiple concurrent live channels (limit to 15 channels in the code). Each channel is assigned its own port between 1935 and 1950. When a new channel is created, it is assigned the next higher port number, starting from 1935. When a channel stops, its port is reclaimed and returned to the available port pool. 
+3. Also, check the hostname/ip_address in *rtmp_ingest_url*. Make sure it is a public IP. Ideally, the worker service queries a IP detection service, "api.ipify.org" for its own public IP and put the IP in *rtmp_ingest_url*. 
+
+It is also possible that Step 9 does not succeed and the new channel is not even created. If that is the case, you will not see any server response in the demo UI when you run Step 9. Also, make sure you have successfully started the worker service in Step 8. If that is the case, run "docker ps" on the worker server to verify worker container is running.
 
 ## Step 11: Verify live channel output to S3
-Go to your AWS s3 console, click into your bucket, you will see a folder named as follows, "output_4f115985-f9be-4fea-9d0c-0421115715a1/". The string after "output_" is the live job id which should match the job id returned from the api_server in step 9. Click into the job media output folder, you will see media output as follow,
+Go to your AWS s3 console, click into your bucket, you will see a folder named like "output_4f115985-f9be-4fea-9d0c-0421115715a1/". The random string after "output_" is the live job id which should match the job id returned from the api_server in step 9. Click into the job media output folder, you will see media output like below,
 
 ![screenshot](diagrams/s3_output.png)
 
-For HLS, media output include m3u8 playlists and sub-folders that contains media segments. \br
+For HLS, media output include m3u8 playlists and sub-folders that contain media segments. 
 
-However, if you don't see the job output folder in your bucket, that may indicate missing AWS access right. Log into your worker container again as in step 9, run 
+However, if you don't see the job output folder in your bucket, that most likely indicates missing AWS access right. Log into your worker container again as in step 9, run 
 ```
 vi /home/streamer/log/worker_transcoder_4f115985-f9be-4fea-9d0c-0421115715a1.log
 ```
-to view the worker log. You may see S3 upload failure due to missing AWS access right.
+to view the worker log. Remember to replace the random string in the log file name by the id of your live job. If you see S3 upload failure in the log, that means the worker service does not have write access to your S3 bucket. You may refer to Step 3 or use your own way to grant AWS access. Granting AWS access is out of scope of the development of ezLiveStreaming.
 
 ## Step 12: Playback
 The live channel playback URL can be found in the botton-right corner of the demo UI, e.g., "https://bzhang-test-bucket-public.s3.amazonaws.com/output_4f115985-f9be-4fea-9d0c-0421115715a1/master.m3u8".
-In the demo UI, I integrated Shaka player to play the live channel. After you started live broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI. You will see playback starts. You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
+In the demo UI, I integrated Shaka player to play the live channel. After you started live OBS broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI, you will see playback starts. The 10 seconds wait time is for the transcoder to start up (initialize, generate the first 2-3 media segments then upload to S3 bucket). You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
+
+If you see the playback starts but has frequent player rebuffering, they could be caused by the following reasons,
+1. The Internet connection isn't good on the machine running OBS. The live RTMP contribution stream does not have a good amount of bandwidth to be delivered.
+2. The Internet connection isn't good on the machine running the video player. The live HLS/DASH stream does not have a good amount of bandwidth to be delivered.
+3. The machine running OBS does not have enough CPU power available to generate the live video stream. 
+4. The worker server (running ffmpeg and Shaka packager) does not have enough CPU power to transcode. You can look at the worker log (Step 11) for clues. If ffmpeg cannot transcode as fast as the real speed of the live video, it will log the errors and the errors are dumped to the worker log.
+5. It can be also likely that you run too many live channels on the single worker server, or your live channels are configured with too many output renditions and/or the video transcoding settings are too high. Try to run fewer jobs (no more than 3 jobs on a c5.large instance), configure fewer output renditions for a job, or reduce video resolution, bitrate, frame rate, or use h.264 as the video codec instead of h.265.
 
 ![screenshot](diagrams/playback_nodrm.png)
 
