@@ -74,32 +74,32 @@ chmod 644 ~/.aws/config
 The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. 
 
 ## Step 4: Create live job queue on AWS SQS
-Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 4 to access the job queue.
+Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 3 to access the job queue.
 
 ## Step 5: Configure the services
 
 The api_server, job scheduler, ezKey_server and worker_app all have their own configuration files.
 
-In *api_server/config.json*, put your own job queue name in *Sqs.Queue_name*. \br
+In *api_server/config.json*, put your own job queue name in *Sqs.Queue_name*. 
 
-In *scheduler/config.json*, put your own job queue name in *Sqs.Queue_name*. \br
+In *scheduler/config.json*, put your own job queue name in *Sqs.Queue_name*. 
 
 No change is needed in *drm_key_server/config.json*.
 
-In *worker/app/worker_app_config.json*, put in your own *SchedulerUrl*. The host name part is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in *scheduler/config.json*. You can leave other configuration options as is.
+In *worker/app/worker_app_config.json*, put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in *scheduler/config.json*. You can leave other configuration options as is.
 
 ## Step 6: Networking
-As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using your *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
+As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
 
 List of public ports that need to be opened,
 
-| Port/Port range | Server | Service | Use | 
-| --- | --- | --- | --- |
-| 1080 | management | api_server| Used by api_server to receive live job requests from users | 
-| 2080 | worker | worker | Used by worker to communicate with job scheduler | 
-| 3080 | management | job scheduler | Used by job scheduler to communicate with workers | 
-| 4080 | management | Nginx | Used by Nginx to serve the demo UI. |
-| 1935-1940 | worker | worker | Used by a worker to receive live rtmp input streams, one port per stream |
+| Port/Port range | Server | Service | Protocol | Use | 
+| --- | --- | --- | --- | --- |
+| 1080 | management | api_server| HTTP (TCP) | Used by api_server to receive live job requests from users | 
+| 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
+| 3080 | management | job scheduler | HTTP (TCP) | Used by job scheduler to communicate with workers | 
+| 4080 | management | Nginx | HTTP (TCP) | Used by Nginx to serve the demo UI. |
+| 1935-1940 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
 
 The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same server as api_server, port 5080 does not need to be made public.
 
