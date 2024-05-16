@@ -9,6 +9,7 @@ If you have any questions regarding this project, please contact Bo Zhang by ema
 - live Adaptative BitRate (ABR) transcoding, 
 - HLS/DASH streaming, 
 - live transcoding API,
+- live channel management API,
 - clear key DRM protection, 
 - uploading transcoder outputs to AWS S3,
 - standard-compliant media transcoding and formatting which potentially work with any video players.
