@@ -136,11 +136,11 @@ On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-
 
 ![screenshot](diagrams/demo_ui.png)
 
-Copy the content of [sample_live_job_without_drm.json](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. You will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copuy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail of about DRM setup will be explained later.
+Copy the content of [sample_live_job_without_drm.json](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail about DRM setup will be explained later.
 
 ![screenshot](diagrams/demo_step2.png)
 
-On the worker server, verify the worker container is running,
+On the backend, ezLiveStreaming will create a new worker for your new channel. On the worker server, verify the worker container is running,
 ```
 docker ps
 ```
@@ -157,6 +157,8 @@ docker exec -it 1abfdfe0f6fe /bin/bash
 Inside the worker container, switches to user "streamer" and verify the worker services are running under user "streamer",
 ```
 su - streamer
+```
+```
 ps aux
 ```
 Expect output as follows,
