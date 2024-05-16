@@ -2,6 +2,8 @@
 
 ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
 
+If you have any questions regarding this project, please contact Bo Zhang by email: maxutility2011@gmail.com.
+
 ## What can ezLiveStreaming do?
 
 - live Adaptative BitRate (ABR) transcoding, 
@@ -88,7 +90,7 @@ No change is needed in *drm_key_server/config.json*.
 
 In *worker/app/worker_app_config.json*, put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in *scheduler/config.json*. You can leave other configuration options as is.
 
-## Step 6: Networking
+## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
 
 List of public ports that need to be opened,
