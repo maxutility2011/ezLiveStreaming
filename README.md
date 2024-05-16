@@ -101,18 +101,20 @@ List of public ports that need to be opened,
 | 4080 | management | Nginx | HTTP (TCP) | Used by Nginx to serve the demo UI. |
 | 1935-1940 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
 
-The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same server as api_server, port 5080 does not need to be made public.
+The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same host server as api_server, port 5080 does not need to be made public.
 
 ## Step 7: Build the services
 On the management server, build the management services,
 ```
 docker compose build api_server scheduler --no-cache
 ```
+In [compose.yaml](compose.yaml) definition, api_server relies on ezKey_server and redis, so building api_server will automatically build the two dependent services.
+
 On the worker server, build the live transcoding worker service,
 ```
 docker compose build worker --no-cache
 ```
-The build process will take about 1-2 minutes on its initial run. The docker compose file, [a relative link](compose.yaml) will create docker images for all the servers and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the servers and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
 ## Step 8: Start the services
@@ -132,7 +134,7 @@ On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-
 
 ![screenshot](diagrams/demo_step1.png)
 
-Copy the content of [a relative link](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. You will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copuy-paste the content of [a relative link](sample_live_job.json) to create a protected live channel. Detail of about DRM setup will be explained later.
+Copy the content of [sample_live_job_without_drm.json](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. You will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copuy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail of about DRM setup will be explained later.
 
 ![screenshot](diagrams/demo_step2.png)
 
