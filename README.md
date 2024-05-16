@@ -46,28 +46,32 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 - You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
 
 ## Step 1: Launch the servers
-Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end EC2 instances (I use a t2-micro one which is free-tier eligible). The live worker services need to run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). 
+Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
 
 ## Step 2: Download the ezLiveStreaming source
-On both EC2 instances, check out the source code.
+On both management and worker servers, check out the source code from github.
 ```
 git clone https://github.com/maxutility2011/ezLiveStreaming.git
+```
+```
 cd ezLiveStreaming/
 ```
-We will run the management services including API server, job scheduler, DRM key server and Redis on one instance, and live worker services on the other.
+We will run the management services on one instance, and the live worker services on the other.
 
-## Step 3: Configure AWS access and grant it to ezLiveStreaming services
+## Step 3: Configure AWS access and grant to ezLiveStreaming services
 Configure aws on both instances if you haven't done so already. ezLiveStreaming uses AWS services such as SQS and S3.
 ```
 aws configure
 ```
-Enter your AWS access key, secret key, default region, etc as prompted. This will generate two files, *~/.aws/config* and *~/.aws/credentials*. Next, please make these two files accessible to any users. 
+Enter your AWS access key, secret key, default region, etc as prompted. Please refer to https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html for how to get the secrets. Two files, *~/.aws/config* and *~/.aws/credentials* will be generated after running *aws configure*. Next, please make these two files accessible to any users. 
 ```
 chmod 644 ~/.aws/credentials
+```
+```
 chmod 644 ~/.aws/config
 ```
 
-The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which belongs to a different user, we need to make that folder accessible to every user. 
+The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. 
 
 ## Step 4: Create live job queue on AWS SQS
 Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 4 to access the job queue.
