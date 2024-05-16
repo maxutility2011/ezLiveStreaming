@@ -61,7 +61,7 @@ cd ezLiveStreaming/
 ```
 We will run the management services on one instance, and the live worker services on the other.
 
-## Step 3: Configure AWS access and grant to ezLiveStreaming services
+## Step 3: Configure and grant AWS access to ezLiveStreaming services
 Configure aws on both instances if you haven't done so already. ezLiveStreaming uses AWS services such as SQS and S3.
 ```
 aws configure
@@ -74,22 +74,22 @@ chmod 644 ~/.aws/credentials
 chmod 644 ~/.aws/config
 ```
 
-The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. Note that I chose to use volume mapping for granting AWS access to ezLiveStreaming services because it is simple while keeping my AWS secrets private. Granting AWS access is out of scope of this project.
+The docker compose file, [compose.yaml](compose.yaml) maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which is owned by a different user, we need to make that folder accessible to any user. Note that I chose to use volume mapping for granting AWS access to ezLiveStreaming services because it is simple while keeping my AWS secrets private. Granting AWS access is out of scope of this project.
 
 ## Step 4: Create live job queue on AWS SQS
-Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 3 to access the job queue.
+Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of [api_server/config.json](api_server/config.json) and [scheduler/config.json](scheduler/config.json). ezLiveStreaming will use the configured AWS secrets in step 3 to access the job queue.
 
 ## Step 5: Configure the services
 
 The api_server, job scheduler, ezKey_server and worker_app all have their own configuration files.
 
-In *api_server/config.json*, put your own job queue name in *Sqs.Queue_name*. 
+In [api_server/config.json](api_server/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
-In *scheduler/config.json*, put your own job queue name in *Sqs.Queue_name*. 
+In [scheduler/config.json](scheduler/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
 No change is needed in *drm_key_server/config.json*.
 
-In *worker/app/worker_app_config.json*, put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in *scheduler/config.json*. You can leave other configuration options as is.
+In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). You can leave other configuration options as is.
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
@@ -419,7 +419,7 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 # Code structure
 
-**api_server/** contains the implementation of a live streaming API server which handle requests to create/list/stop/resume live streams.
+[api_server/](api_server/) contains the implementation of a live streaming API server which handle requests to create/list/stop/resume live streams.
 
 **demo/** provides the implementation of a simple UI demo. <br>
 
