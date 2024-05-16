@@ -419,28 +419,37 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 # Code structure
 
-[api_server/](api_server/) contains the implementation of a live streaming API server which handle requests to create/list/stop/resume live streams.
+[api_server/](api_server/) contains the implementation of a live streaming API server which handle requests to create/list/stop/resume live streams. <br>
 
-**demo/** provides the implementation of a simple UI demo. <br>
+[demo/](demo/) provides the implementation of a simple UI demo. <br>
 
-**drm/** provides the implementation of a simple DRM key server. <br>
+[diagrams/](diagrams/) groups together all the diagrams found in this document. <br>
 
-**job/** contains the definition of API requests and live job states, and also contains source code for generating FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job. <br>
+[docker/](docker/) provides all the dockerfiles for the different services. <br>
 
-**job_sqs/** contains the implementation of a AWS Simple Queue Service (SQS) sender and receiver. The api_server sends new live jobs to the job queue (AWS SQS). The job scheduler periodically polls the job queue to receive new jobs. <br>
+[drm_key_server/](drm_key_server/)  provides the implementation of a simple DRM key server. <br>
 
-**model/** contains various model definitions. <br>
+[job/](job/) contains the definition of API requests and live job states, and also contains source code for generating FFmpeg (or other encoder library such as GStreamer) commands that are used to execute a live job. <br>
 
-**redis_client/** implements a redis client wrapper based on go_redis (https://github.com/redis/go-redis). <br>
+[job_sqs/](job_sqs/) contains the implementation of a AWS Simple Queue Service (SQS) sender and receiver. The api_server sends new live jobs to the job queue (AWS SQS). The job scheduler periodically polls the job queue to receive new jobs. <br>
 
-**scheduler/** contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes API endpoints and receives new live worker registration requests from newly launched workers. <br>
+[model/](model/) contains various model definitions. <br>
 
-**worker/** contains the implementation of live transcoding/streaming workers. The file *app/worker_app.go* implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (*worker/transcoder/worker_transcode.go*) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc. *worker/* also contains the Shaka packager binary "packager" (the nightly build from 04/2024).
-<br>
+[redis_client/](redis_client/) implements a redis client wrapper based on go_redis (https://github.com/redis/go-redis). <br>
 
-**sample_live_job.json** contains a sample live job request. <br>
+[s3/](s3/) provides a AWS S3 client wrapper. <br>
 
-**ezLiveStreaming.postman_collection.json** provides sample API requests to ezLiveStreaming in a postman collection.
+[scheduler/](scheduler/) contains the implementation of a live job scheduler. Job scheduler receives new live jobs from the api_server via a AWS SQS job queue. Job scheduler also exposes API endpoints and receives new live worker registration requests from newly launched workers. <br>
+
+[worker/](worker/) contains the implementation of live transcoding/streaming workers. The file *app/worker_app.go* implements the main application of the live worker. There is only one worker_app running on each live worker. worker_app receives live transcoding jobs from the job scheduler, launch new worker_transcoder (*worker/transcoder/worker_transcode.go*) to process live inputs and generate outputs, sends hearbeat periodically to the job scheduler, reports status of jobs and current workload to the job scheduler, etc. *worker/* also contains the Shaka packager binary "packager" (the nightly build from 04/2024). <br>
+
+[compose.yaml](compose.yaml) is the docker compose file.
+
+[sample_live_job.json](sample_live_job.json) provides a sample live job request with DRM protection configured. <br>
+
+[sample_live_job.json](sample_live_job_without_drm.json) provides a sample live job request without DRM protection configuration. <br>
+
+[ezLiveStreaming.postman_collection.json](ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection.
 
 There are five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
 
