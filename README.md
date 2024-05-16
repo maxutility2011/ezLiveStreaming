@@ -1,6 +1,6 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides simple API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec she wants to use, what resolutions/bitrate/frame rate to use for outputting video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI for demo purposes. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
 
 ## What can ezLiveStreaming do?
 
@@ -9,7 +9,7 @@ ezLiveStreaming is a highly scalable and efficient live transcoding system writt
 - live transcoding API,
 - clear key DRM protection, 
 - uploading transcoder outputs to AWS S3,
-- standard-compliant media transcoding and packaging which potentially work with any video players.
+- standard-compliant media transcoding and formatting which potentially work with any video players.
 
 # High-level architecture
 
@@ -18,12 +18,12 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 - live job scheduler
 - live transcoding worker
 - a simple clear-key DRM key server called **ezKey_server**
-- **Redis** data store
+- Redis data store
 
 ## Management workflow
 ![screenshot](diagrams/architecture_diagram.png)
 
-The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. Specifically, a ffmpeg transcoder is started to ingest and transcode the live input feed, and also a shaka packager is started to receive transcoded multi-bitrate MPEG transport streams from ffmpeg transcoder, then package, encrypt and output an ABR stream (e.g., HLS/DASH). The output HLS/DASH stream is uploaded to cloud origin servers such as AWS S3. The users are responsible for generating and pushing live input feeds (using protocols such as RTMP SRT) to the ffmpeg transcoder. The API server requests DRM encrypt key from ezKey_server, pass it along to Shaka packager with other DRM configurations for stream encryption.The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
+The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM configured, the API server requests DRM encrypt/decrypt key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
 # Live stream data flow
 
