@@ -11,7 +11,7 @@ ezLiveStreaming is a highly scalable and efficient live transcoding system writt
 - uploading transcoder outputs to AWS S3,
 - standard-compliant media transcoding and packaging which potentially work with any video players.
 
-# Workflow and high-level architecture
+# High-level architecture
 
 ezLiveStreaming consists of 5 microservices that can be independently scaled,
 - live API server
@@ -20,13 +20,189 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 - a simple clear-key DRM key server called **ezKey_server**
 - **Redis** data store
 
+## Management workflow
 ![screenshot](diagrams/architecture_diagram.png)
 
 The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. Specifically, a ffmpeg transcoder is started to ingest and transcode the live input feed, and also a shaka packager is started to receive transcoded multi-bitrate MPEG transport streams from ffmpeg transcoder, then package, encrypt and output an ABR stream (e.g., HLS/DASH). The output HLS/DASH stream is uploaded to cloud origin servers such as AWS S3. The users are responsible for generating and pushing live input feeds (using protocols such as RTMP SRT) to the ffmpeg transcoder. The API server requests DRM encrypt key from ezKey_server, pass it along to Shaka packager with other DRM configurations for stream encryption.The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
-## List of API methods
+# Live stream data flow
 
-### Create Job
+![screenshot](diagrams/data_flow.png)
+
+The live stream data flow on a live worker VM is shown in the above diagram. To run a live channel, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs N number of output MPEG-TS streams, where N is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
+
+# Quickstart
+
+All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in few easy steps as follows. 
+
+## Minimum requirements:
+
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Platform. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own unitests. However, for a better demonstration, I would recommend two servers.
+
+- You need to install docker, and git. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
+
+- You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on a third machine.
+
+- You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder.
+
+## Step 1: Launch the servers
+Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end EC2 instances (I use a t2-micro one which is free-tier eligible). The live worker services need to run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). 
+
+## Step 2: Download the ezLiveStreaming source
+On both EC2 instances, check out the source code.
+```
+git clone https://github.com/maxutility2011/ezLiveStreaming.git
+cd ezLiveStreaming/
+```
+We will run the management services including API server, job scheduler, DRM key server and Redis on one instance, and live worker services on the other.
+
+## Step 3: Configure AWS access and grant it to ezLiveStreaming services
+Configure aws on both instances if you haven't done so already. ezLiveStreaming uses AWS services such as SQS and S3.
+```
+aws configure
+```
+Enter your AWS access key, secret key, default region, etc as prompted. This will generate two files, *~/.aws/config* and *~/.aws/credentials*. Next, please make these two files accessible to any users. 
+```
+chmod 644 ~/.aws/credentials
+chmod 644 ~/.aws/config
+```
+
+The docker compose file, *compose.yaml* maps *~/.aws/* in the docker host machines to */home/streamer/.aws/* in the docker containers, so that the services inside docker receive AWS access from the mapped credential. The live transcoder process inside the worker container runs as user *streamer* which is different to the user on your host machines. To allow user *streamer* to access */home/streamer/.aws/* which belongs to a different user, we need to make that folder accessible to every user. 
+
+## Step 4: Create live job queue on AWS SQS
+Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-getting-started.html and pick any queue name that you like. This will be the live transcoding job queue which will be used by the API server and job scheduler to transfer live transcoding jobs. Please put the queue name in *Sqs.Queue_name* of *ezLiveStreaming/api_server/config.json* and *ezLiveStreaming/scheduler/config.json*. ezLiveStreaming will use the configured AWS secrets in step 4 to access the job queue.
+
+## Step 5: Configure the services
+
+The api_server, job scheduler, ezKey_server and worker_app all have their own configuration files.
+
+In *api_server/config.json*, put your own job queue name in *Sqs.Queue_name*. \br
+
+In *scheduler/config.json*, put your own job queue name in *Sqs.Queue_name*. \br
+
+No change is needed in *drm_key_server/config.json*.
+
+In *worker/app/worker_app_config.json*, put in your own *SchedulerUrl*. The host name part is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in *scheduler/config.json*. You can leave other configuration options as is.
+
+## Step 6: Networking
+As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using your *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
+
+List of public ports that need to be opened,
+
+| Port/Port range | Server | Service | Use | 
+| --- | --- | --- | --- |
+| 1080 | management | api_server| Used by api_server to receive live job requests from users | 
+| 2080 | worker | worker | Used by worker to communicate with job scheduler | 
+| 3080 | management | job scheduler | Used by job scheduler to communicate with workers | 
+| 4080 | management | Nginx | Used by Nginx to serve the demo UI. |
+| 1935-1940 | worker | worker | Used by a worker to receive live rtmp input streams, one port per stream |
+
+The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same server as api_server, port 5080 does not need to be made public.
+
+## Step 7: Build the services
+On the management server, build the management services,
+```
+docker compose build api_server scheduler --no-cache
+```
+On the worker server, build the live transcoding worker service,
+```
+docker compose build worker --no-cache
+```
+The build process will take about 1-2 minutes on its initial run. The docker compose file, [a relative link](compose.yaml) will create docker images for all the servers and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
+
+## Step 8: Start the services
+On the management server, start **api_server** and **scheduler**.
+```
+docker compose up api_server
+docker compose up scheduler
+```
+On the worker server, start an instance of **worker**.
+```
+docker compose up worker
+```
+The order of starting services does not matter.
+
+## Step 9: Start your live channel from the UI
+On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. In the URL, replace the EC2 hostname with your own management server hostname. Again, please make sure port 4080 is open in the firewall. 
+
+![screenshot](diagrams/demo_step1.png)
+
+Copy the content of [a relative link](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. You will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copuy-paste the content of [a relative link](sample_live_job.json) to create a protected live channel. Detail of about DRM setup will be explained later.
+
+![screenshot](diagrams/demo_step2.png)
+
+On the worker server, verify the worker container is running,
+```
+docker ps
+```
+Expect output as follows,
+```
+[ec2-user@ip-172-31-20-123 ~]$ docker ps
+CONTAINER ID   IMAGE                                   COMMAND                  CREATED        STATUS          PORTS                                                                                                                          NAMES
+1abfdfe0f6fe   maxutility2011/ezlivestreaming_worker   "/bin/sh -c '/home/s…"   20 hours ago   Up 13 minutes   0.0.0.0:1935-1950->1935-1950/tcp, :::1935-1950->1935-1950/tcp, 1080/tcp, 4080/tcp, 0.0.0.0:2080->2080/tcp, :::2080->2080/tcp   ezlivestreaming-worker-1
+```
+Log into the worker container, e.g.,
+```
+docker exec -it 1abfdfe0f6fe /bin/bash
+```
+Inside the worker container, switches to user "streamer" and verify the worker services are running under user "streamer",
+```
+su - streamer
+ps aux
+```
+Expect output as follows,
+```
+streamer@1abfdfe0f6fe:~$ ps aux
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+streamer       1  0.0  0.1   2800  1080 ?        Ss   07:25   0:00 /bin/sh -c /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_a
+streamer       7  0.1  2.7 1231516 26376 ?       Sl   07:25   0:00 /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.j
+streamer      31  0.0  1.1 1237864 10856 ?       Sl   07:29   0:00 worker_transcoder -job_id=4f115985-f9be-4fea-9d0c-0421115715a1 -param={"Input"
+streamer      35  0.0 10.5 1091680 102280 ?      Sl   07:29   0:00 packager in=udp://127.0.0.1:10001,stream=video,init_segment=/tmp/output_4f1159
+streamer      42  0.0  4.4 275364 43424 ?        SL   07:29   0:00 ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1936/live/5ae4760f-49a0-41a9-979d-00
+streamer      49  0.3  0.4   4588  3964 pts/0    Ss   07:39   0:00 /bin/bash
+root          60  0.0  0.3   6744  3740 pts/0    S    07:39   0:00 su - streamer
+streamer      61  0.0  0.4   5016  4204 pts/0    S    07:39   0:00 -bash
+streamer      68  0.0  0.4   8332  4140 pts/0    R+   07:39   0:00 ps aux
+```
+If the new channel is up and running, you should see 4 worker processes running: 
+- worker_app
+- worker_transcoder
+- packager (Shaka packager)
+- ffmpeg
+
+The ffmpeg process is ready to receive your live RTMP input stream.
+![screenshot](diagrams/verify_new_channel.png)
+
+## Step 10: Feed your live channel
+On your PC, open OBS studio to broadcast a live RTMP contribution stream. Go to the demo UI and copy the *rtmp_ingest_url*, e.g., "rtmp://54.91.250.183:1936/live/5ae4760f-49a0-41a9-979d-005fe9c32834". In OBS, click "Settings", 
+
+![screenshot](diagrams/obs_stream_setting.png)
+
+Copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.183:1936/live/" into the "Server" section, and the RTMP stream key, e.g., "5ae4760f-49a0-41a9-979d-005fe9c32834" into the "Stream Key" section. Click "OK" to save and apply the RTMP output settings. Then, click "Start Streaming" button to start live broadcasting to ezLiveStreaming. If OBS returns no error, that means the live broadcasting is up and running.
+
+## Step 11: Verify live channel output to S3
+Go to your AWS s3 console, click into your bucket, you will see a folder named as follows, "output_4f115985-f9be-4fea-9d0c-0421115715a1/". The string after "output_" is the live job id which should match the job id returned from the api_server in step 9. Click into the job media output folder, you will see media output as follow,
+
+![screenshot](diagrams/s3_output.png)
+
+For HLS, media output include m3u8 playlists and sub-folders that contains media segments. \br
+
+However, if you don't see the job output folder in your bucket, that may indicate missing AWS access right. Log into your worker container again as in step 9, run 
+```
+vi /home/streamer/log/worker_transcoder_4f115985-f9be-4fea-9d0c-0421115715a1.log
+```
+to view the worker log. You may see S3 upload failure due to missing AWS access right.
+
+## Step 12: Playback
+The live channel playback URL can be found in the botton-right corner of the demo UI, e.g., "https://bzhang-test-bucket-public.s3.amazonaws.com/output_4f115985-f9be-4fea-9d0c-0421115715a1/master.m3u8".
+In the demo UI, I integrated Shaka player to play the live channel. After you started live broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI. You will see playback starts. You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
+
+![screenshot](diagrams/playback_nodrm.png)
+
+# List of API methods
+
+## Create Job
 Creating a new live transcoding request (a.k.a. live transcoding job or live job) <br>
 **POST /jobs** <br>
 **Request body**: JSON string representing the live job specification <br>
@@ -118,14 +294,14 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Audio_outputs | json | array of audio outputs | n/a |
 | Codec (Audio_outputs) | string | audio codec | "aac" |
 
-### Get all the jobs
+## Get all the jobs
 Show all the jobs including currently running jobs and already finished jobs. <br>
 **GET /jobs** <br>
 **Request body**: None <br>
 **Response code** on success: 200 OK <br>
 **Response body**: A JSON array that lists all the jobs. <br>
 
-### Get one job
+## Get one job
 List a single job given by its ID. <br>
 **GET /jobs/[job_id]** <br>
 **Request body**: None <br>
@@ -134,7 +310,7 @@ List a single job given by its ID. <br>
 
 ![screenshot](diagrams/get_job.png)
 
-### Stop a job
+## Stop a job
 Stop a job given by its ID. Upon request, the associated worker_transcoder instance will be stopped but the job info and states will remain in Redis. When the job is resumed in the future, the job ID, stream key and all the transcoding and packaging parameters remain the same. <br>
 
 **PUT /jobs/[job_id]** <br>
@@ -144,7 +320,7 @@ Stop a job given by its ID. Upon request, the associated worker_transcoder insta
 
 ![screenshot](diagrams/stop_job.png)
 
-### Resume a job
+## Resume a job
 Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
 
 **PUT /jobs/[job_id]** <br>
@@ -167,12 +343,6 @@ Each live worker is a virtual machine that runs ezLiveStreaming worker services.
 When worker_app on a live worker first starts, it registers with the job scheduler and receives a worker ID assigned by the scheduler. After that worker_app needs to send periodic heartbeat to the scheduler so that the latter knows the former is still running. If no heartbeat is received from a worker for a certain length of time, the scheduler presumes that worker is no longer running so it deletes the worker from the active worker set and also stops all the live jobs running on that worker. The worker_app also handles **stop_job** requests and **resume_job** requests to stop a running job or resumes a stopped job. 
 
 A worker_app not only handles normal job requests, it also handles unexpected job failures. To detect failed jobs, a worker_app periodically ping the live jobs (worker_transcoders) running on that worker VM. If a worker_transcoder does not respond, the worker_app presumes that the corresponding live job is no longer running. The worker_app reports the failed jobs to the job scheduler. The latter will adjust workload accordingly.
-
-# Live stream data flow
-
-![screenshot](diagrams/data_flow.png)
-
-The live stream data flow on a live worker VM is shown in the above diagram. To run a live channel, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs N number of output MPEG-TS streams, where N is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. Worker_transcoder runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to end users via CDN.
 
 # DRM configuration
 
