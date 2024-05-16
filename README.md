@@ -92,7 +92,7 @@ No change is needed in *drm_key_server/config.json*.
 In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). You can leave other configuration options as is.
 
 ## Step 6: Network setup
-As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl*. Please also make sure any configured network ports are open in the firewall. 
+As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 
 
 List of public ports that need to be opened,
 
@@ -449,7 +449,7 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 [sample_live_job.json](sample_live_job_without_drm.json) provides a sample live job request without DRM protection configuration. <br>
 
-[ezLiveStreaming.postman_collection.json](ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection.
+[ezLiveStreaming.postman_collection.json](ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
 There are five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
 
