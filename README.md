@@ -114,25 +114,27 @@ On the worker server, build the live transcoding worker service,
 ```
 docker compose build worker --no-cache
 ```
-The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the servers and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
 ## Step 8: Start the services
 On the management server, start **api_server** and **scheduler**.
 ```
 docker compose up api_server
+```
+```
 docker compose up scheduler
 ```
 On the worker server, start an instance of **worker**.
 ```
 docker compose up worker
 ```
-The order of starting services does not matter.
+The order of starting services does not matter. The services will connect to each other automatically.
 
 ## Step 9: Start your live channel from the UI
-On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. In the URL, replace the EC2 hostname with your own management server hostname. Again, please make sure port 4080 is open in the firewall. 
+On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. In the URL, replace the EC2 hostname with your own management server hostname. Again, please make sure port 4080 is open to the Internet. 
 
-![screenshot](diagrams/demo_step1.png)
+![screenshot](diagrams/demo_ui.png)
 
 Copy the content of [sample_live_job_without_drm.json](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. You will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copuy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail of about DRM setup will be explained later.
 
