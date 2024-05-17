@@ -55,7 +55,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
 	kf += ")'"
 
-	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+	ffmpegArgs = append(ffmpegArgs, "\"-force_key_frames\"")
     ffmpegArgs = append(ffmpegArgs, kf)
 
 	port_base := j.Input.JobUdpPortBase
