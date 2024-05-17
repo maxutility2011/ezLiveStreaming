@@ -437,7 +437,7 @@ func main() {
 		if err2 != nil {
         	Log.Println("Errors starting ffmpeg: ", string(out))
             //os.Exit(1)
-	//	}
+		}
 	//}()
 
     return
