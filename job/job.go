@@ -15,6 +15,7 @@ type LiveVideoOutputSpec struct {
 	Max_bitrate string
 	Buf_size string
 	Preset string
+	Crf string
 	Threads int
 }
 

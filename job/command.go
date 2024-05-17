@@ -16,6 +16,8 @@ const H264_CODEC = "h264"
 const FFMPEG_H264 = "libx264"
 const H265_CODEC = "h265"
 const FFMPEG_H265 = "libx265"
+const AV1_CODEC = "av1"
+const FFMPEG_AV1 = "libsvtav1"
 const AAC_CODEC = "aac"
 const MP3_CODEC = "mp3"
 const PROTECTION_SYSTEM_FAIRPLAY = "FairPlay"
@@ -91,24 +93,28 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H264)
 		} else if vo.Codec == H265_CODEC {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
-		}
+		} else if vo.Codec == AV1_CODEC {
+			ffmpegArgs = append(ffmpegArgs, FFMPEG_AV1)
+		} 
 
 		ffmpegArgs = append(ffmpegArgs, "-filter:v")
 		fps := "fps="
 		fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
 		ffmpegArgs = append(ffmpegArgs, fps)
 
-		var h26xProfile string
-		if vo.Height <= 480 {
-			h26xProfile = "baseline"
-		} else if vo.Height > 480 && vo.Height <= 720 {
-			h26xProfile = "main"
-		} else if vo.Height > 720 {
-			h26xProfile = "high"
+		if vo.Codec == H264_CODEC || vo.Codec == H265_CODEC {
+			var h26xProfile string
+			if vo.Height <= 480 {
+				h26xProfile = "baseline"
+			} else if vo.Height > 480 && vo.Height <= 720 {
+				h26xProfile = "main"
+			} else if vo.Height > 720 {
+				h26xProfile = "high"
+			}
+	
+			ffmpegArgs = append(ffmpegArgs, "-profile:v")
+			ffmpegArgs = append(ffmpegArgs, h26xProfile)
 		}
-
-		ffmpegArgs = append(ffmpegArgs, "-profile:v")
-		ffmpegArgs = append(ffmpegArgs, h26xProfile)
 
 		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
 			bv := "-b:v:"
@@ -131,6 +137,11 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		if vo.Preset != "" {
 			ffmpegArgs = append(ffmpegArgs, "-preset")
 			ffmpegArgs = append(ffmpegArgs, vo.Preset)
+		}
+
+		if vo.Crf != "" {
+			ffmpegArgs = append(ffmpegArgs, "-crf")
+			ffmpegArgs = append(ffmpegArgs, vo.Crf)
 		}
 
 		if vo.Threads != 0 {
