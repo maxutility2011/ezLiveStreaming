@@ -51,9 +51,9 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
     ffmpegArgs = append(ffmpegArgs, "-i")
     ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
-	kf := "\"expr:gte\\(t,n_forced*"
+	kf := "expr:gte(t,n_forced*"
 	kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
-	kf += "\\)\""
+	kf += ")"
 
 	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
     ffmpegArgs = append(ffmpegArgs, kf)

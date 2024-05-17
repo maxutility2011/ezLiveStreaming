@@ -42,7 +42,7 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 
 - Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I'm using a two server setup. 
 
-- You need to install docker, docker-compose and git. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
+- You need to install docker, docker-compose, git and aws-cli. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
 
 - You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on any machine with camera.
 
