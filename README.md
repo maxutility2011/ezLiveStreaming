@@ -36,7 +36,7 @@ The live stream data flow on a live worker server is shown in the above diagram.
 
 # Quickstart
 
-All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you may see terms like *live job*, *live channel* and "live stream*. They all roughly mean the same thing hence are used interchangeably.
+All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you will see terms like *live job*, *live channel* and *live stream* which are used interchangeably. 
 
 ## Prerequisites:
 
@@ -227,7 +227,7 @@ For interesting users, a postman collection is included in this repository which
 ```
 redis-cli
 ```
-ezLiveStreaming uses the default Redis port, 6379. A full list of all the Redis tables used by ezLiveStreaming is given in the end of this document.
+ezLiveStreaming uses the default Redis port, 6379. A full list of all the Redis tables used by ezLiveStreaming can be found at the end of this document.
 
 ![screenshot](diagrams/playback_nodrm.png)
 
