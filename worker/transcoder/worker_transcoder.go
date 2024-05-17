@@ -432,15 +432,14 @@ func main() {
     ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
 
 	err2 = nil
-	//go func() {
+	go func() {
 		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
 		if err2 != nil {
         	Log.Println("Errors starting ffmpeg: ", string(out))
             //os.Exit(1)
 		}
-	//}()
+	}()
 
-    return
     // Wait 100ms before ffmpeg fully starts
     time.Sleep(100 * time.Millisecond)
     if (err2 != nil) {

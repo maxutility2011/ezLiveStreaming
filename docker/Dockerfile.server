@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:r1.0
+FROM maxutility2011/ezlivestreaming_baseimage:v5.1
 
 USER streamer
 
