@@ -434,18 +434,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			return ffmpegArgs, local_media_output_path_subdirs
 		}
 
-		var h26xProfile string
-		if vo.Height <= 480 {
-			h26xProfile = "baseline"
-		} else if vo.Height > 480 && vo.Height <= 720 {
-			h26xProfile = "main"
-		} else if vo.Height > 720 {
-			h26xProfile = "high"
-		}
-
-		ffmpegArgs = append(ffmpegArgs, "-profile:v")
-		ffmpegArgs = append(ffmpegArgs, h26xProfile)
-
 		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
 			bv := "-b:v:"
 			bv += strconv.Itoa(i)
