@@ -46,7 +46,7 @@ func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
     // regardless of whether the process exists. 
     // To test whether the process actually exists, see whether p.Signal(syscall.Signal(0)) reports an error.
     process, _ := os.FindProcess(int(ffmpegCmd.Process.Pid))
-    errSignal0 = process.Signal(syscall.Signal(0))
+    errSignal0 := process.Signal(syscall.Signal(0))
     Log.Printf("process.Signal 0 on pid %d returned: %v\n", ffmpegCmd.Process.Pid, errSignal0)
 
     if errSignal0 != nil {
