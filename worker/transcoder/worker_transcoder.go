@@ -457,6 +457,7 @@ func main() {
         Log.Println(job.ArgumentArrayToString(ffmpegArgs))
 
         ffmpegCmd = exec.Command("ffmpeg", ffmpegArgs...)
+        ffmpegCmd.Dir = local_media_output_path
 	    go func() {
 		    out, errEncoder = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
 		    if errEncoder != nil {
