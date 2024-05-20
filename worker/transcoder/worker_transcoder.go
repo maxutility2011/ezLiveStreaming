@@ -392,7 +392,7 @@ func main() {
     var ffmpegCmd *exec.Cmd
     packagerCmd = nil
     ffmpegCmd = nil
-    var remote_media_output_path string
+    remote_media_output_path := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
 
     if !ffmpegAlone {
         // Start Shaka packager first
@@ -418,7 +418,6 @@ func main() {
             //os.Exit(1)
         }
 
-        remote_media_output_path = j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
         // If clear-key DRM is configured for the job, create and upload a key file to cloud storage
         if *drmPtr != "" {
             errUploadKey := createUploadDrmKeyFile(*drmPtr, local_media_output_path, remote_media_output_path)
