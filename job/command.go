@@ -569,6 +569,10 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			vsr = vsr + "v:" + strconv.Itoa(i) + " "
 		}
 
+		for i := range j.Output.Audio_outputs {
+			vsr = vsr + "a:" + strconv.Itoa(i) + " "
+		}
+
 		vsr = vsr[: len(vsr)-1]
 		ffmpegArgs = append(ffmpegArgs, vsr)
 
