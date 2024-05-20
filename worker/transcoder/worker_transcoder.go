@@ -234,7 +234,6 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     }
 
     Log.Printf("Uploading %s to %s", local_file, remote_path_base + rendition_name + file_name)
-
     err := s3.Upload(local_file, file_name, remote_path_base + rendition_name)
     if err != nil {
         Log.Printf("Failed to upload: %s to %s. Error: %v", local_file, remote_path_base + rendition_name + file_name, err)
@@ -392,7 +391,7 @@ func main() {
     var ffmpegCmd *exec.Cmd
     packagerCmd = nil
     ffmpegCmd = nil
-    remote_media_output_path := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
+    remote_media_output_path_base := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
 
     if !ffmpegAlone {
         // Start Shaka packager first
@@ -420,7 +419,7 @@ func main() {
 
         // If clear-key DRM is configured for the job, create and upload a key file to cloud storage
         if *drmPtr != "" {
-            errUploadKey := createUploadDrmKeyFile(*drmPtr, local_media_output_path, remote_media_output_path)
+            errUploadKey := createUploadDrmKeyFile(*drmPtr, local_media_output_path, remote_media_output_path_base)
             if errUploadKey != nil {
                 Log.Println("Failed to create/upload key file. Error: ", errUploadKey)
                 // TODO: This is a critical error - Stream files will not be decrypted and played when clear-key DRM is used.
@@ -497,7 +496,7 @@ func main() {
             watch_dirs = append(watch_dirs, local_media_output_path + subdir + "/")
         }
 
-		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path)
+		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base)
 	}()
 
     if errWatchFiles != nil {

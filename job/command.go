@@ -560,6 +560,10 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		hls_segment_filename_value += file_extention
 		ffmpegArgs = append(ffmpegArgs, hls_segment_filename_value)
 
+		ffmpegArgs = append(ffmpegArgs, "-hls_fmp4_init_filename")
+		hls_fmp4_init_filename_value := "stream_%v/init.mp4"
+		ffmpegArgs = append(ffmpegArgs, hls_fmp4_init_filename_value)
+
 		ffmpegArgs = append(ffmpegArgs, "-master_pl_name")
 		ffmpegArgs = append(ffmpegArgs, HLS_MASTER_PLAYLIST_FILE_NAME)
 
