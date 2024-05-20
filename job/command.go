@@ -109,9 +109,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H264)
 		} else if vo.Codec == H265_CODEC {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
-		} else if vo.Codec == AV1_CODEC {
-			ffmpegArgs = append(ffmpegArgs, FFMPEG_AV1)
-		} 
+		}
 
 		ffmpegArgs = append(ffmpegArgs, "-filter:v")
 		fps := "fps="
@@ -385,6 +383,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
     return packagerArgs, local_media_output_path_subdirs
 }
 
+// This function is for AV1 ONLY!! 
 // Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
 // Regular latency: 
 // ffmpeg -f flv -listen 1 -i rtmp://172.17.0.3:1935/live/b1326cd4-9f89-418f-11b-9fe2c19784f5 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -seg_duration 4 -window_size 15 -extra_window_size 15 -remove_at_exit 1 -adaptation_sets 'id=0,streams=v id=1,streams=a' -f dash /var/www/html/1.mpd
@@ -429,10 +428,11 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, resolution)
 
 		ffmpegArgs = append(ffmpegArgs, "-c:v")
-		if vo.Codec == H264_CODEC {
-			ffmpegArgs = append(ffmpegArgs, FFMPEG_H264)
-		} else if vo.Codec == H265_CODEC {
-			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
+		if vo.Codec == AV1_CODEC {
+			ffmpegArgs = append(ffmpegArgs, FFMPEG_AV1)
+		} else {
+			Log.Println("ffmpeg-alone only supports libsvtav1")
+			return ffmpegArgs, local_media_output_path_subdirs
 		}
 
 		var h26xProfile string

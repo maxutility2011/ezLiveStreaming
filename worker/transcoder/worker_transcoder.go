@@ -41,18 +41,18 @@ const num_concurrent_uploads = 5
 const stream_file_write_delay_ms = 200 
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
-    process, err := os.FindProcess(int(ffmpegCmd.Process.Pid))
-    if err != nil {
-        Log.Printf("ffmpeg is not found. Worker_transcoder exiting...")
+    // According to https://pkg.go.dev/os#FindProcess, 
+    // On Unix systems, function FindProcess always succeeds and returns a Process for the given pid, 
+    // regardless of whether the process exists. 
+    // To test whether the process actually exists, see whether p.Signal(syscall.Signal(0)) reports an error.
+    process, _ := os.FindProcess(int(ffmpegCmd.Process.Pid))
+    errSignal0 = process.Signal(syscall.Signal(0))
+    Log.Printf("process.Signal 0 on pid %d returned: %v\n", ffmpegCmd.Process.Pid, errSignal0)
+
+    if errSignal0 != nil {
+        errSigterm := process.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", ffmpegCmd.Process.Pid, errSigterm)
         os.Exit(0)
-    }
-
-    err = process.Signal(syscall.Signal(0))
-    Log.Printf("process.Signal on pid %d returned: %v\n", ffmpegCmd.Process.Pid, err)
-
-    if err != nil {
-        err := process.Signal(syscall.Signal(syscall.SIGTERM))
-        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", ffmpegCmd.Process.Pid, err)
     }
 }
 
@@ -560,7 +560,7 @@ func main() {
 		}
 	}(ticker)
 
-    // Periodically manage ffmpeg and shaka packager
+    // Periodically upload stream files
     d2, _ := time.ParseDuration(stream_file_upload_interval)
 	ticker = time.NewTicker(d2)
 	go func(ticker *time.Ticker) {
