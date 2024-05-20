@@ -576,7 +576,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		vsr = vsr[: len(vsr)-1]
 		ffmpegArgs = append(ffmpegArgs, vsr)
 
-		variant_playlist_format_value := media_output_path + "stream_%v/stream_%v.m3u8"
+		variant_playlist_format_value := media_output_path + "stream_%v.m3u8"
 		ffmpegArgs = append(ffmpegArgs, variant_playlist_format_value)
 	}
 
