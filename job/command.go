@@ -9,6 +9,7 @@ import (
 
 const RTMP = "rtmp"
 const MPEGTS = "mpegts"
+const FMP4 = "fmp4"
 const udp_port_base = 10001
 const HLS = "hls"
 const DASH = "dash"
@@ -30,6 +31,21 @@ const drm_label_allmedia = "allmedia"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
+}
+
+// If any one output rendition uses AV1 video codec, return true;
+// Otherwise, return false.
+func HasAV1Output(j LiveJobSpec) bool {
+	r := false
+	for i := range j.Output.Video_outputs {
+		vo := j.Output.Video_outputs[i]
+        if vo.Codec == AV1_CODEC {
+			r = true
+			break
+		}
+    }
+
+	return r
 }
 
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
@@ -373,7 +389,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 // Regular latency: 
 // ffmpeg -f flv -listen 1 -i rtmp://172.17.0.3:1935/live/b1326cd4-9f89-418f-11b-9fe2c19784f5 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -seg_duration 4 -window_size 15 -extra_window_size 15 -remove_at_exit 1 -adaptation_sets 'id=0,streams=v id=1,streams=a' -f dash /var/www/html/1.mpd
 // Low latency: ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1935/live/app -vf scale=w=640:h=360 -c:v libx264 -profile:v baseline -an -use_template 1 -adaptation_sets "id=0,streams=v id=1,streams=a" -seg_duration 4 -utc_timing_url https://time.akamai.com/?iso -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash /var/www/html/[job_ib]/1.mpd
-func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
+func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []string) {
     var ffmpegArgs []string 
     if strings.Contains(j.Input.Url, RTMP) {
         ffmpegArgs = append(ffmpegArgs, "-f")
@@ -393,9 +409,12 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
 	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
     ffmpegArgs = append(ffmpegArgs, kf)
 
+	var local_media_output_path_subdirs []string
+	i := 0
 	// Video encoding params
-	for i := range j.Output.Video_outputs {
+	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
+		local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_" + strconv.Itoa(i))
 
 		ffmpegArgs = append(ffmpegArgs, "-map")
 		ffmpegArgs = append(ffmpegArgs, "v:0")
@@ -451,6 +470,11 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
 			ffmpegArgs = append(ffmpegArgs, vo.Preset)
 		}
 
+		if vo.Crf != "" {
+			ffmpegArgs = append(ffmpegArgs, "-crf")
+			ffmpegArgs = append(ffmpegArgs, vo.Crf)
+		}
+
 		if vo.Threads != 0 {
 			ffmpegArgs = append(ffmpegArgs, "-threads")
 			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Threads))
@@ -461,8 +485,9 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
 	if len(j.Output.Audio_outputs) == 0 {
 		ffmpegArgs = append(ffmpegArgs, "-an")
 	} else {
-		for i := range j.Output.Audio_outputs {
-			ao := j.Output.Audio_outputs[i]
+		for k := range j.Output.Audio_outputs {
+			ao := j.Output.Audio_outputs[k]
+			local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_" + strconv.Itoa(i+k+1))
 
 			ffmpegArgs = append(ffmpegArgs, "-map")
 			ffmpegArgs = append(ffmpegArgs, "a:0")
@@ -479,46 +504,90 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) []string {
 		}
 	} 	
 
-	// Streaming params (HLS, DASH, DRM, etc.)
-	ffmpegArgs = append(ffmpegArgs, "-seg_duration")
-	ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
-
-	ffmpegArgs = append(ffmpegArgs, "-window_size")
-	ffmpegArgs = append(ffmpegArgs, "15")
-
-	ffmpegArgs = append(ffmpegArgs, "-extra_window_size")
-	ffmpegArgs = append(ffmpegArgs, "15")
-
-	ffmpegArgs = append(ffmpegArgs, "-remove_at_exit")
-	ffmpegArgs = append(ffmpegArgs, "1")
-
-	if j.Output.Low_latency_mode == true {
-		ffmpegArgs = append(ffmpegArgs, "-ldash")
-		ffmpegArgs = append(ffmpegArgs, "1")
-
-		ffmpegArgs = append(ffmpegArgs, "-streaming")
-		ffmpegArgs = append(ffmpegArgs, "1")
-
-		ffmpegArgs = append(ffmpegArgs, "-use_timeline")
-		ffmpegArgs = append(ffmpegArgs, "0")
-
-		ffmpegArgs = append(ffmpegArgs, "-use_template")
-		ffmpegArgs = append(ffmpegArgs, "1")
-	}
-
-	ffmpegArgs = append(ffmpegArgs, "-adaptation_sets")
-	ffmpegArgs = append(ffmpegArgs, "id=0,streams=v id=1,streams=a")
-
-	ffmpegArgs = append(ffmpegArgs, "-f")
-
 	if j.Output.Stream_type == DASH {
-		ffmpegArgs = append(ffmpegArgs, DASH)
+		// Streaming params (HLS, DASH, DRM, etc.)
+		ffmpegArgs = append(ffmpegArgs, "-seg_duration")
+		ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
+
+		ffmpegArgs = append(ffmpegArgs, "-window_size")
+		ffmpegArgs = append(ffmpegArgs, "15")
+
+		ffmpegArgs = append(ffmpegArgs, "-extra_window_size")
+		ffmpegArgs = append(ffmpegArgs, "15")
+
+		ffmpegArgs = append(ffmpegArgs, "-remove_at_exit")
+		ffmpegArgs = append(ffmpegArgs, "1")
+
+		if j.Output.Low_latency_mode == true {
+			ffmpegArgs = append(ffmpegArgs, "-ldash")
+			ffmpegArgs = append(ffmpegArgs, "1")
+
+			ffmpegArgs = append(ffmpegArgs, "-streaming")
+			ffmpegArgs = append(ffmpegArgs, "1")
+
+			ffmpegArgs = append(ffmpegArgs, "-use_timeline")
+			ffmpegArgs = append(ffmpegArgs, "0")
+
+			ffmpegArgs = append(ffmpegArgs, "-use_template")
+			ffmpegArgs = append(ffmpegArgs, "1")
+		}
+
+		ffmpegArgs = append(ffmpegArgs, "-adaptation_sets")
+		ffmpegArgs = append(ffmpegArgs, "id=0,streams=v id=1,streams=a")
+
+		ffmpegArgs = append(ffmpegArgs, "-f")
+
+		if j.Output.Stream_type == DASH {
+			ffmpegArgs = append(ffmpegArgs, DASH)
+		} else if j.Output.Stream_type == HLS {
+			ffmpegArgs = append(ffmpegArgs, HLS)
+		}
+
+		output_path := media_output_path + "1.mpd"
+		ffmpegArgs = append(ffmpegArgs, output_path)
 	} else if j.Output.Stream_type == HLS {
-		ffmpegArgs = append(ffmpegArgs, HLS)
+		ffmpegArgs = append(ffmpegArgs, "-f")
+		ffmpegArgs = append(ffmpegArgs, "hls")
+
+		ffmpegArgs = append(ffmpegArgs, "-hls_playlist_type")
+		ffmpegArgs = append(ffmpegArgs, "event")
+
+		ffmpegArgs = append(ffmpegArgs, "-hls_flags")
+		ffmpegArgs = append(ffmpegArgs, "independent_segments")
+
+		ffmpegArgs = append(ffmpegArgs, "-hls_segment_type")
+		ffmpegArgs = append(ffmpegArgs, j.Output.Segment_format)
+
+		ffmpegArgs = append(ffmpegArgs, "-hls_time")
+		ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
+
+		ffmpegArgs = append(ffmpegArgs, "-hls_segment_filename")
+		hls_segment_filename_value := "stream_%v/seg_%02d"
+		file_extention := ""
+		if j.Output.Segment_format == FMP4 {
+			file_extention = ".m4s"
+		} else if j.Output.Segment_format == MPEGTS {
+			file_extention = ".ts"
+		}
+
+		hls_segment_filename_value += file_extention
+		ffmpegArgs = append(ffmpegArgs, hls_segment_filename_value)
+
+		ffmpegArgs = append(ffmpegArgs, "-master_pl_name")
+		ffmpegArgs = append(ffmpegArgs, HLS_MASTER_PLAYLIST_FILE_NAME)
+
+		ffmpegArgs = append(ffmpegArgs, "-var_stream_map")
+		vsr := ""
+		for i := range j.Output.Video_outputs {
+			vsr = vsr + "v:" + strconv.Itoa(i) + " "
+		}
+
+		vsr = vsr[: len(vsr)-1]
+		ffmpegArgs = append(ffmpegArgs, vsr)
+
+		variant_playlist_format_value := "stream_%v.m3u8"
+		ffmpegArgs = append(ffmpegArgs, variant_playlist_format_value)
 	}
 
-	output_path := media_output_path + "1.mpd"
-	ffmpegArgs = append(ffmpegArgs, output_path)
-
-    return ffmpegArgs
+    return ffmpegArgs, local_media_output_path_subdirs
 }

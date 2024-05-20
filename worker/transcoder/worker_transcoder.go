@@ -40,6 +40,22 @@ const num_concurrent_uploads = 5
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200 
 
+func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
+    process, err := os.FindProcess(int(ffmpegCmd.Process.Pid))
+    if err != nil {
+        Log.Printf("ffmpeg is not found. Worker_transcoder exiting...")
+        os.Exit(0)
+    }
+
+    err = process.Signal(syscall.Signal(0))
+    Log.Printf("process.Signal on pid %d returned: %v\n", ffmpegCmd.Process.Pid, err)
+
+    if err != nil {
+        err := process.Signal(syscall.Signal(syscall.SIGTERM))
+        Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", ffmpegCmd.Process.Pid, err)
+    }
+}
+
 // Monitor ffmpeg and shaka packager
 // ffmpeg and packager must both be running.
 // If one dies, the other should be killed.
@@ -306,8 +322,10 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string) erro
     return err
 }
 
-// worker_transcoder -file job.json 
-// worker_transcoder -param [job_json] 
+var ffmpegAlone bool
+
+// worker_transcoder -file=job.json -job_id=abcdef
+// worker_transcoder -param=[job_json] -job_id=abcdef 
 func main() {
     jobIdPtr := flag.String("job_id", "", "input job id")
     jobSpecPathPtr := flag.String("file", "", "input job spec file")
@@ -355,11 +373,107 @@ func main() {
         os.Exit(1)
     }
 
-    // Start Shaka packager first
-    packagerArgs, local_media_output_path_subdirs := job.JobSpecToShakaPackagerArgs(*jobIdPtr, j, local_media_output_path, *drmPtr)
-    Log.Println("Shaka packager arguments: ")
-    Log.Println(job.ArgumentArrayToString(packagerArgs))
+    // When output video codec is "av1", start ffmpeg only to perform both transcoding and packaging.
+    // Do NOT start Shaka packager. As of 05/2024, Shaka packager does not recognize AV1 encoded video
+    // contained in MPEG-TS stream. When ingesting AV1 in MPEG-TS, Shaka packager returns error: 
+    // "mp2t_media_parser.cc:342] Ignore unsupported MPEG2TS stream type 0x0x6"
+    if job.HasAV1Output(j) {
+        ffmpegAlone = true
+    } else {
+        ffmpegAlone = false
+    }
 
+    var local_media_output_path_subdirs []string
+    var packagerArgs []string
+    var ffmpegArgs []string
+    var out []byte
+    var errEncoder error
+    var packagerCmd *exec.Cmd
+    var ffmpegCmd *exec.Cmd
+    packagerCmd = nil
+    ffmpegCmd = nil
+    var remote_media_output_path string
+
+    if !ffmpegAlone {
+        // Start Shaka packager first
+        packagerArgs, local_media_output_path_subdirs = job.JobSpecToShakaPackagerArgs(*jobIdPtr, j, local_media_output_path, *drmPtr)
+        Log.Println("Shaka packager arguments: ")
+        Log.Println(job.ArgumentArrayToString(packagerArgs))
+
+        // TODO: File path of the packager binary needs to be added to the PATH env-var
+        packagerCmd = exec.Command("packager", packagerArgs...)
+	    errEncoder = nil
+	    go func() {
+		    out, errEncoder = packagerCmd.CombinedOutput() // This line blocks when packagerCmd launch succeeds
+		    if errEncoder != nil {
+        	    Log.Println("Errors starting Shaka packager: ", errEncoder, " packager output: ", string(out))
+                // os.Exit(1) // Do not exit worker_transcoder here since ffmpeg also needs to be stopped after the packager is stopped. Let function manageCommand() to handle this.
+		    }
+	    }()
+
+        // Wait 100ms before Shaka packager fully starts
+        time.Sleep(100 * time.Millisecond)
+        if (errEncoder != nil) {
+            Log.Println("Errors starting Shaka packager: ", errEncoder, " packager output: ", string(out))
+            //os.Exit(1)
+        }
+
+        remote_media_output_path = j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
+        // If clear-key DRM is configured for the job, create and upload a key file to cloud storage
+        if *drmPtr != "" {
+            errUploadKey := createUploadDrmKeyFile(*drmPtr, local_media_output_path, remote_media_output_path)
+            if errUploadKey != nil {
+                Log.Println("Failed to create/upload key file. Error: ", errUploadKey)
+                // TODO: This is a critical error - Stream files will not be decrypted and played when clear-key DRM is used.
+                //       Should worker_transcoder exit?
+            }
+        }
+
+        // Start ffmpeg ONLY if Shaka packager is running
+        ffmpegArgs := job.JobSpecToFFmpegArgs(j, local_media_output_path)
+        Log.Println("FFmpeg arguments: ")
+        Log.Println(job.ArgumentArrayToString(ffmpegArgs))
+
+        ffmpegCmd = exec.Command("ffmpeg", ffmpegArgs...)
+
+	    errEncoder = nil
+	    go func() {
+		    out, errEncoder = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
+		    if errEncoder != nil {
+        	    Log.Println("Errors starting ffmpeg: ", errEncoder, " ffmpeg output: ", string(out))
+                //os.Exit(1)
+		    }
+	    }()
+
+        // Wait 100ms before ffmpeg fully starts
+        time.Sleep(100 * time.Millisecond)
+        if (errEncoder != nil) {
+            Log.Println("Errors starting ffmpeg: ", errEncoder, " ffmpeg output: ", string(out))
+            //os.Exit(1)
+        }
+    } else {
+        ffmpegArgs, local_media_output_path_subdirs = job.JobSpecToEncoderArgs(j, local_media_output_path)
+        Log.Println("FFmpeg-alone arguments: ")
+        Log.Println(job.ArgumentArrayToString(ffmpegArgs))
+
+        ffmpegCmd = exec.Command("ffmpeg", ffmpegArgs...)
+	    go func() {
+		    out, errEncoder = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
+		    if errEncoder != nil {
+        	    Log.Println("Errors starting ffmpeg-alone: ", errEncoder, " ffmpeg-alone output: ", string(out))
+                //os.Exit(1)
+		    }
+	    }()
+
+        // Wait 100ms before ffmpeg fully starts
+        time.Sleep(100 * time.Millisecond)
+        if (errEncoder != nil) {
+            Log.Println("Errors starting ffmpeg-alone: ", errEncoder, " ffmpeg-alone output: ", string(out))
+            //os.Exit(1)
+        }
+    }
+
+    // Create local output paths. Shaka packager may have already created the paths.
     for _, sd := range local_media_output_path_subdirs {
         sd = local_media_output_path + sd
         _, err_fstat := os.Stat(sd);
@@ -374,29 +488,7 @@ func main() {
         }
     }
 
-    // TODO: File path of the packager binary needs to be added to the PATH env-var
-    packagerCmd := exec.Command("packager", packagerArgs...)
-
-    var out []byte
-	var err2 error
-	err2 = nil
-	go func() {
-		out, err2 = packagerCmd.CombinedOutput() // This line blocks when packagerCmd launch succeeds
-		if err2 != nil {
-        	Log.Println("Errors starting Shaka packager: ", string(out))
-            // os.Exit(1) // Do not exit worker_transcoder here since ffmpeg also needs to be stopped after the packager is stopped. Let function manageCommand() to handle this.
-		}
-	}()
-
-    // Wait 100ms before Shaka packager fully starts
-    time.Sleep(100 * time.Millisecond)
-    if (err2 != nil) {
-        Log.Println("Errors starting Shaka packager: ", string(out))
-        //os.Exit(1)
-    }
-
     // Start a file watcher to check for new stream output from the packager and upload to remote origin server.
-    remote_media_output_path := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
     var errWatchFiles error
     go func() {
         var watch_dirs []string
@@ -413,40 +505,7 @@ func main() {
         // TODO: This is a critical error - Stream files will not be upload to remote origin server. 
         //       Should worker_transcoder exit?
     }
-
-    // If clear-key DRM is configured for the job, create and upload a key file to cloud storage
-    if *drmPtr != "" {
-        errUploadKey := createUploadDrmKeyFile(*drmPtr, local_media_output_path, remote_media_output_path)
-        if errUploadKey != nil {
-            Log.Println("Failed to create/upload key file. Error: ", errUploadKey)
-            // TODO: This is a critical error - Stream files will not be decrypted and played when clear-key DRM is used.
-            //       Should worker_transcoder exit?
-        }
-    }
-
-    // Start ffmpeg ONLY if Shaka packager is running
-    ffmpegArgs := job.JobSpecToFFmpegArgs(j, local_media_output_path)
-    Log.Println("FFmpeg arguments: ")
-    Log.Println(job.ArgumentArrayToString(ffmpegArgs))
-
-    ffmpegCmd := exec.Command("ffmpeg", ffmpegArgs...)
-
-	err2 = nil
-	go func() {
-		out, err2 = ffmpegCmd.CombinedOutput() // This line blocks when ffmpegCmd launch succeeds
-		if err2 != nil {
-        	Log.Println("Errors starting ffmpeg: ", string(out))
-            //os.Exit(1)
-		}
-	}()
-
-    // Wait 100ms before ffmpeg fully starts
-    time.Sleep(100 * time.Millisecond)
-    if (err2 != nil) {
-        Log.Println("Errors starting ffmpeg: ", string(out))
-        //os.Exit(1)
-    }
-
+    
     // Handle system signals to terminate worker_transcoder
     shutdown := make(chan os.Signal, 1)
     // syscall.SIGKILL cannot be handled
@@ -458,13 +517,15 @@ func main() {
         // Received signal from worker_app:
         // - first, stop shaka packager and ffmpeg
         // - then, exit myself
-        processPackager, err3 := os.FindProcess(int(packagerCmd.Process.Pid))
-		if err3 != nil {
-        	Log.Printf("Process id = %d (packagerCmd) not found. Error: %v\n", packagerCmd.Process.Pid, err3)
-    	} else {
-			err3 = processPackager.Signal(syscall.Signal(syscall.SIGTERM))
-			Log.Printf("process.Signal.SIGTERM on pid %d (Shaka packager) returned: %v\n", packagerCmd.Process.Pid, err3)
-    	}
+        if !ffmpegAlone {
+            processPackager, err3 := os.FindProcess(int(packagerCmd.Process.Pid))
+		    if err3 != nil {
+        	    Log.Printf("Process id = %d (packagerCmd) not found. Error: %v\n", packagerCmd.Process.Pid, err3)
+    	    } else {
+			    err3 = processPackager.Signal(syscall.Signal(syscall.SIGTERM))
+			    Log.Printf("process.Signal.SIGTERM on pid %d (Shaka packager) returned: %v\n", packagerCmd.Process.Pid, err3)
+    	    }
+        }
 
         processFfmpeg, err4 := os.FindProcess(int(ffmpegCmd.Process.Pid))
 		if err4 != nil {
@@ -485,7 +546,11 @@ func main() {
 		for {
 		   select {
 			    case <-ticker.C: {
-				    manageCommands(packagerCmd, ffmpegCmd)
+                    if !ffmpegAlone {
+				        manageCommands(packagerCmd, ffmpegCmd)
+                    } else {
+                        manageFfmpegAlone(ffmpegCmd)
+                    }
 			    }
 			    case <-quit: {
 				    ticker.Stop()
