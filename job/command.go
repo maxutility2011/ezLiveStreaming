@@ -549,7 +549,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
 
 		ffmpegArgs = append(ffmpegArgs, "-hls_segment_filename")
-		hls_segment_filename_value := "stream_%v/seg_%02d"
+		hls_segment_filename_value := media_output_path + "stream_%v/seg_%02d"
 		file_extention := ""
 		if j.Output.Segment_format == FMP4 {
 			file_extention = ".m4s"
@@ -561,7 +561,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, hls_segment_filename_value)
 
 		ffmpegArgs = append(ffmpegArgs, "-master_pl_name")
-		ffmpegArgs = append(ffmpegArgs, HLS_MASTER_PLAYLIST_FILE_NAME)
+		ffmpegArgs = append(ffmpegArgs, media_output_path + HLS_MASTER_PLAYLIST_FILE_NAME)
 
 		ffmpegArgs = append(ffmpegArgs, "-var_stream_map")
 		vsr := ""
@@ -576,7 +576,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		vsr = vsr[: len(vsr)-1]
 		ffmpegArgs = append(ffmpegArgs, vsr)
 
-		variant_playlist_format_value := "stream_%v.m3u8"
+		variant_playlist_format_value := media_output_path + "stream_%v.m3u8"
 		ffmpegArgs = append(ffmpegArgs, variant_playlist_format_value)
 	}
 
