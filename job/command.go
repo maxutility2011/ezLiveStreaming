@@ -431,7 +431,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		if vo.Codec == AV1_CODEC {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_AV1)
 		} else {
-			Log.Println("ffmpeg-alone only supports libsvtav1")
 			return ffmpegArgs, local_media_output_path_subdirs
 		}
 
