@@ -548,10 +548,10 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, "-hls_time")
 		ffmpegArgs = append(ffmpegArgs, strconv.Itoa(j.Output.Segment_duration))
 
-		ffmpegArgs = append(ffmpegArgs, "-hls_fmp4_init_filename")
-		hls_fmp4_init_filename_value := "stream_%v/init.mp4"
-		ffmpegArgs = append(ffmpegArgs, hls_fmp4_init_filename_value)
-		
+		//ffmpegArgs = append(ffmpegArgs, "-hls_fmp4_init_filename")
+		//hls_fmp4_init_filename_value := "stream_%v/init.mp4"
+		//ffmpegArgs = append(ffmpegArgs, hls_fmp4_init_filename_value)
+
 		ffmpegArgs = append(ffmpegArgs, "-hls_segment_filename")
 		hls_segment_filename_value := "stream_%v/seg_%02d"
 		file_extention := ""
