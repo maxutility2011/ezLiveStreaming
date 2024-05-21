@@ -38,7 +38,8 @@ const stream_file_upload_interval = "0.1s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
-const stream_file_write_delay_ms = 200 
+const stream_file_write_delay_ms = 200
+const av1_init_segment_write_delay_ms = 2000
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
     // According to https://pkg.go.dev/os#FindProcess, 
@@ -184,7 +185,14 @@ func uploadFiles() {
         time_created := f.Time_created.UnixMilli()
         now := time.Now().UnixMilli()
         Log.Printf("%d - Upload item: \n file: %s\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, time_created, now - time_created, f.Num_retried, f.Remote_media_output_path)
-        if now - time_created > stream_file_write_delay_ms {
+        var write_delay_ms int64
+        if isFmp4InitSegment(f.File_path) {
+            write_delay_ms = av1_init_segment_write_delay_ms
+        } else {
+            write_delay_ms = stream_file_write_delay_ms
+        }
+
+        if now - time_created > write_delay_ms {
             if i > num_concurrent_uploads {
                 Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, num_concurrent_uploads)
                 break
