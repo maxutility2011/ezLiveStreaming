@@ -274,9 +274,10 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     }
 
     // This is the first media data segment. Let's also upload the init segment of this rendition. 
-    // Media data segment template: "stream_%v/seg_%05d". The first segment looks like e.g., seg_00000.m4s.
+    // FFmpeg media data segment template: "stream_%v/seg_%05d". The first segment looks like e.g., seg_00000.m4s.
+    // Shaka packager template: "stream_%v/seg_$Number$.m4s". The first segment looks like e.g., seg_1.m4s.
     // TODO: remove dependency on data segment template.
-    if isMediaDataSegment(local_file) && strings.Contains(local_file, "seg_00000") {
+    if isMediaDataSegment(local_file) && (strings.Contains(local_file, "seg_00000") || strings.Contains(local_file, "seg_1")) {
         item, ok := init_segments_to_upload[rendition_name[: len(rendition_name)-1]]
         if !ok {
             Log.Printf("Failed to find init segment item with rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name[: len(rendition_name)-1], local_file)
