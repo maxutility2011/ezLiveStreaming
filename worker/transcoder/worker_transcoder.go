@@ -279,7 +279,7 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     if isMediaDataSegment(local_file) && strings.Contains(local_file, "seg_00000") {
         item, ok := init_segments_to_upload[rendition_name]
         if !ok {
-            Log.Printf("Failed to find init segment of rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name[: len(rendition_name)-1], local_file)
+            Log.Printf("Failed to find init segment item of rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name[: len(rendition_name)-1], local_file)
             return nil // This is NOT a fatal error, let's return nil.
         } 
 
@@ -348,10 +348,10 @@ func addToUploadList(file_path string, remote_media_output_path string) {
     if isFmp4InitSegment(file_path) {
         rendition_name := getRenditionNameFromPath(file_path)
         if (rendition_name != "") {
-            Log.Printf("Add %s to init segment list\n", file_path)
+            Log.Printf("Add %s to init segment list under rendition name = %s\n", file_path, rendition_name)
             init_segments_to_upload[rendition_name] = it
         } else {
-            Log.Printf("Failed to add %s to init segment list. Invalid rendition name: %s\n", file_path, rendition_name)
+            Log.Printf("Failed to add %s to init segment tabele. Invalid rendition name: %s\n", file_path, rendition_name)
         }
     } else { // Add media data segments to upload_list
         Log.Printf("Add %s to UploadList\n", file_path)
