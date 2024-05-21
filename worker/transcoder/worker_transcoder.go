@@ -244,10 +244,10 @@ func uploadOneFile(local_file string, remote_path_base string, written_by_ffmpeg
         // init segments: ./init.mp4, e.g., ./init.mp4. There is no [rendition_name] in the paths.
 
         // Except for init segments output by ffmpeg, all other stream file paths contains a [rendition_name]. We need to extract [rendition_name] from those paths.
-        if !written_by_ffmpeg || (written_by_ffmpeg && !isFmp4InitSegment(local_file)) {
+        //if !written_by_ffmpeg || (written_by_ffmpeg && !isFmp4InitSegment(local_file)) {
             posSecondLastSingleSlash := strings.LastIndex(file_path, "/")
             rendition_name = local_file[posSecondLastSingleSlash + 1 : posLastSingleSlash] + "/"
-        }
+        //}
     }
 
     Log.Printf("Uploading %s to %s", local_file, remote_path_base + rendition_name + file_name)
