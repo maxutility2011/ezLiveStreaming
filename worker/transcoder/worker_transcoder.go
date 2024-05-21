@@ -279,7 +279,7 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     if isMediaDataSegment(local_file) && strings.Contains(local_file, "seg_00000") {
         item, ok := init_segments_to_upload[rendition_name]
         if !ok {
-            Log.Printf("Failed to find init segment of rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name, local_file)
+            Log.Printf("Failed to find init segment of rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name[: len(rendition_name)-1], local_file)
             return nil // This is NOT a fatal error, let's return nil.
         } 
 
