@@ -39,7 +39,7 @@ const max_upload_retries = 3
 const num_concurrent_uploads = 5
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
-const av1_init_segment_write_delay_ms = 2000
+const av1_init_segment_write_delay_ms = 5000
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
     // According to https://pkg.go.dev/os#FindProcess, 
