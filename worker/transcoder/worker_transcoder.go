@@ -230,7 +230,7 @@ func uploadOneFile(local_file string, remote_path_base string, written_by_ffmpeg
     file_path := local_file[: posLastSingleSlash - 1]
 
     rendition_name := ""
-    if isMediaSegment(local_file) {
+    if isMediaDataSegment(local_file) || isFmp4InitSegment(local_file) || isHlsVariantPlaylist(local_file) {
         // Depending on video transcoding specification by the user, worker_transcoder may choose to use
         // "ffmpeg + shaka" or "ffmpeg-alone" (e.g., when "av1" video codec is specified) to transcode and package.
         // The stream output structure are different for ffmpeg and shaka-packager. We need to handle the difference when uploading the files.
@@ -267,7 +267,7 @@ func isStreamFile(file_name string) bool {
             strings.Contains(file_name, ".m4s")
 }
 
-func isMediaSegment(file_name string) bool {
+func isMediaDataSegment(file_name string) bool {
     return strings.Contains(file_name, ".mp4") || 
             strings.Contains(file_name, ".ts") || 
             strings.Contains(file_name, ".m4s")
@@ -275,6 +275,10 @@ func isMediaSegment(file_name string) bool {
 
 func isFmp4InitSegment(file_name string) bool {
     return strings.Contains(file_name, ".mp4")
+}
+
+func isHlsVariantPlaylist(file_name string) bool {
+    return strings.Contains(file_name, "playlist.m3u8")
 }
 
 func addToUploadList(file_path string, remote_media_output_path string, written_by_ffmpeg bool) {
