@@ -25,7 +25,6 @@ import (
 type Upload_item struct {
     File_path string
     Time_created time.Time
-    Written_by_ffmpeg bool
     Num_retried int
     Remote_media_output_path string
 }
@@ -201,7 +200,7 @@ func uploadFiles() {
                     Log.Printf("Num. retried: %d < max_retries: %d. Stream file %s uploading...\n", f.Num_retried, max_upload_retries, f.File_path)
                     i++;
 
-                    err = uploadOneFile(f.File_path, f.Remote_media_output_path, f.Written_by_ffmpeg)
+                    err = uploadOneFile(f.File_path, f.Remote_media_output_path)
                 } else {
                     Log.Printf("Num. retried: %d < max_retries: %d. Drop upload of stream file %s due to exceeding max_retries.\n", f.Num_retried, max_upload_retries, f.File_path)
                 }
@@ -224,7 +223,7 @@ func uploadFiles() {
     }
 }
 
-func uploadOneFile(local_file string, remote_path_base string, written_by_ffmpeg bool) error {
+func uploadOneFile(local_file string, remote_path_base string) error {
     posLastSingleSlash := strings.LastIndex(local_file, "/")
     file_name := local_file[posLastSingleSlash + 1 :]
     file_path := local_file[: posLastSingleSlash - 1]
@@ -233,21 +232,23 @@ func uploadOneFile(local_file string, remote_path_base string, written_by_ffmpeg
     if isMediaDataSegment(local_file) || isFmp4InitSegment(local_file) || isHlsVariantPlaylist(local_file) {
         // Depending on video transcoding specification by the user, worker_transcoder may choose to use
         // "ffmpeg + shaka" or "ffmpeg-alone" (e.g., when "av1" video codec is specified) to transcode and package.
-        // The stream output structure are different for ffmpeg and shaka-packager. We need to handle the difference when uploading the files.
+        // The stream output structure are the same for ffmpeg and shaka-packager. 
 
         // Shaka packager output structure: 
+        // master playlist: master.m3u8
+        // variant playlist: [rendition_name]/playlist.m3u8, e.g., video_500k/playlist.m3u8
         // data segments: [rendition_name]/seg_[number].m4s, e.g., video_500k/seg_10.m4s
         // init segments: [rendition_name]/init.mp4, e.g., video_500k/init.mp4
 
         // ffmpeg output structure: 
+        // master playlist: master.m3u8
+        // variant playlist: [rendition_name]/playlist.m3u8, e.g., stream_0/playlist.m3u8
         // data segments: [rendition_name]/seg_[number].m4s, e.g., stream_0/seg_10.m4s
-        // init segments: ./init.mp4, e.g., ./init.mp4. There is no [rendition_name] in the paths.
+        // init segments: [rendition_name]/init.mp4, e.g., stream_0/init.mp4
 
-        // Except for init segments output by ffmpeg, all other stream file paths contains a [rendition_name]. We need to extract [rendition_name] from those paths.
-        //if !written_by_ffmpeg || (written_by_ffmpeg && !isFmp4InitSegment(local_file)) {
-            posSecondLastSingleSlash := strings.LastIndex(file_path, "/")
-            rendition_name = local_file[posSecondLastSingleSlash + 1 : posLastSingleSlash] + "/"
-        //}
+        // Extract [rendition_name] from the paths, except for master.m3u8 which is stored directly under the path base.
+        posSecondLastSingleSlash := strings.LastIndex(file_path, "/")
+        rendition_name = local_file[posSecondLastSingleSlash + 1 : posLastSingleSlash] + "/"
     }
 
     Log.Printf("Uploading %s to %s", local_file, remote_path_base + rendition_name + file_name)
@@ -281,11 +282,10 @@ func isHlsVariantPlaylist(file_name string) bool {
     return strings.Contains(file_name, "playlist.m3u8")
 }
 
-func addToUploadList(file_path string, remote_media_output_path string, written_by_ffmpeg bool) {
+func addToUploadList(file_path string, remote_media_output_path string) {
     Log.Printf("Add %s to UploadList\n", file_path)
     var it Upload_item
     it.File_path = file_path
-    it.Written_by_ffmpeg = written_by_ffmpeg
     it.Time_created = time.Now()
     it.Num_retried = 0
     it.Remote_media_output_path = remote_media_output_path
@@ -319,12 +319,7 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
                 // Packager has finished writing to a stream file when it is renamed
                 if event.Op == fsnotify.Create {
                     if isStreamFile(event.Name) {
-                        written_by_ffmpeg := false
-                        if ffmpegAlone {
-                            written_by_ffmpeg = true
-                        }
-
-                        addToUploadList(event.Name, remote_media_output_path, written_by_ffmpeg)
+                        addToUploadList(event.Name, remote_media_output_path)
                     } else {
                         Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
                     }
