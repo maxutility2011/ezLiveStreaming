@@ -318,7 +318,7 @@ func getRenditionNameFromPath(path string) string {
         return s
     }
 
-    t := path[: posLastSingleSlash - 1]
+    t := path[: posLastSingleSlash]
 
     posSecondLastSingleSlash := strings.LastIndex(t, "/")
     if posSecondLastSingleSlash == -1 {
