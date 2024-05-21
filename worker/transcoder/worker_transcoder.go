@@ -224,6 +224,12 @@ func uploadFiles() {
 }
 
 func uploadOneFile(local_file string, remote_path_base string) error {
+    f, err := os.Stat(local_file)
+    if err != nil {
+        Log.Printf("File %s not found\n", local_file)
+        return err
+    }
+
     posLastSingleSlash := strings.LastIndex(local_file, "/")
     file_name := local_file[posLastSingleSlash + 1 :]
     file_path := local_file[: posLastSingleSlash - 1]
@@ -252,9 +258,11 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     }
 
     Log.Printf("Uploading %s to %s", local_file, remote_path_base + rendition_name + file_name)
-    err := s3.Upload(local_file, file_name, remote_path_base + rendition_name)
+    err = s3.Upload(local_file, file_name, remote_path_base + rendition_name)
     if err != nil {
         Log.Printf("Failed to upload: %s to %s. Error: %v", local_file, remote_path_base + rendition_name + file_name, err)
+    } else {
+        Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_file)
     }
 
     return err
