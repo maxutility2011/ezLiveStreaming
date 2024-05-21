@@ -290,25 +290,34 @@ func uploadOneFile(local_file string, remote_path_base string) error {
 }
 
 func isStreamFile(file_name string) bool {
-    return strings.Contains(file_name, ".m3u8") || 
+    return (strings.Contains(file_name, ".m3u8") || 
             strings.Contains(file_name, ".mpd") || 
             strings.Contains(file_name, ".mp4") || 
             strings.Contains(file_name, ".ts") || 
-            strings.Contains(file_name, ".m4s")
+            strings.Contains(file_name, ".m4s")) && 
+            !strings.Contains(file_name, ".tmp")
 }
 
 func isMediaDataSegment(file_name string) bool {
-    return strings.Contains(file_name, ".mp4") || 
+    return (strings.Contains(file_name, ".mp4") || 
             strings.Contains(file_name, ".ts") || 
-            strings.Contains(file_name, ".m4s")
+            strings.Contains(file_name, ".m4s")) && 
+            !strings.Contains(file_name, ".tmp")
 }
 
 func isFmp4InitSegment(file_name string) bool {
-    return strings.Contains(file_name, ".mp4")
+    return strings.Contains(file_name, ".mp4") && 
+            !strings.Contains(file_name, ".tmp")
 }
 
 func isHlsVariantPlaylist(file_name string) bool {
-    return strings.Contains(file_name, "playlist.m3u8")
+    return strings.Contains(file_name, "playlist.m3u8") && 
+            !strings.Contains(file_name, ".tmp")
+}
+
+func isHlsmasterPlaylist(file_name string) bool {
+    return strings.Contains(file_name, "master.m3u8") && 
+            !strings.Contains(file_name, ".tmp")
 }
 
 func getRenditionNameFromPath(path string) string {
@@ -348,7 +357,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
     if isFmp4InitSegment(file_path) {
         rendition_name := getRenditionNameFromPath(file_path)
         if (rendition_name != "") {
-            Log.Printf("Add %s to init segment list under rendition name = %s\n", file_path, rendition_name)
+            Log.Printf("Add %s to init segment table under rendition name = %s\n", file_path, rendition_name)
             init_segments_to_upload[rendition_name] = it
         } else {
             Log.Printf("Failed to add %s to init segment tabele. Invalid rendition name: %s\n", file_path, rendition_name)
