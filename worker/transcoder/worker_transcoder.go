@@ -31,6 +31,7 @@ type Upload_item struct {
 
 var Log *log.Logger
 var upload_list *list.List
+var init_segments_to_upload = make(map[string]Upload_item) // map key (string): rendition name; map value: Upload_item representing the init segments
 var local_media_output_path string
 
 const transcoder_status_check_interval = "2s"
@@ -39,7 +40,6 @@ const max_upload_retries = 3
 const num_concurrent_uploads = 5
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
-const av1_init_segment_write_delay_ms = 10000
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
     // According to https://pkg.go.dev/os#FindProcess, 
@@ -190,14 +190,8 @@ func uploadFiles() {
         time_created := f.Time_created.UnixMilli()
         now := time.Now().UnixMilli()
         Log.Printf("%d - Upload item: \n file: %s (size: %d bytes)\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, fs.Size(), time_created, now - time_created, f.Num_retried, f.Remote_media_output_path)
-        var write_delay_ms int64
-        if isFmp4InitSegment(f.File_path) {
-            write_delay_ms = av1_init_segment_write_delay_ms
-        } else {
-            write_delay_ms = stream_file_write_delay_ms
-        }
-
-        if now - time_created > write_delay_ms {
+        
+        if (now - time_created > stream_file_write_delay_ms) {
             if i > num_concurrent_uploads {
                 Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, num_concurrent_uploads)
                 break
@@ -274,8 +268,22 @@ func uploadOneFile(local_file string, remote_path_base string) error {
     err = s3.Upload(local_file, file_name, remote_path_base + rendition_name)
     if err != nil {
         Log.Printf("Failed to upload: %s to %s. Error: %v", local_file, remote_path_base + rendition_name + file_name, err)
+        return err
     } else {
         Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_file)
+    }
+
+    // This is the first media data segment. Let's also upload the init segment of this rendition. 
+    // Media data segment template: "stream_%v/seg_%05d". The first segment looks like e.g., seg_00000.m4s.
+    // TODO: remove dependency on data segment template.
+    if isMediaDataSegment(local_file) && strings.Contains(local_file, "seg_00000") {
+        item, ok := init_segments_to_upload[rendition_name]
+        if !ok {
+            Log.Printf("Failed to find init segment of rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name, local_file)
+            return nil // This is NOT a fatal error, let's return nil.
+        } 
+
+        upload_list.PushBack(item)
     }
 
     return err
@@ -303,15 +311,52 @@ func isHlsVariantPlaylist(file_name string) bool {
     return strings.Contains(file_name, "playlist.m3u8")
 }
 
+func getRenditionNameFromPath(path string) string {
+    s := ""
+    posLastSingleSlash := strings.LastIndex(path, "/")
+    if posLastSingleSlash == -1 {
+        return s
+    }
+
+    t := path[: posLastSingleSlash - 1]
+
+    posSecondLastSingleSlash := strings.LastIndex(t, "/")
+    if posSecondLastSingleSlash == -1 {
+        return s
+    }
+
+    return t[posSecondLastSingleSlash + 1 :]
+}
+
 func addToUploadList(file_path string, remote_media_output_path string) {
-    Log.Printf("Add %s to UploadList\n", file_path)
     var it Upload_item
     it.File_path = file_path
     it.Time_created = time.Now()
     it.Num_retried = 0
     it.Remote_media_output_path = remote_media_output_path
 
-    upload_list.PushBack(it)
+    // Add fmp4 init segments to init_segments_to_upload. 
+    // Add an init segment to upload_list when we upload the first media data segment.
+    // Why?
+    // For AV1 video, FFmpeg takes long times (5-10 seconds) between when it creates "init.mp4" on disk
+    // and when it actually writes "init.mp4" along with the first data segment and the variant playlist.
+    // Therefore, waiting stream_file_write_delay_ms time units (e.g., around 200ms) is not long enough 
+    // for "init.mp4" to be ready for s3 upload. If we upload now, it will be an empty file in the bucket.
+    // The fix:
+    // Let's wait when the first media data segment becomes ready at which time "init.mp4" is guaranteed
+    // to be ready for upload. So, we add init.mp4 to init_segments_to_upload.
+    if isFmp4InitSegment(file_path) {
+        rendition_name := getRenditionNameFromPath(file_path)
+        if (rendition_name != "") {
+            Log.Printf("Add %s to init segment list\n", file_path)
+            init_segments_to_upload[rendition_name] = it
+        } else {
+            Log.Printf("Failed to add %s to init segment list. Invalid rendition name: %s\n", file_path, rendition_name)
+        }
+    } else { // Add media data segments to upload_list
+        Log.Printf("Add %s to UploadList\n", file_path)
+        upload_list.PushBack(it)
+    }
 }
 
 // https://github.com/fsnotify/fsnotify
