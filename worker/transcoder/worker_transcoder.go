@@ -182,9 +182,14 @@ func uploadFiles() {
 
         f = Upload_item(e.Value.(Upload_item))
 
+        fs, err := os.Stat(f.File_path)
+        if err != nil {
+            Log.Printf("File %s not found\n", f.File_path)
+        }
+
         time_created := f.Time_created.UnixMilli()
         now := time.Now().UnixMilli()
-        Log.Printf("%d - Upload item: \n file: %s\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, time_created, now - time_created, f.Num_retried, f.Remote_media_output_path)
+        Log.Printf("%d - Upload item: \n file: %s (size: %d bytes)\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, fs.Size(), time_created, now - time_created, f.Num_retried, f.Remote_media_output_path)
         var write_delay_ms int64
         if isFmp4InitSegment(f.File_path) {
             write_delay_ms = av1_init_segment_write_delay_ms
