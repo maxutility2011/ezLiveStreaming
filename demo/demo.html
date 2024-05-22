@@ -101,29 +101,8 @@
 
 <head>
 	<script src="dist/shaka-player.compiled.js"></script>
-  <script>var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";</script>
+  	<script>var api_server_url = "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/";</script>
 	<script src="live_demo_player.js"></script>
-  <script>
-    /* When the user clicks on the button, 
-    toggle between hiding and showing the dropdown content */
-    function myFunction() {
-      document.getElementById("myDropdown").classList.toggle("show");
-    }
-    
-    // Close the dropdown if the user clicks outside of it
-    window.onclick = function(event) {
-      if (!event.target.matches('.dropbtn')) {
-        var dropdowns = document.getElementsByClassName("dropdown-content");
-        var i;
-        for (i = 0; i < dropdowns.length; i++) {
-          var openDropdown = dropdowns[i];
-          if (openDropdown.classList.contains('show')) {
-            openDropdown.classList.remove('show');
-          }
-        }
-      }
-    }
-    </script>
 </head>
 
 <div class="row">
@@ -131,8 +110,16 @@
     <form>
 		<b><label id=livestream style="font-family: Garamond, serif; font-size: 25px; display: block; text-align: center">Live job request</label></b>
 		<br>
-		<textarea id="job_request" name="job_request" rows="18" cols="74"></textarea>
+		<textarea id="job_request" name="job_request" rows="16" cols="74"></textarea>
 		<br>
+		<form>
+                	<select id = "liveJobList" onchange = "changeJob()" >
+                        	<option>Choose a live job template</option>
+                        	<option>hls live with clear-key drm</option>
+                        	<option>hls live without drm</option>
+                        	<option>hls live with av1 codec</option>
+                	</select>
+        	</form>
 		<button class="button" id=create type=button>Create</button>
 		<button class="button" id=stop type=button>Stop</button>
 		<button class="button" id=resume type=button>Resume</button>
@@ -142,15 +129,7 @@
 		<button class="button" id=stoplivefeed type=button>stoplivefeed</button>-->
 		<label id=obs style="font-size: 12px; background-color:#745904;">Use OBS to live feed</label>
 		<button class="button" id=play type=button>Play</button>
-    <div class="dropdown">
-      <button onclick="myFunction()" class="dropbtn">Dropdown</button>
-      <div id="myDropdown" class="dropdown-content">
-        <a href="#home">Home</a>
-        <a href="#about">About</a>
-        <a href="#contact">Contact</a>
-      </div>
-    </div>
-	</form>
+    	</form>
   </div>
   <div class="columnright" style="background-color:#161452;">
 	<center> 
