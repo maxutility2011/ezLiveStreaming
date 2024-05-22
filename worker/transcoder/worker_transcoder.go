@@ -552,7 +552,7 @@ func main() {
             Log.Println("Errors starting ffmpeg: ", errEncoder, " ffmpeg output: ", string(out))
             //os.Exit(1)
         }
-    } else {
+    } else { // Start ffmpeg-alone
         ffmpegArgs, local_media_output_path_subdirs = job.JobSpecToEncoderArgs(j, local_media_output_path)
         Log.Println("FFmpeg-alone arguments: ")
         Log.Println(job.ArgumentArrayToString(ffmpegArgs))
