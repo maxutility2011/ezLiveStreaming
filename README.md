@@ -146,11 +146,16 @@ docker compose up worker
 The order of starting services does not matter. The services will connect to each other automatically.
 
 ## Step 9: Start your live channel from the UI
-On your web browser, load the ezLiveStreaming demo UI page, e.g., http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. In the URL, replace the EC2 hostname with your own management server hostname. Again, please make sure port 4080 is open to the Internet. 
+The docker file for api_server copies the demo UI source to the Nginx web root (e.g., /var/www/html/demo/). When the API server is running, a Nginx web server will be running too and can serve the demo UI at the following URL, http://[api_server_hostname]:[api_server_port]/demo/demo.html. For example, http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. On your web browser, load the ezLiveStreaming demo UI page. Again, please make sure port 4080 is open to the Internet. 
 
 ![screenshot](diagrams/demo_ui.png)
 
-Copy the content of [sample_live_job_without_drm.json](sample_live_job_without_drm.json), and paste it under *Live Job Request*. Put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail about DRM setup will be explained later.
+The demo UI provides a list of job request templates. Please choose one and the full job request will be shown in the editor section. Currently, 3 templates are provided,
+- hls live with clear-key drm
+- hls live without drm 
+- hls live with av1 codec
+
+After the job request is loaded in the editor, put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail about DRM setup will be explained later.
 
 ![screenshot](diagrams/demo_step2.png)
 
