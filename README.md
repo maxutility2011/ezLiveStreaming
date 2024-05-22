@@ -1,6 +1,6 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec (e.g., h.264, h.265, av1 for video, aac for audio) she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec (e.g., h.264, h.265, av1 for video, aac for audio) she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
 
 If you have any questions regarding this project, please contact Bo Zhang by email: maxutility2011@gmail.com.
 
@@ -570,3 +570,7 @@ This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis
 **Data structure**: hash table <br>
 **key**: DRM key id <br>
 **value**: "type KeyInfo struct" in models/drm.go <br>
+
+# Limitation
+## AV1
+The current implementation uses libsvtav1 for live AV1 transcoding. In order to transcode at real-time speed, the encoder preset has to be set to 12. Further evaluation has to be done to assess the impact on video quality.
