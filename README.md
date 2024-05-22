@@ -1,6 +1,6 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via HTTP. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec (e.g., h.264, h.265, av1 for video, aac for audio) she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
 
 If you have any questions regarding this project, please contact Bo Zhang by email: maxutility2011@gmail.com.
 
@@ -10,9 +10,20 @@ If you have any questions regarding this project, please contact Bo Zhang by ema
 - HLS/DASH streaming, 
 - live transcoding API,
 - live channel management API,
+- live HLS streaming with AV1 video codec
 - clear key DRM protection, 
 - uploading transcoder outputs to AWS S3,
 - standard-compliant media transcoding and formatting which potentially work with any video players.
+
+## Supported media codecs
+Video: 
+- h.264,
+- h.265,
+- av1
+
+Audio:
+- aac
+- mp3
 
 # High-level architecture
 
@@ -313,14 +324,14 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Bucket | string | S3 bucket name | n/a |
 | Video_outputs | json array | Array of video output renditions | n/a |
 | Label | string | label of an output rendition | n/a |
-| Codec (Video_outputs) | string | video codec | "h264" (libx264), "h265" (libx265) |
+| Codec (Video_outputs) | string | video codec | "h264" (libx264), "h265" (libx265), "av1" (libsvtav1) |
 | Framerate | integer | output video frame rate | n/a |
 | Width | integer | output video resolution (width) | n/a |
 | Height | integer | output video resolution (height) | n/a |
 | Bitrate | string | output video bitrate (corresponds to "-b:v" in ffmpeg) | for example, "500k", "1m" |
 | Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg) | for example, "750k" |
 |Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg) | for example, "750k" |
-| Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets |
+| Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets (12+ for av1 video codec) |
 | Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values |
 | Audio_outputs | json | array of audio outputs | n/a |
 | Codec (Audio_outputs) | string | audio codec | "aac" |
