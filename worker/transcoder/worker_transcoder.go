@@ -393,7 +393,9 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
                     continue
                 }
 
-                // Packager has finished writing to a stream file when it is renamed
+                // After a stream file (e.g., media segments, playlists) is created on disk, add the file to
+                // the upload list to make it ready for upload. The file will be uploaded in the next file
+                // upload opportunity
                 if event.Op == fsnotify.Create {
                     if isStreamFile(event.Name) {
                         addToUploadList(event.Name, remote_media_output_path)
