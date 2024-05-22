@@ -20,7 +20,7 @@
                 "Max_bitrate": "500k",
                 "Buf_size": "500k",
                 "Preset": "12",
-                "Crf": "35",
+                "Crf": 35,
                 "Threads": 2
             }
         ],

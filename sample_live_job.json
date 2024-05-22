@@ -25,6 +25,7 @@
                     "Max_bitrate": "500k",
                     "Buf_size": "500k",
                     "Preset": "faster",
+                    "Crf": 27,
                     "Threads": 2
                 },
                 {
@@ -37,6 +38,7 @@
                     "Max_bitrate": "750k",
                     "Buf_size": "750k",
                     "Preset": "faster",
+                    "Crf": 27,
                     "Threads": 2
                 }
             ],

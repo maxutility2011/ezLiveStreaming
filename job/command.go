@@ -155,7 +155,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 
 		if vo.Crf != "" {
 			ffmpegArgs = append(ffmpegArgs, "-crf")
-			ffmpegArgs = append(ffmpegArgs, vo.Crf)
+			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Crf))
 		}
 
 		if vo.Threads != 0 {
@@ -461,7 +461,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 
 		if vo.Crf != "" {
 			ffmpegArgs = append(ffmpegArgs, "-crf")
-			ffmpegArgs = append(ffmpegArgs, vo.Crf)
+			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Crf))
 		}
 
 		if vo.Threads != 0 {
