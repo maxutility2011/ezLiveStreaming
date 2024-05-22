@@ -11,17 +11,17 @@
         },
         "Video_outputs": [
             {
-                "Label": "video365k",
+                "Label": "video1500k",
                 "Codec": "av1",
                 "Framerate": 25,
-                "Width": 640,
-                "Height": 360,
-                "Bitrate": "365k",
-                "Max_bitrate": "500k",
-                "Buf_size": "500k",
+                "Width": 1280,
+                "Height": 720,
+                "Bitrate": "1500k",
+                "Max_bitrate": "2500k",
+                "Buf_size": "2500k",
                 "Preset": "12",
                 "Crf": 35,
-                "Threads": 2
+                "Threads": 4
             }
         ],
         "Audio_outputs": [
