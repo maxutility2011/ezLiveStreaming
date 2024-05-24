@@ -339,8 +339,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             	return
         	}
 
-			var job job.LiveJobSpec
-			e := json.NewDecoder(r.Body).Decode(&job)
+			var jspec job.LiveJobSpec
+			e := json.NewDecoder(r.Body).Decode(&jspec)
 			if e != nil {
             	res := "Failed to decode job request"
             	Log.Println("Error happened in JSON marshal. Err: ", e)
@@ -351,8 +351,10 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			//Log.Println("Header: ", r.Header)
 			//Log.Printf("Job: %+v\n", job)
 
+			job.Validate(jspec)
+
 			// TODO: Need to implement a job validator
-			e1, j := createJob(job)
+			e1, j := createJob(jspec)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
