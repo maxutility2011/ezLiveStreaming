@@ -1,6 +1,7 @@
 {
     "Api_server_hostname": "0.0.0.0",
     "Api_server_port": "1080",
+    "Log_path": "/home/streamer/log/api_server.log",
     "Drm_key_server_url": "http://key_server:5080/keys/",
     "Sqs": {
         "Queue_name": "ezlive_job_queue.fifo"

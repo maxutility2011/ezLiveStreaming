@@ -581,7 +581,6 @@ func main() {
     for _, sd := range local_media_output_path_subdirs {
         sd = local_media_output_path + sd
         _, err_fstat := os.Stat(sd);
-        Log.Printf("Fstat result for dir: %s: %v.", sd, err_fstat)
         if errors.Is(err_fstat, os.ErrNotExist) {
             Log.Printf("Path %s does not exist. Creating it...", sd)
             err1 = os.Mkdir(sd, 0777)

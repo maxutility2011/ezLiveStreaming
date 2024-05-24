@@ -30,8 +30,7 @@ type SqsConfig struct {
 type ApiServerConfig struct {
 	Api_server_hostname string
 	Api_server_port string
-	//Origin_server_hostname string
-    //Origin_server_port string
+	Log_path string
 	Drm_key_server_url string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
@@ -586,12 +585,6 @@ func main() {
 		server_config_file_path = *configPtr
 	}
 
-	// cron will schedule logrotate to automatically rotate all ezlivestreaming log files (logs that are under /home/streamer/logs/) every day. 
-	var logfile, err1 = os.Create("/home/streamer/log/api_server.log")
-    if err1 != nil {
-        panic(err1)
-    }
-
 	readConfig()
 	sqs_sender.QueueName = server_config.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
@@ -599,6 +592,33 @@ func main() {
 	redis.RedisIp = server_config.Redis.RedisIp
 	redis.RedisPort = server_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
+
+	// Cron will schedule logrotate events to automatically rotate all ezlivestreaming log files (logs that are under /home/streamer/logs/) every day. 
+	log_file_path := "/tmp/api_server.log"
+	if server_config.Log_path != "" {
+		posLastSingleSlash := strings.LastIndex(server_config.Log_path, "/")
+    	if posLastSingleSlash >= 0 {
+        	dir := server_config.Log_path[: posLastSingleSlash]
+			_, err_fstat := os.Stat(dir);
+			var err_mkdirall error
+        	if errors.Is(err_fstat, os.ErrNotExist) {
+				err_mkdirall = os.MkdirAll(dir, 0750)
+			}
+
+			if err_mkdirall == nil {
+				log_file_path = server_config.Log_path
+			} else {
+				fmt.Printf("Invalid log file path config (Failed to mkdirall). Use default path instead: %s\n", log_file_path)
+			}
+    	} else {
+			fmt.Printf("Invalid log file path config (bad path). Use default path instead: %s\n", log_file_path)
+		}
+	}
+
+	var logfile, err1 = os.Create(log_file_path)
+    if err1 != nil {
+        panic(err1)
+    }
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)
