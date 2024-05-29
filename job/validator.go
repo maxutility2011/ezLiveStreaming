@@ -109,7 +109,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	// DRM config is optional
 	// Currently, only clear-key DRM is supported so we cannot disable clear key.
 	if !((*j).Output.Drm.Protection_system == "" && (*j).Output.Drm.Protection_scheme == "") { // DRM is configured.
-		if (*j).Output.Drm.disable_clear_key == true {
+		if (*j).Output.Drm.disable_clear_key {
 			return errors.New("disable_clear_key_must_be_false"), warnings
 		}
 
@@ -123,9 +123,9 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("protection_system_must_be_FairPlay"), warnings
 		}
 
-		if !((*j).Output.Drm.Protection_system == "cbcs" || 
-			(*j).Output.Drm.Protection_system == "CBCS" || 
-			(*j).Output.Drm.Protection_system == "Cbcs") {
+		if !((*j).Output.Drm.Protection_scheme == "cbcs" || 
+			(*j).Output.Drm.Protection_scheme == "CBCS" || 
+			(*j).Output.Drm.Protection_scheme == "Cbcs") {
 			return errors.New("protection_scheme_must_be_cbcs"), warnings
 		}
 	}

@@ -454,7 +454,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
 			ffmpegArgs = append(ffmpegArgs, fps)
 		}
-		
+
 		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
 			bv := "-b:v:"
 			bv += strconv.Itoa(i)
@@ -526,7 +526,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, "-remove_at_exit")
 		ffmpegArgs = append(ffmpegArgs, "1")
 
-		if j.Output.Low_latency_mode == true {
+		if j.Output.Low_latency_mode {
 			ffmpegArgs = append(ffmpegArgs, "-ldash")
 			ffmpegArgs = append(ffmpegArgs, "1")
 
