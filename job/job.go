@@ -81,6 +81,6 @@ type LiveJob struct {
 }
 
 type CreateLiveJobResponse struct {
-	Job LiveJob
 	Warnings string
+	Job LiveJob
 }
