@@ -265,7 +265,7 @@ function createJob() {
           if (create_job_req.status === 201) {
             let job_resp = this.response;
             let j = JSON.parse(job_resp);
-            job_id = j.Job.Id;
+            job_id = j.Id;
             response_code.innerHTML = "status code=" + create_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
             create_button.disabled = true;
