@@ -448,6 +448,13 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			return ffmpegArgs, local_media_output_path_subdirs
 		}
 
+		if vo.Framerate > 0 {
+			ffmpegArgs = append(ffmpegArgs, "-filter:v")
+			fps := "fps="
+			fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
+			ffmpegArgs = append(ffmpegArgs, fps)
+		}
+		
 		if vo.Bitrate != "" && vo.Max_bitrate != "" && vo.Buf_size != "" {
 			bv := "-b:v:"
 			bv += strconv.Itoa(i)

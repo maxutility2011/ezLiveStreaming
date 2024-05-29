@@ -215,8 +215,6 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return j, true
 }
 
-// There are 1 all-jobs table, and 3 sub-tables grouped by job state.
-// Please refer to redis_client.go for all the redis key definitions
 func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 	var jobs []job.LiveJob
 	jobsString, e := redis.HGetAll(htable)
@@ -426,6 +424,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 					return
 				}
+			} else if UrlLastPart == "active" { // TODO: Get active jobs only.
+				
 			} else { // Get one job: /jobs/[job_id]
 				jid := UrlLastPart
 				j, ok := getJobById(jid) 
