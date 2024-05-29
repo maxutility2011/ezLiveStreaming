@@ -106,6 +106,30 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		(*j).Output.Time_shift_buffer_depth = max_time_shift_buffer_depth
 	}
 
+	// DRM config is optional
+	// Currently, only clear-key DRM is supported so we cannot disable clear key.
+	if !((*j).Output.Drm.Protection_system == "" && (*j).Output.Drm.Protection_scheme == "") { // DRM is configured.
+		if (*j).Output.Drm.disable_clear_key == true {
+			return errors.New("disable_clear_key_must_be_false"), warnings
+		}
+
+		if !((*j).Output.Drm.Protection_system != "" && (*j).Output.Drm.Protection_scheme != "") {
+			return errors.New("protection_system_and_scheme_must_both_be_set"), warnings
+		}
+
+		if !((*j).Output.Drm.Protection_system == "FairPlay" || 
+			(*j).Output.Drm.Protection_system == "Fairplay" || 
+			(*j).Output.Drm.Protection_system == "fairplay") {
+			return errors.New("protection_system_must_be_FairPlay"), warnings
+		}
+
+		if !((*j).Output.Drm.Protection_system == "cbcs" || 
+			(*j).Output.Drm.Protection_system == "CBCS" || 
+			(*j).Output.Drm.Protection_system == "Cbcs") {
+			return errors.New("protection_scheme_must_be_cbcs"), warnings
+		}
+	}
+
 	// Fatal error. Output bucket is required
 	// TODO: Need to verify output bucket (e.g., upload a small file to verify)
 	if (*j).Output.S3_output.Bucket == "" {
@@ -176,7 +200,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 		
 		if mbi > bi * max_peak_to_average_bitrate_ratio {
-			w := "- Video max_bitrate cannot exceed twice of video average bitrate. "
+			w := "- Video max_bitrate should not exceed twice of video average bitrate. "
 			warnings = append(warnings, w)
 		}
 
@@ -282,7 +306,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		if bi > max_audio_output_bitrate {
-			w := "- Audio bitrate cannot exceed " + strconv.Itoa(max_audio_output_bitrate) + "kbps. "
+			w := "- Audio bitrate should not exceed " + strconv.Itoa(max_audio_output_bitrate) + "kbps. "
 			warnings = append(warnings, w)
 		}
 	}

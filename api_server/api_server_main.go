@@ -7,6 +7,7 @@ import (
 	"time"
 	"net/http"
 	"strings"
+	"strconv"
 	"encoding/json"
 	"github.com/google/uuid"
 	"os"
@@ -358,8 +359,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			err_validate, warnings := job.Validate(&jspec)
 			if err_validate != nil {
 				warning_message := "Warnings: "
-				for _, e := range warnings {
-					warning_message += e
+				for i, e := range warnings {
+					warning_message += strconv.Itoa(i) + ": " + e
 				}
 
 				res := "Error: "
