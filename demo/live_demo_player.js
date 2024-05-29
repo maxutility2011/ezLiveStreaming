@@ -264,13 +264,13 @@ function createJob() {
         if (create_job_req.readyState === create_job_req.DONE) {
           if (create_job_req.status === 201) {
             let job_resp = this.response;
-            let j = JSON.parse(job_resp)
-            job_id = j.Id
-            response_code.innerHTML = "status code=" + create_job_req.status
-            response_body.innerHTML = JSON.stringify(j, null, 2)
-            create_button.disabled = true
+            let j = JSON.parse(job_resp);
+            job_id = j.Job.Id;
+            response_code.innerHTML = "status code=" + create_job_req.status;
+            response_body.innerHTML = JSON.stringify(j, null, 2);
+            create_button.disabled = true;
 
-            startShowJobTimer()
+            startShowJobTimer();
             //window.alert(job_resp);
           } else {
             console.log("create new live job failed. Status code:" + create_job_req.status);
