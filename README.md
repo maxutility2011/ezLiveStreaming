@@ -316,11 +316,11 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Param | Data type | Definition | Valid values |
 | --- | --- | --- | --- |
 | Stream_type | string | stream type (protocol) | "hls", "dash" |
-| Segment_format | string | media segment format | "fmp4", "mpegts", "cmaf" |
-| Fragment_duration | integer | fragment (GOP) duration in second. Currently, this will set the closed GOP size and key frame interval | n/a |
-| Segment_duration | integer | duration of segments in second | n/a |
+| Segment_format | string | media segment format | "fmp4" ("cmaf" and "ts" to be added) |
+| Fragment_duration | integer | fragment (GOP) duration in second. Currently, this will set the closed GOP size and key frame interval | [0 - 10] |
+| Segment_duration | integer | duration of segments in second | [0 - 10] |
 | Low_latency_mode | boolean | whether low latency mode is used | n/a |
-| Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | n/a |
+| Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | [0 - 14400] |
 | Drm | json | DRM configuration | n/a |
 | disable_clear_key | boolean | whether clear key DRM is disabled | n/a |
 | Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
@@ -330,16 +330,16 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 | Video_outputs | json array | Array of video output renditions | n/a |
 | Label | string | label of an output rendition | n/a |
 | Codec (Video_outputs) | string | video codec | "h264" (libx264), "h265" (libx265), "av1" (libsvtav1) |
-| Framerate | integer | output video frame rate | n/a |
-| Width | integer | output video resolution (width) | n/a |
-| Height | integer | output video resolution (height) | n/a |
-| Bitrate | string | output video bitrate (corresponds to "-b:v" in ffmpeg) | for example, "500k", "1m" |
-| Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg) | for example, "750k" |
-|Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg) | for example, "750k" |
-| Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets (12+ for av1 video codec) |
-| Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values |
+| Framerate | integer | output video frame rate | [0 - 60] |
+| Width | integer | output video resolution (width) | < 1920 |
+| Height | integer | output video resolution (height) | < 1080 |
+| Bitrate | string | output video bitrate (corresponds to "-b:v" in ffmpeg). For example, "500k" | < 5000k |
+| Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg). For example, "750k" | < 2 x Bitrate |
+|Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg). For example, "750k" | < 2 x Bitrate |
+| Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets. >= 12 for av1 video codec |
+| Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values. >= 2 for h26x, >= 4 for av1 |
 | Audio_outputs | json | array of audio outputs | n/a |
-| Codec (Audio_outputs) | string | audio codec | "aac" |
+| Codec (Audio_outputs) | string | audio codec | "aac", "mp3" |
 
 ## Get all the jobs
 Show all the jobs including currently running jobs and already finished jobs. <br>

@@ -111,10 +111,15 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 			ffmpegArgs = append(ffmpegArgs, FFMPEG_H265)
 		}
 
-		ffmpegArgs = append(ffmpegArgs, "-filter:v")
-		fps := "fps="
-		fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
-		ffmpegArgs = append(ffmpegArgs, fps)
+		// If the original job spec specifies a non-0 and valid frame rate, we add framerate by adding the filter.
+		// If frame rate is not specified or an invalid value is specified, the job validator sets it to 0 so we 
+		// don't use frame rate filter and  the original frame rate of the input stream will remain in the output stream.
+		if vo.Framerate > 0 {
+			ffmpegArgs = append(ffmpegArgs, "-filter:v")
+			fps := "fps="
+			fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
+			ffmpegArgs = append(ffmpegArgs, fps)
+		}
 
 		if vo.Codec == H264_CODEC || vo.Codec == H265_CODEC {
 			var h26xProfile string

@@ -350,8 +350,27 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			//Log.Println("Header: ", r.Header)
 			//Log.Printf("Job: %+v\n", job)
 
-			job.Validate(jspec)
+			err_validate, warnings := job.Validate(&jspec)
+			if err_validate != nil {
+				warning_message := "\nWarnings: \n"
+				for _, e := range warnings {
+					warning_message += e
+				}
 
+				res := "Error: "
+				res += err_validate.Error()
+				res += warning_message
+				http.Error(w, "400 bad request\n  " + res, http.StatusBadRequest)
+				return
+			}
+
+			// TEST ONLY!!!
+			/*FileContentType_test := "application/json"
+        	w.Header().Set("Content-Type", FileContentType_test)
+        	w.WriteHeader(http.StatusCreated)
+        	json.NewEncoder(w).Encode(jspec)
+			return*/
+			
 			// TODO: Need to implement a job validator
 			e1, j := createJob(jspec)
 			if e1 != nil {
@@ -382,7 +401,16 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
-        	json.NewEncoder(w).Encode(j)
+
+			warning_message := "\nWarnings: \n"
+			for _, e := range warnings {
+				warning_message += e
+			}
+
+			var jr job.CreateLiveJobResponse
+			jr.Job = j
+			jr.Warnings = warning_message
+        	json.NewEncoder(w).Encode(jr)
 		} else if r.Method == "GET" {
 			// Get all jobs: /jobs/
 			if UrlLastPart == liveJobsEndpoint {

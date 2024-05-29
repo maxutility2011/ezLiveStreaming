@@ -79,3 +79,8 @@ type LiveJob struct {
 	Stop bool // A flag indicating the job is to be stopped
 	Delete bool // A flag indicating the job is to be deleted
 }
+
+type CreateLiveJobResponse struct {
+	Job LiveJob
+	Warnings string
+}
