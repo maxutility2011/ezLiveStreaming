@@ -363,7 +363,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				res := "Error: "
-				res += err_validate.Error()
+				res += err_validate.Error() + ".  "
 				res += warning_message
 				http.Error(w, "400 bad request\n  " + res, http.StatusBadRequest)
 				return
