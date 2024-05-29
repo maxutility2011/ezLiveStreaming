@@ -273,7 +273,8 @@ function createJob() {
             startShowJobTimer();
             //window.alert(job_resp);
           } else {
-            console.log("create new live job failed. Status code:" + create_job_req.status);
+            let job_resp = this.response;
+            response_body.innerHTML = "Create new live job failed. Status code:" + create_job_req.status + "\nError: " + job_resp;
           }
         }
     }

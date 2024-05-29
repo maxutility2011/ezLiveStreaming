@@ -176,7 +176,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 		
 		if mbi > bi * max_peak_to_average_bitrate_ratio {
-			w := "- Video max_bitrate cannot exceed twice of video average bitrate.\n"
+			w := "- Video max_bitrate cannot exceed twice of video average bitrate. "
 			warnings = append(warnings, w)
 		}
 
@@ -196,7 +196,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		if buf_i > bi * max_buffersize_to_average_bitrate_ratio {
-			w := "- Video buf_size cannot exceed twice of video average bitrate.\n"
+			w := "- Video buf_size cannot exceed twice of video average bitrate. "
 			warnings = append(warnings, w)
 		}
 
@@ -208,7 +208,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			} 
 
 			if preset < min_libsvtav1_preset {
-				w := "- libsvtav1 presets lower than 12 will not be fast enough for real-time (live) encoding.\n"
+				w := "- libsvtav1 presets lower than 12 will not be fast enough for real-time (live) encoding. "
 				warnings = append(warnings, w)
 			}
 
@@ -217,7 +217,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			}
 
 			if vo.Threads < min_av1_threads {
-				w := "- at least " + strconv.Itoa(min_av1_threads) + " threads are needed for av1"
+				w := "- at least " + strconv.Itoa(min_av1_threads) + " threads are needed for av1. "
 				warnings = append(warnings, w)
 			}
 		} else if vo.Codec == H264_CODEC || vo.Codec == H265_CODEC {
@@ -232,7 +232,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			if preset_index == -1 {
 				return errors.New("invalid_h264_encoder_preset"), warnings
 			} else if preset_index < min_h26x_preset {
-				w := "- libx264/libx265 presets lower than " + valid_h26x_presets[min_h26x_preset] + " will not be fast enough for real-time (live) encoding.\n"
+				w := "- libx264/libx265 presets lower than " + valid_h26x_presets[min_h26x_preset] + " will not be fast enough for real-time (live) encoding. "
 				warnings = append(warnings, w)
 			}
 
@@ -241,7 +241,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			}
 
 			if vo.Threads < min_h26x_threads {
-				w := "- at least " + strconv.Itoa(min_h26x_threads) + " threads are needed for h26x"
+				w := "- at least " + strconv.Itoa(min_h26x_threads) + " threads are needed for h26x. "
 				warnings = append(warnings, w)
 			}
 		}
@@ -249,7 +249,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 	// Validate audio outputs
 	if len((*j).Output.Audio_outputs) == 0 {
-		w := "- No audio outputs configured."
+		w := "- No audio outputs configured. "
 		warnings = append(warnings, w)
 		return nil, warnings
 	}
@@ -282,7 +282,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		if bi > max_audio_output_bitrate {
-			w := "- Audio bitrate cannot exceed " + strconv.Itoa(max_audio_output_bitrate) + "kbps.\n"
+			w := "- Audio bitrate cannot exceed " + strconv.Itoa(max_audio_output_bitrate) + "kbps. "
 			warnings = append(warnings, w)
 		}
 	}
