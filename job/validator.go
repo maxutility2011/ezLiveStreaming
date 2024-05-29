@@ -171,8 +171,13 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("bad_video_bitrate_unit"), warnings
 		}
 
-		if mbi < 0 || mbi > bi * max_peak_to_average_bitrate_ratio {
-			return errors.New("video_max_bitrate_out_of_range"), warnings
+		if mbi < 0 {
+			return errors.New("negative_video_max_bitrate"), warnings
+		}
+		
+		if mbi > bi * max_peak_to_average_bitrate_ratio {
+			w := "- Video max_bitrate cannot exceed twice of video average bitrate.\n"
+			warnings = append(warnings, w)
 		}
 
 		// Video buffer size validation
@@ -186,8 +191,13 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("bad_video_buffer_size_unit"), warnings
 		}
 
-		if buf_i < 0 || buf_i > bi * max_buffersize_to_average_bitrate_ratio {
-			return errors.New("video_buffer_size_out_of_range"), warnings
+		if buf_i < 0 {
+			return errors.New("negative_video_buffer_size"), warnings
+		}
+
+		if buf_i > bi * max_buffersize_to_average_bitrate_ratio {
+			w := "- Video buf_size cannot exceed twice of video average bitrate.\n"
+			warnings = append(warnings, w)
 		}
 
 		// Video encoder preset, CRF and threads validation
@@ -197,7 +207,6 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				return errors.New("bad_libsvtav1_preset"), warnings
 			} 
 
-			// Presets lower than 12 will not be fast enough for real-time (live) encoding
 			if preset < min_libsvtav1_preset {
 				w := "- libsvtav1 presets lower than 12 will not be fast enough for real-time (live) encoding.\n"
 				warnings = append(warnings, w)
@@ -268,8 +277,13 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("bad_audio_bitrate_unit"), warnings
 		}
 
-		if bi < 0 || bi > max_audio_output_bitrate {
+		if bi < 0 {
 			return errors.New("audio_bitrate_out_of_range"), warnings
+		}
+
+		if bi > max_audio_output_bitrate {
+			w := "- Audio bitrate cannot exceed " + strconv.Itoa(max_audio_output_bitrate) + "kbps.\n"
+			warnings = append(warnings, w)
 		}
 	}
 
