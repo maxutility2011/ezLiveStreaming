@@ -309,6 +309,9 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 **Response code** on success: 201 created <br>
 **Response body**: on success, the server returns the original request body, plus the created job ID, timestamps and job state. <br>
 
+## Job validation
+The api_server will validate the specification of new jobs. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response.
+
 ![screenshot](diagrams/create_job.png)
 
 ## Transcoding parameter definitions

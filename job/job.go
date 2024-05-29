@@ -66,6 +66,7 @@ const JOB_STATE_STOPPED = "stopped" // Stopped
 type LiveJob struct {
 	Id string
 	Spec LiveJobSpec
+	Job_validation_warnings string
 	StreamKey string
 	Playback_url string
 	RtmpIngestPort int
@@ -78,9 +79,4 @@ type LiveJob struct {
 	DrmEncryptionKeyInfo models.KeyInfo
 	Stop bool // A flag indicating the job is to be stopped
 	Delete bool // A flag indicating the job is to be deleted
-}
-
-type CreateLiveJobResponse struct {
-	Warnings string
-	Job LiveJob
 }

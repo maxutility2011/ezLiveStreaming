@@ -109,7 +109,7 @@ func getDrmKey(key_id string) (models.KeyInfo, error) {
 	return k, nil
 }
 
-func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
+func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	Log.Println("Generating a random job ID: ", lj.Id)
@@ -133,6 +133,13 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Stop = false // Set to true when the client wants to stop this job
 	lj.Delete = false // Set to true when the client wants to delete this job
 	lj.State = job.JOB_STATE_CREATED
+
+	warning_message := "\nWarnings: \n"
+	for _, e := range warnings {
+		warning_message += e
+	}
+
+	lj.Job_validation_warnings = warning_message
 	
 	var k models.KeyInfo
 	var err_get_key error
@@ -368,9 +375,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         	w.WriteHeader(http.StatusCreated)
         	json.NewEncoder(w).Encode(jspec)
 			return*/
-			
-			// TODO: Need to implement a job validator
-			e1, j := createJob(jspec)
+
+			e1, j := createJob(jspec, warnings)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
@@ -399,16 +405,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			FileContentType := "application/json"
         	w.Header().Set("Content-Type", FileContentType)
         	w.WriteHeader(http.StatusCreated)
-
-			warning_message := "\nWarnings: \n"
-			for _, e := range warnings {
-				warning_message += e
-			}
-
-			var jr job.CreateLiveJobResponse
-			jr.Job = j
-			jr.Warnings = warning_message
-        	json.NewEncoder(w).Encode(jr)
+        	json.NewEncoder(w).Encode(j)
 		} else if r.Method == "GET" {
 			// Get all jobs: /jobs/
 			if UrlLastPart == liveJobsEndpoint {
