@@ -356,7 +356,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 			packagerArgs = append(packagerArgs, protection_scheme_value)
 
 			// Use clear key
-			if !j.Output.Drm.disable_clear_key {
+			if j.Output.Drm.disable_clear_key == 0 {
 				enable_raw_key_option := "--enable_raw_key_encryption"
 				packagerArgs = append(packagerArgs, enable_raw_key_option)
 
@@ -526,7 +526,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, "-remove_at_exit")
 		ffmpegArgs = append(ffmpegArgs, "1")
 
-		if j.Output.Low_latency_mode {
+		if j.Output.Low_latency_mode != 0 {
 			ffmpegArgs = append(ffmpegArgs, "-ldash")
 			ffmpegArgs = append(ffmpegArgs, "1")
 

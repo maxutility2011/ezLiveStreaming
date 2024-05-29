@@ -260,10 +260,10 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
         "Segment_format": "fmp4", 
         "Fragment_duration": 1, 
         "Segment_duration": 4, 
-        "Low_latency_mode": false, 
+        "Low_latency_mode": 0, 
         "Time_shift_buffer_depth": 120,
         "Drm": {
-                "disable_clear_key": false,
+                "disable_clear_key": 0,
                 "Protection_system": "FairPlay",
                 "Protection_scheme": "cbcs"
         },
@@ -322,10 +322,10 @@ The api_server will validate the specification of new jobs. A new job request wi
 | Segment_format | string | media segment format | "fmp4" ("cmaf" and "ts" to be added) |
 | Fragment_duration | integer | fragment (GOP) duration in second. Currently, this will set the closed GOP size and key frame interval | [0 - 10] |
 | Segment_duration | integer | duration of segments in second | [0 - 10] |
-| Low_latency_mode | boolean | whether low latency mode is used | n/a |
+| Low_latency_mode | boolean | whether low latency mode is used | 0/1 |
 | Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | [0 - 14400] |
 | Drm | json | DRM configuration | n/a |
-| disable_clear_key | boolean | whether clear key DRM is disabled | n/a |
+| disable_clear_key | boolean | whether clear key DRM is disabled | 0/1 |
 | Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
 | Protection_scheme | string | DRM protection (encryption) scheme | "cbcs", "cenc" |
 | S3_output | json | S3 output configuration | n/a |
@@ -400,12 +400,12 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
 
 ```
 "Drm": {
-    "disable_clear_key": false,
+    "disable_clear_key": 0,
     "Protection_system": "FairPlay",
     "Protection_scheme": "cbcs"
 },
 ```
-Particularly we must set *disable_clear_key* to false in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
+Particularly we must set *disable_clear_key* to 0 in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
 
 To play the clear-key DRM-protected HLS stream, I used the Shaka player demo (https://shaka-player-demo.appspot.com/demo) and configured key_id and key . I simply added the following section to the Shaka player "extra config" section,
 ```

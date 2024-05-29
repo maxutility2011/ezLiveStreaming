@@ -94,7 +94,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		(*j).Output.Fragment_duration = (*j).Output.Segment_duration
 	}
 
-	// Low_latency_mode defaults to false (0). No need to validate here.
+	// Low_latency_mode defaults to 0. No need to validate.
 
 	// Default to 120 seconds
 	if (*j).Output.Time_shift_buffer_depth <= 0  {
@@ -109,7 +109,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	// DRM config is optional
 	// Currently, only clear-key DRM is supported so we cannot disable clear key.
 	if !((*j).Output.Drm.Protection_system == "" && (*j).Output.Drm.Protection_scheme == "") { // DRM is configured.
-		if (*j).Output.Drm.disable_clear_key {
+		if (*j).Output.Drm.disable_clear_key != 0 {
 			return errors.New("disable_clear_key_must_be_false"), warnings
 		}
 

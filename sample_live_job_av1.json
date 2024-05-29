@@ -4,7 +4,7 @@
         "Segment_format": "fmp4",
         "Fragment_duration": 1,
         "Segment_duration": 4,
-        "Low_latency_mode": false,
+        "Low_latency_mode": 0,
         "Time_shift_buffer_depth": 120,
         "S3_output": {
             "Bucket": "bzhang-test-bucket-public"
