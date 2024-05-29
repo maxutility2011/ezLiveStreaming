@@ -7,6 +7,7 @@ import (
 	"time"
 	"net/http"
 	"strings"
+	"strconv"
 	"encoding/json"
 	"github.com/google/uuid"
 	"os"
@@ -30,8 +31,7 @@ type SqsConfig struct {
 type ApiServerConfig struct {
 	Api_server_hostname string
 	Api_server_port string
-	//Origin_server_hostname string
-    //Origin_server_port string
+	Log_path string
 	Drm_key_server_url string
 	Sqs SqsConfig
 	Redis redis_client.RedisConfig
@@ -110,7 +110,7 @@ func getDrmKey(key_id string) (models.KeyInfo, error) {
 	return k, nil
 }
 
-func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
+func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 	var lj job.LiveJob
 	lj.Id = uuid.New().String()
 	Log.Println("Generating a random job ID: ", lj.Id)
@@ -134,6 +134,13 @@ func createJob(j job.LiveJobSpec) (error, job.LiveJob) {
 	lj.Stop = false // Set to true when the client wants to stop this job
 	lj.Delete = false // Set to true when the client wants to delete this job
 	lj.State = job.JOB_STATE_CREATED
+
+	warning_message := "\nWarnings: \n"
+	for _, e := range warnings {
+		warning_message += e
+	}
+
+	lj.Job_validation_warnings = warning_message
 	
 	var k models.KeyInfo
 	var err_get_key error
@@ -216,8 +223,6 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return j, true
 }
 
-// There are 1 all-jobs table, and 3 sub-tables grouped by job state.
-// Please refer to redis_client.go for all the redis key definitions
 func getJobsByTable(htable string) ([]job.LiveJob, bool) {
 	var jobs []job.LiveJob
 	jobsString, e := redis.HGetAll(htable)
@@ -339,8 +344,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
             	return
         	}
 
-			var job job.LiveJobSpec
-			e := json.NewDecoder(r.Body).Decode(&job)
+			var jspec job.LiveJobSpec
+			e := json.NewDecoder(r.Body).Decode(&jspec)
 			if e != nil {
             	res := "Failed to decode job request"
             	Log.Println("Error happened in JSON marshal. Err: ", e)
@@ -351,8 +356,28 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			//Log.Println("Header: ", r.Header)
 			//Log.Printf("Job: %+v\n", job)
 
-			// TODO: Need to implement a job validator
-			e1, j := createJob(job)
+			err_validate, warnings := job.Validate(&jspec)
+			if err_validate != nil {
+				warning_message := "Warnings: "
+				for i, e := range warnings {
+					warning_message += strconv.Itoa(i) + ": " + e
+				}
+
+				res := "Error: "
+				res += err_validate.Error() + ".  "
+				res += warning_message
+				http.Error(w, "400 bad request\n  " + res, http.StatusBadRequest)
+				return
+			}
+
+			// TEST ONLY!!!
+			/*FileContentType_test := "application/json"
+        	w.Header().Set("Content-Type", FileContentType_test)
+        	w.WriteHeader(http.StatusCreated)
+        	json.NewEncoder(w).Encode(jspec)
+			return*/
+
+			e1, j := createJob(jspec, warnings)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				return
@@ -397,6 +422,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 					return
 				}
+			} else if UrlLastPart == "active" { // TODO: Get active jobs only.
+				
 			} else { // Get one job: /jobs/[job_id]
 				jid := UrlLastPart
 				j, ok := getJobById(jid) 
@@ -584,12 +611,6 @@ func main() {
 		server_config_file_path = *configPtr
 	}
 
-	// cron will schedule logrotate to automatically rotate all ezlivestreaming log files (logs that are under /home/streamer/logs/) every day. 
-	var logfile, err1 = os.Create("/home/streamer/log/api_server.log")
-    if err1 != nil {
-        panic(err1)
-    }
-
 	readConfig()
 	sqs_sender.QueueName = server_config.Sqs.Queue_name
 	sqs_sender.SqsClient = sqs_sender.CreateClient()
@@ -597,6 +618,33 @@ func main() {
 	redis.RedisIp = server_config.Redis.RedisIp
 	redis.RedisPort = server_config.Redis.RedisPort
 	redis.Client, redis.Ctx = redis.CreateClient(redis.RedisIp, redis.RedisPort)
+
+	// Cron will schedule logrotate events to automatically rotate all ezlivestreaming log files (logs that are under /home/streamer/logs/) every day. 
+	log_file_path := "/tmp/api_server.log"
+	if server_config.Log_path != "" {
+		posLastSingleSlash := strings.LastIndex(server_config.Log_path, "/")
+    	if posLastSingleSlash >= 0 {
+        	dir := server_config.Log_path[: posLastSingleSlash]
+			_, err_fstat := os.Stat(dir);
+			var err_mkdirall error
+        	if errors.Is(err_fstat, os.ErrNotExist) {
+				err_mkdirall = os.MkdirAll(dir, 0750)
+			}
+
+			if err_mkdirall == nil {
+				log_file_path = server_config.Log_path
+			} else {
+				fmt.Printf("Invalid log file path config (Failed to mkdirall). Use default path instead: %s\n", log_file_path)
+			}
+    	} else {
+			fmt.Printf("Invalid log file path config (bad path). Use default path instead: %s\n", log_file_path)
+		}
+	}
+
+	var logfile, err1 = os.Create(log_file_path)
+    if err1 != nil {
+        panic(err1)
+    }
 
     Log = log.New(logfile, "", log.LstdFlags)
 	http.HandleFunc("/", main_server_handler)

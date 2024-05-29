@@ -7,7 +7,7 @@ RUN mkdir /home/streamer/src \
     && mkdir /home/streamer/conf \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src \
-    && git clone https://github.com/maxutility2011/ezLiveStreaming.git 
+    && git clone -b job_validator https://github.com/maxutility2011/ezLiveStreaming.git 
 
 RUN cd /home/streamer/src/ezLiveStreaming/scheduler \
     && /usr/local/go/bin/go build scheduler.go \
