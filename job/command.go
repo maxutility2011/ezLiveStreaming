@@ -356,7 +356,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 			packagerArgs = append(packagerArgs, protection_scheme_value)
 
 			// Use clear key
-			if j.Output.Drm.disable_clear_key == 0 {
+			if j.Output.Drm.Disable_clear_key == 0 {
 				enable_raw_key_option := "--enable_raw_key_encryption"
 				packagerArgs = append(packagerArgs, enable_raw_key_option)
 

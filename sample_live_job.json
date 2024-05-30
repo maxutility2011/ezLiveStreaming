@@ -7,7 +7,7 @@
             "Low_latency_mode": 0,
             "Time_shift_buffer_depth": 120,
             "Drm": {
-                "disable_clear_key": 0,
+                "Disable_clear_key": 0,
                 "Protection_system": "FairPlay",
                 "Protection_scheme": "cbcs"
             },

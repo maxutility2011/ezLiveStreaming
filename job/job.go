@@ -26,7 +26,7 @@ type LiveAudioOutputSpec struct {
 }
 
 type DrmConfig struct {
-	disable_clear_key int
+	Disable_clear_key int
 	Protection_system string
 	Protection_scheme string
 }
