@@ -353,7 +353,7 @@ The api_server will validate the specification of new jobs. A new job request wi
 | Max_bitrate | string | output video bitrate cap (corresponds to "-maxrate" in ffmpeg). For example, "750k" | < 2 x Bitrate |
 |Buf_size | string | VBV buffer size (corresponds to "-bufsize" in ffmpeg). For example, "750k" | < 2 x Bitrate |
 | Preset | string | video encoding speed preset (corresponds to "-preset" in ffmpeg) | same as libx264 or libx265 presets. >= 12 for av1 video codec |
-| Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) | same as ffmpeg "-threads" values. >= 2 for h26x, >= 4 for av1 |
+| Threads | integer | number of encoding threads (corresponds to "-threads" in ffmpeg) per rendition | same as ffmpeg "-threads" values. >= 2 for h26x, >= 4 for av1 |
 | Audio_outputs | json | array of audio outputs | n/a |
 | Codec (Audio_outputs) | string | audio codec | "aac", "mp3" |
 
