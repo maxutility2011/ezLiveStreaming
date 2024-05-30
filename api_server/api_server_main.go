@@ -223,27 +223,52 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return j, true
 }
 
-func getJobsByTable(htable string) ([]job.LiveJob, bool) {
+func getAllJobs() ([]job.LiveJob, error) {
 	var jobs []job.LiveJob
-	jobsString, e := redis.HGetAll(htable)
-	if e != nil {
-		Log.Println("Failed to get all jobs. Error: ", e)
-		return jobs, false
+	jobsString, err := redis.HGetAll(redis_client.REDIS_KEY_ALLJOBS)
+	if err != nil {
+		Log.Println("Failed to get all jobs. Error: ", err)
+		return jobs, err
 	}
 
 	var j job.LiveJob
 	for _, j_string := range jobsString {
-		e = json.Unmarshal([]byte(j_string), &j)
-		if e != nil {
+		err = json.Unmarshal([]byte(j_string), &j)
+		if err != nil {
 			jobs = nil
-			Log.Println("Failed to unmarshal Redis results (getJobsByTable). Error: ", e)
-			return jobs, false
+			Log.Println("Failed to unmarshal Redis results (getAllJobs). Error: ", err)
+			return jobs, err
 		}
 
 		jobs = append(jobs, j)
 	}
 
-	return jobs, true
+	return jobs, nil
+}
+
+func getAllActiveJobs() ([]job.LiveJob, error) {
+	var jobs []job.LiveJob
+	jobsString, err := redis.HGetAll(redis_client.REDIS_KEY_ALLJOBS)
+	if err != nil {
+		Log.Println("Failed to get all jobs. Error: ", err)
+		return jobs, err
+	}
+
+	var j job.LiveJob
+	for _, j_string := range jobsString {
+		err = json.Unmarshal([]byte(j_string), &j)
+		if err != nil {
+			jobs = nil
+			Log.Println("Failed to unmarshal Redis results (getAllActiveJobs). Error: ", err)
+			return jobs, err
+		}
+
+		if j.State == job.JOB_STATE_RUNNING || j.State == job.JOB_STATE_STREAMING {
+			jobs = append(jobs, j)
+		}
+	}
+
+	return jobs, nil
 }
 
 var isLiveFeeding = false
@@ -414,16 +439,27 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         		w.Header().Set("Content-Type", FileContentType)
         		w.WriteHeader(http.StatusOK)
 
-				jobs, ok := getJobsByTable(redis_client.REDIS_KEY_ALLJOBS)
-				if ok {
+				jobs, err := getAllJobs()
+				if err == nil {
 					json.NewEncoder(w).Encode(jobs)
 					return
 				} else {
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 					return
 				}
-			} else if UrlLastPart == "active" { // TODO: Get active jobs only.
-				
+			} else if UrlLastPart == "active" {
+				FileContentType := "application/json"
+        		w.Header().Set("Content-Type", FileContentType)
+        		w.WriteHeader(http.StatusOK)
+
+				jobs, err := getAllActiveJobs()
+				if err == nil {
+					json.NewEncoder(w).Encode(jobs)
+					return
+				} else {
+					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
+					return
+				}
 			} else { // Get one job: /jobs/[job_id]
 				jid := UrlLastPart
 				j, ok := getJobById(jid) 

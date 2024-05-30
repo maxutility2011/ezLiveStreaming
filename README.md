@@ -1,8 +1,8 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec (e.g., h.264, h.265, av1 for video, aac for audio) she wants to use, what resolutions/bitrate/frame rate to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. ezLiveStreaming includes a simple transcoding UI only for demo purposes. In practice, you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. ezLiveStreaming uses **FFmpeg** for live video transcoding and uses **Shaka packager** for packaging and DRM protection. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec, resolutions, bitrate and frame rate, etc. to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. A simple transcoding UI for demo purposes is also provided. However, in practice you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. 
 
-If you have any questions regarding this project, please contact Bo Zhang by email: maxutility2011@gmail.com.
+If you have any questions regarding this project, please email to: maxutility2011@gmail.com.
 
 ## What can ezLiveStreaming do?
 
@@ -45,6 +45,12 @@ The API server exposes API endpoints to users for submitting and managing their 
 
 The live stream data flow on a live worker server is shown in the above diagram. To run a live channel, the worker launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends a live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs *N* number of output MPEG-TS streams, where *N* is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. The worker runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to the viewers via CDN.
 
+# How to integrate ezLiveStreaming
+
+While the provided UI is only for demo purposes and can only serve a single live job, you can build your own Web catalog system to create and manage all the jobs using ezLiveStreaming's Web APIs. The detail of the APIs are specified in the following sections of this document.
+
+Since all the job states are kept in Redis and are ready to be served via ezLiveStreaming's Web API, all you need to do is to implement a Web catalog system for creating and managing your live jobs. For example, your catalog system may provide a page for creating a new job and a landing page for listing all the current jobs. If users click on a specific job from the landing page, they are directed to a per-job page that shows the detail of that job or they can also stop, reconfigure then resume the job. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
+
 # Quickstart
 
 All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you will see terms like *live job*, *live channel* and *live stream* which are used interchangeably. 
@@ -62,7 +68,7 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 ## Step 1: Launch the servers
 Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
 
-## Step 2: Download the ezLiveStreaming source
+## Step 2: Get ezLiveStreaming source
 On both management and worker servers, check out the source code from github.
 ```
 git clone https://github.com/maxutility2011/ezLiveStreaming.git
@@ -231,6 +237,8 @@ to view the worker log. Remember to replace the random string in the log file na
 ## Step 12: Playback
 The live channel playback URL can be found in the botton-right corner of the demo UI, e.g., "https://bzhang-test-bucket-public.s3.amazonaws.com/output_4f115985-f9be-4fea-9d0c-0421115715a1/master.m3u8".
 In the demo UI, I integrated Shaka player to play the live channel. After you started live OBS broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI, you will see playback starts. The 10 seconds wait time is for the transcoder to start up (initialize, generate the first 2-3 media segments then upload to S3 bucket). You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. If you stream with av1 video codec, I recommend using hls.js demo player (https://hlsjs.video-dev.org/demo) to play the streams. Shaka player also worked for av1, but I also had issues with some of its nightly builds. You must also check whether your browser supports av1 decoding. The latest version of Chrome supports AV1. If you are having issues with AV1, please feel free to contact me. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
+
+## Trouble-shooting
 
 If you see the playback starts but has frequent player rebuffering, they could be caused by the following reasons,
 1. The Internet connection isn't good on the machine running OBS. The live RTMP contribution stream does not have a good amount of bandwidth to be delivered.
@@ -559,3 +567,8 @@ This table stores all the DRM keys. <br>
 # Limitation
 ## AV1
 The current implementation uses libsvtav1 for live AV1 transcoding. In order to transcode at real-time speed, the encoder preset has to be set to 12. Further evaluation has to be done to assess the impact on video quality.
+
+## About the demo UI
+The simple demo UI is designed to only serve a single live job. Each time a new job is to be created, the demo UI page needs to be refreshed. The page refresh will automatically send out a *stop_job* request to api_server to clean up the old job.
+
+However, all the job states are kept in Redis and are ready to be served via ezLiveStreaming's Web API. All you need to do is to implement a Web catalog system for creating and managing your live jobs. For example, your catalog system may provide a page for creating a new job and a landing page for listing all the current jobs. If users click on a specific job from the landing page, they are directed to a per-job page that shows the detail of that job or they can also stop, reconfigure then resume the job. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
