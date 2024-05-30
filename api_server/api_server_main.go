@@ -167,8 +167,8 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 		return e, lj
 	}
 
-	j2, ok := getJobById(lj.Id) 
-	if !ok {
+	j2, err := getJobById(lj.Id) 
+	if err != nil {
 		Log.Println("Error: Failed to find job ID: ", lj.Id)
 		return e, lj
 	} 
@@ -206,21 +206,30 @@ func resumeJob(j job.LiveJob) error {
 	return err
 }
 
-func getJobById(jid string) (job.LiveJob, bool) {
+func deleteJob(j job.LiveJob) error {
+	err := redis.HDelOne(redis_client.REDIS_KEY_ALLJOBS, j.Id)
+	if err != nil {
+		Log.Println("Failed to stop job id=", j.Id, ". Error: ", err)
+	}
+
+	return err
+}
+
+func getJobById(jid string) (job.LiveJob, error) {
 	var j job.LiveJob
-	v, e := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
-	if e != nil {
-		Log.Println("Failed to find job id=", jid, ". Error: ", e)
-		return j, false
+	v, err := redis.HGet(redis_client.REDIS_KEY_ALLJOBS, jid)
+	if err != nil {
+		Log.Println("Failed to find job id=", jid, ". Error: ", err)
+		return j, err
 	}
 
-	e = json.Unmarshal([]byte(v), &j)
-	if e != nil {
-		Log.Println("Failed to unmarshal Redis result (getJobById). Error: ", e)
-		return j, false
+	err = json.Unmarshal([]byte(v), &j)
+	if err != nil {
+		Log.Println("Failed to unmarshal Redis result (getJobById). Error: ", err)
+		return j, err
 	}
 
-	return j, true
+	return j, nil
 }
 
 func getAllJobs() ([]job.LiveJob, error) {
@@ -462,8 +471,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 			} else { // Get one job: /jobs/[job_id]
 				jid := UrlLastPart
-				j, ok := getJobById(jid) 
-				if ok {
+				j, err := getJobById(jid) 
+				if err == nil {
 					FileContentType := "application/json"
         			w.Header().Set("Content-Type", FileContentType)
         			w.WriteHeader(http.StatusOK)
@@ -489,8 +498,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				jid := r.URL.Path[begin:end]
 				Log.Println(jid)
 
-				j, ok := getJobById(jid) 
-				if ok {
+				j, err := getJobById(jid) 
+				if err == nil {
 					if j.State == job.JOB_STATE_STOPPED {
 						res := "Trying to stop a already stopped job id: " + jid
 						Log.Println(res)
@@ -525,9 +534,9 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 					return
 				} else {
-					res := "Trying to stop a non-existent job id: " + jid
-					Log.Println(res)
-                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
+					res := "Cannot stop a non-existent job id = " + jid
+					Log.Printf(res)
+					http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
 					return
 				}
 			} else if strings.Contains(r.URL.Path, "resume") {
@@ -536,8 +545,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				jid := r.URL.Path[begin:end]
 				Log.Println(jid)
 
-				j, ok := getJobById(jid) 
-				if ok {
+				j, err := getJobById(jid) 
+				if err == nil {
 					if j.State == job.JOB_STATE_RUNNING || j.State == job.JOB_STATE_STREAMING {
 						res := "Trying to resume an active job id: " + jid
 						Log.Println(res)
@@ -574,9 +583,40 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					res := "Trying to resume a non-existent job id: " + jid
 					Log.Println(res)
-                    http.Error(w, "403 StatusForbidden\n  Error: " + res, http.StatusForbidden)
+                    http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
 					return
 				}
+			}
+		} else if r.Method == "DELETE" {
+			jid := UrlLastPart
+			j, err := getJobById(jid)
+			if err != nil {
+				res := "Cannot delete a non-existent job id = " + jid
+				Log.Printf(res)
+				http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
+			}
+
+			if (j.State != job.JOB_STATE_STOPPED) {
+				res := "Cannot delete a running job. Please stop the job first."
+				Log.Printf(res)
+				http.Error(w, "403 forbidden\n  Error: " + res, http.StatusForbidden)
+			}
+				
+			err = deleteJob(j) 
+			if err == nil {
+				FileContentType := "application/json"
+        		w.Header().Set("Content-Type", FileContentType)
+        		w.WriteHeader(http.StatusOK)
+
+				res := "Successfully deleted job " + jid
+				Log.Printf(res)
+        		w.Write([]byte(res))
+				return
+			} else {
+				res := "Failed to delete job " + jid + ". Error: " + err.Error()
+				Log.Printf(res)
+                http.Error(w, res, http.StatusInternalServerError)
+				return
 			}
 		}
 	} else if strings.Contains(r.URL.Path, "feed") { // Demo ONLY!!!
