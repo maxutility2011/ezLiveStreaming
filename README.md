@@ -396,7 +396,7 @@ A worker_app not only handles normal job requests, it also handles unexpected jo
 
 # DRM configuration
 
-A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parse the key materials from the response, then pass it along with the job request (including the DRM protection configuration) to the scheduler followed by the worker_app and worker_transcoder. The worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. For clear-key DRM, a key file named *key.bin* is output and uploaded to S3. As per HLS specification, for clear key DRM, key.bin is a public file which contains the decrypt key in binary format. Its S3 URI is included the *EXT-X-KEY* tag in the variant playlist. The player can download the key file to access the decrypt key. Note that clear-key DRM is ONLY for testing and debugging purposes. A full DRM workflow is needed to keep you content secure.
+A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parses the key materials from the response, then passes it to scheduler/worker_app/worker_transcoder along with the job request (including the DRM protection configuration). Worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. For clear-key DRM, a key file named *key.bin* is output and uploaded to S3. As per HLS specification, for clear key DRM, key.bin is a public file which contains the decrypt key in binary format. The S3 URI to *key.bin* is signaled by the *EXT-X-KEY* tag in the variant playlist. The player downloads the key file to obtain the key in order to decrypt the stream. However, clear-key DRM is ONLY for testing and debugging purposes. A full DRM workflow is needed to keep you content secure.
 
 ```
 "Drm": {
@@ -407,7 +407,7 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
 ```
 Particularly we must set *disable_clear_key* to 0 in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
 
-To play the clear-key DRM-protected HLS stream, I used the Shaka player demo (https://shaka-player-demo.appspot.com/demo) and configured key_id and key . I simply added the following section to the Shaka player "extra config" section,
+To play the clear-key DRM-protected HLS stream, I used Shaka player (https://shaka-player-demo.appspot.com/demo) and configured key_id and key. The following section is added to the Shaka player "extra config" section,
 ```
 {
   "drm": {
@@ -417,14 +417,16 @@ To play the clear-key DRM-protected HLS stream, I used the Shaka player demo (ht
   }
 }
 ```
-Please replace the key_id and key with your ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, please copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
+Please replace the key_id and key with your own ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
 
 ![screenshot](diagrams/shaka_player_drm_config.png)
 
 ### How to get the DRM key_id and key
-The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
+The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! 
 
-Actually, the above DRM key configuration is not needed if you play the individual variant playlists. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
+Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
+
+Actually, the above DRM key configuration is not needed if you play the individual variant playlists instead of  the master playlist. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
 
 # S3 output configuration
 
@@ -520,29 +522,9 @@ then start the key server by running
 ./ezKey_server -config=config.json
 ```
 
-You can write your own docker compose file and/or scripts to automate the deployment of your api_server cluster, the job scheduler cluster, the worker cluster and Redis cluster. I'm also working on providing a sample docker compose file.
-
-You need to configure AWS access to allow the api_server and job scheduler to access AWS SQS - the job queue. Specifically, you need to configure the following environment variables,
-```
-export AWS_ACCESS_KEY_ID=[your_aws_access_key]
-export AWS_SECRET_ACCESS_KEY=[your_aws_secret_key]
-export AWS_DEFAULT_REGION=[your_default_aws_region] (optional)
-```
-
-Please remember to create your own SQS queue first, and put the queue name in the api_server and scheduler config file.
-
-Additionally, depending on where you install your worker_transcoder, ffmpeg and Shaka packager executables, you need to specify the path to the executable by configure the following environment variables,
-```
-export PATH=[path_to_your_worker_transcoder_binary]:$PATH
-export PATH=[path_to_your_ffmpeg_binary]:$PATH
-export PATH=[path_to_your_shaka_packager_binary]:$PATH
-```
-
-You may also configure path to api_server and job scheduler.
-
 # List of Redis data structures 
 ## "jobs": 
-All live jobs - see REDIS_KEY_ALLJOBS in redis_client/redis_client.go. <br>
+All live jobs. <br>
 **Data structure**: hash table <br>
 **key**: job id <br>
 **value**: "type LiveJob struct" in job/job.go <br>
@@ -550,12 +532,12 @@ All live jobs - see REDIS_KEY_ALLJOBS in redis_client/redis_client.go. <br>
 To view all jobs in redis-cli, run "hgetall jobs". <br>
 
 ## "queued_jobs": 
-Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled - see REDIS_KEY_ALLJOBS in redis_client/redis_client.go. <br>
+Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled. <br>
 **Data structure**: list <br>
 **value**: string of "type LiveJob struct" (job/job.go) <br>
 
 ## "workers":
-The set of live workers currently being managed by the job scheduler - see REDIS_KEY_ALLWORKERS in redis_client/redis_client.go. <br>
+The set of live workers currently being managed by the job scheduler. <br>
 **Data structure**: hash table <br>
 **key**: worker id <br>
 **value**: string of "type LiveWorker struct" (models/worker.go) <br>
@@ -563,13 +545,13 @@ The set of live workers currently being managed by the job scheduler - see REDIS
 To view all workers in redis-cli, run "hgetall workers". 
 
 ## "worker_loads": 
-The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load - see REDIS_KEY_WORKER_LOADS in redis_client/redis_client.go. <br>
+The current load of a worker: list of jobs running on the worker and its CPU and bandwidth load. <br>
 **Data structure**: hash table <br>
 **key**: worker id <br>
 **value**: "type LiveWorker struct" in models/worker.go <br>
 
 ## "drm_keys":
-This table stores all the DRM keys: see REDIS_KEY_DRM_KEYS in redis_client/redis_client.go. <br>
+This table stores all the DRM keys. <br>
 **Data structure**: hash table <br>
 **key**: DRM key id <br>
 **value**: "type KeyInfo struct" in models/drm.go <br>
