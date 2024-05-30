@@ -57,7 +57,7 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 
 ## Prerequisites:
 
-- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I'm using a two server setup. 
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 22.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I'm using a two server setup. 
 
 - You need to install docker, docker-compose, git and aws-cli. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
 
@@ -106,7 +106,7 @@ In [scheduler/config.json](scheduler/config.json), put your own job queue name i
 
 No change is needed in *drm_key_server/config.json*.
 
-In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). You can leave other configuration options as is.
+In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). You can leave other configuration options as is.
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 
@@ -137,7 +137,9 @@ docker compose build worker --no-cache
 The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
-## Step 8: Start the services
+On fresh installation, you probably need to start docker as a service after installing it, e.g., *sudo service start docker*. And on some OSes, you may need to change the permission of */var/run/docker.sock*, e.g., *sudo chmod 666 /var/run/docker.sock*.
+
+## Step 8: Start ezLiveStreaming services
 On the management server, start **api_server** and **scheduler**.
 ```
 docker compose up api_server
