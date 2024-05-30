@@ -314,8 +314,11 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
     }
 }
 ```
-**Response code** on success: 201 created <br>
-**Response body**: on success, the server returns the original request body, plus the created job ID, timestamps and job state. <br>
+**Response code** <br>
+- on success: 201 created <br>
+- on bad request: 400 bad request <br>
+- on failure: 500 internal server error <br>
+**Response body**: On success, the server returns the original request body, plus the created job ID, timestamps and job state. Otherwise, the result. <br>
 
 ## Job validation
 The api_server will validate the specification of new jobs. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response ("Job_validation_warnings").
@@ -356,14 +359,19 @@ The api_server will validate the specification of new jobs. A new job request wi
 Show all the jobs including currently running jobs and already finished jobs. <br>
 **GET /jobs** <br>
 **Request body**: None <br>
-**Response code** on success: 200 OK <br>
+**Response code** <br>
+- on success: 200 OK <br>
+- on failure: 500 internal server error <br>
 **Response body**: A JSON array that lists all the jobs. <br>
 
 ## Get one job
 List a single job given by its ID. <br>
 **GET /jobs/[job_id]** <br>
 **Request body**: None <br>
-**Response code** on success: 200 OK <br>
+**Response code** <br>
+- on success: 200 OK <br>
+- on failure: 500 internal server error <br>
+- on invalid job id: 404 not found <br>
 **Response body**: the requested job <br>
 
 ![screenshot](diagrams/get_job.png)
@@ -373,8 +381,12 @@ Stop a job given by its ID. Upon request, the associated worker_transcoder insta
 
 **PUT /jobs/[job_id]** <br>
 **Request body**: None <br>
-**Response code** on success: 202 Accepted <br>
-**Response body**: None <br>
+**Response code** <br>
+- on success: 202 Accepted <br>
+- on failure: 500 internal server error <br>
+- on invalid job id: 404 not found <br>
+- stopping a stopped job: 403 forbidden <br>
+**Response body**: result <br>
 
 ![screenshot](diagrams/stop_job.png)
 
@@ -383,10 +395,29 @@ Resume a job given by its ID. Upon request, the stopped job will be resumed. A n
 
 **PUT /jobs/[job_id]** <br>
 **Request body**: None <br>
-**Response code** on success: 202 Accepted <br>
-**Response body**: None <br>
+**Response code** <br>
+- on success: 202 Accepted <br>
+- on failure: 500 internal server error <br>
+- on invalid job id: 404 not found <br>
+- resuming a running job: 403 forbidden <br>
+**Response body**: result <br>
 
 ![screenshot](diagrams/resume_job.png)
+
+## Delete a job
+
+Delete a job given by its ID. A job must be stopped first before it can be deleted. <br>
+
+**DELETE /jobs/[job_id]** <br>
+**Request body**: None <br>
+**Response code** <br>
+- on success: 200 OK <br>
+- on failure: 500 internal server error <br>
+- on invalid job id: 404 not found <br>
+- deleting a running job: 403 forbidden <br>
+**Response body**: result <br>
+
+![screenshot](diagrams/delete_job.png)
 
 This repository also provides a postman collection including all the external and internal API provided by the API server, the job scheduler and worker_app.
 

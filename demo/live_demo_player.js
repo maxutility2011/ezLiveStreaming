@@ -4,6 +4,7 @@ var create_button;
 var stop_button;
 var resume_button;
 var show_button;
+var play_button;
 var livefeed_button;
 var stoplivefeed_button;
 var response_code;
@@ -99,16 +100,25 @@ window.addEventListener("DOMContentLoaded", (event) => {
     });
     
     stop_button = document.getElementById('stop');
+    stop_button.disabled = true
     stop_button.addEventListener('click', (event) => {
         stopJob();
     });
     
     resume_button = document.getElementById('resume');
+    resume_button.disabled = true
     resume_button.addEventListener('click', (event) => {
         resumeJob();
     });
 
+    delete_button = document.getElementById('delete');
+    delete_button.disabled = true
+    delete_button.addEventListener('click', (event) => {
+        deleteJob();
+    });
+
     show_button = document.getElementById('show');
+    show_button.disabled = true
     show_button.addEventListener('click', (event) => {
         showJob();
     });
@@ -125,8 +135,8 @@ window.addEventListener("DOMContentLoaded", (event) => {
     });
 	*/
 
-    show_button = document.getElementById('play');
-    show_button.addEventListener('click', (event) => {
+    play_button = document.getElementById('play');
+    play_button.addEventListener('click', (event) => {
         playVideo();
     });
 
@@ -242,11 +252,9 @@ function showJob() {
             job_essentials.innerHTML = JSON.stringify(je, null, 2)
             response_code.innerHTML = "status code=" + show_job_req.status
             response_body.innerHTML = JSON.stringify(j, null, 2)
-
-            //startLiveFeedTimer()
-            //window.alert(job_resp);
           } else {
-            console.log("Show live job failed. Status code:" + show_job_req.status);
+            let job_resp = this.response;
+            window.alert(job_resp);
           }
         }
     }
@@ -269,12 +277,14 @@ function createJob() {
             response_code.innerHTML = "status code=" + create_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
             create_button.disabled = true;
+            stop_button.disabled = false;
+            resume_button.disabled = false;
+            show_button.disabled = false;
 
             startShowJobTimer();
-            //window.alert(job_resp);
           } else {
             let job_resp = this.response;
-            response_body.innerHTML = "Create new live job failed. Status code:" + create_job_req.status + "\nError: " + job_resp;
+            window.alert(job_resp);
           }
         }
     }
@@ -315,12 +325,12 @@ function stopJob() {
     stop_job_req.onload = function (e) {
         if (stop_job_req.readyState === stop_job_req.DONE) {
           if (stop_job_req.status === 202) {
-            let job_resp = this.response;
             response_code.innerHTML = "status code=" + stop_job_req.status
+            delete_button.disabled = false;
             //response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
-            //window.alert(job_resp);
           } else {
-            console.log("stop new live job failed. Status code:" + stop_job_req.status);
+            let job_resp = this.response;
+            window.alert(job_resp);
           }
         }
     }
@@ -339,15 +349,36 @@ function resumeJob() {
     resume_job_req.onload = function (e) {
         if (resume_job_req.readyState === resume_job_req.DONE) {
           if (resume_job_req.status === 202) {
-            let job_resp = this.response;
             response_code.innerHTML = "status code=" + resume_job_req.status
-            //response_body.innerHTML = JSON.stringify(JSON.parse(job_resp), null, 2)
             startShowJobTimer()
           } else {
-            console.log("stop new live job failed. Status code:" + resume_job_req.status);
+            let job_resp = this.response;
+            window.alert(job_resp);
           }
         }
     }
     
     resume_job_req.send();
+}
+
+function deleteJob() {
+  let delete_job_url = api_server_url + "jobs/";
+  delete_job_url += job_id
+
+  let delete_job_req = new XMLHttpRequest();
+  delete_job_req.open("DELETE", delete_job_url, true);
+
+  delete_job_req.onload = function (e) {
+      if (delete_job_req.readyState === delete_job_req.DONE) {
+        if (delete_job_req.status === 202) {
+          response_code.innerHTML = "status code=" + delete_job_req.status
+          startShowJobTimer()
+        } else {
+          let job_resp = this.response;
+          window.alert(job_resp);
+        }
+      }
+  }
+  
+  delete_job_req.send();
 }
