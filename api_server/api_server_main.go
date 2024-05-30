@@ -594,12 +594,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				res := "Cannot delete a non-existent job id = " + jid
 				Log.Printf(res)
 				http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
+				return
 			}
 
 			if (j.State != job.JOB_STATE_STOPPED) {
 				res := "Cannot delete a running job. Please stop the job first."
 				Log.Printf(res)
 				http.Error(w, "403 forbidden\n  Error: " + res, http.StatusForbidden)
+				return
 			}
 				
 			err = deleteJob(j) 
