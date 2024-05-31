@@ -44,6 +44,7 @@ const sqs_poll_interval_multiplier = 2 // Poll SQS job queue every other time wh
 const check_worker_heartbeat_interval_multiplier = 25 
 const max_missing_heartbeats_before_suspension = 3
 const max_missing_heartbeats_before_removal = 10
+const ingest_bandwidth_threshold_kbps = 10 // If ingest bandwidth is lower than this, the live job is considered "inactive".
 
 var sqs_receiver job_sqs.SqsReceiver
 var redis redis_client.RedisClient
@@ -869,7 +870,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Handle stopped jobs reported by a worker
+		// Handle stopped jobs report
 		// 1. Set job state to STOPPED
 		// 2. Update worker load
 		for _, jid := range report.StoppedJobs {
@@ -878,7 +879,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				j.State = job.JOB_STATE_STOPPED
 				createUpdateJob(j)
 			} else {
-				Log.Println("Failed to get job id = ", jid, " when handling new job status request from worker id=", report.WorkerId)
+				Log.Println("Failed to get job id = ", jid, " when handling new job status from worker id=", report.WorkerId)
 			}
 
 			e := updateWorkerLoad(report.WorkerId, jid)
@@ -886,6 +887,30 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				Log.Println("Successfully deleted stopped job id = ", j, " and updated load of worker id = ", report.WorkerId)
 			} else {
 				Log.Println("Failed to delete stopped job id = ", j, " or failed to update load of worker id = ", report.WorkerId, " Error: ", e)
+			}
+		}
+
+		// Handle job stats report
+		for _, j_stats := range report.JobStatsReport {
+			j, ok := getJobById(j_stats.Id)
+			if ok {
+				if j_stats.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps { // Job is actively ingesting
+					j.State = job.JOB_STATE_STREAMING
+				} else { // Job is waiting for input
+					j.State = job.JOB_STATE_RUNNING
+				}
+
+				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
+				j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report) * j.Ingress_bandwidth_kbps
+				j.Total_up_time += (time.Now().UnixMilli() - j.Time_last_worker_report)
+				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps {
+					j.Total_active_time += (time.Now().UnixMilli() - j.Time_last_worker_report)
+				}
+
+				j.Time_last_worker_report = time.Now().UnixMilli()
+				createUpdateJob(j)
+			} else {
+				Log.Println("Failed to get job id = ", j_stats.Id, " when handling new job stats from worker id=", report.WorkerId)
 			}
 		}
 

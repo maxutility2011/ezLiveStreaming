@@ -252,7 +252,7 @@ var rtmp_port_base = 1935 // TODO: Make this configurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var available_rtmp_ports *list.List
 var scheduler_heartbeat_interval = "1s" 
-var job_status_check_interval = "2s"
+var job_status_check_interval = "2s" // not less than 1s
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
@@ -441,8 +441,41 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
-func checkIngestActiveness() {
-	
+func getJobStats(j job.LiveJob) models.LiveJobStats {
+	var stats models.LiveJobStats
+	stats.Id = j.Id
+
+	// Use iftop to monitor per-port (per-job) ingress bandwidth
+	iftopCmd := exec.Command("sh", "start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
+	out, err := iftopCmd.CombinedOutput()
+	var bandwidth int64
+	bandwidth = 0
+	if err != nil {
+       	fmt.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s", j.Id, err, string(out))
+    } else {
+		iftop_output := string(out)
+		bandwidth_unit := iftop_output[len(iftop_output) - 3 : len(iftop_output) - 1]
+		bandwidth_value := iftop_output[: len(iftop_output) - 3]
+
+		bandwidth, err := strconv.ParseFloat(bandwidth_value, 64)
+		if err != nil {
+			fmt.Printf("Invalid bandwidth reading: %s (unit: %s)", bandwidth_value, bandwidth_unit)
+			bandwidth = 0
+		}
+
+		if bandwidth_unit == "Mb" {
+			bandwidth *= 1000
+		}
+	}
+
+	stats.Ingress_bandwidth_kbps = bandwidth
+	/*stats.total_bytes_ingested += job_status_check_interval * bandwidth
+	stats.total_up_time += job_status_check_interval
+	if stats.ingress_bandwidth_kbps > 0 {
+		stats.total_active_time += job_status_check_interval
+	}*/
+
+	return stats
 }
 
 func checkJobStatus() {
@@ -495,6 +528,13 @@ func checkJobStatus() {
 		j = RunningJob(prev_e.Value.(RunningJob))
 		job_report.StoppedJobs = append(job_report.StoppedJobs, j.Job.Id)
 		running_jobs.Remove(prev_e)
+	}
+
+	// Let's collect stats for the active jobs (after removing all the stopped jobs).
+	for e := running_jobs.Front(); e != nil; e = e.Next() {
+		j = RunningJob(e.Value.(RunningJob))
+		stats := getJobStats(j.Job)
+		job_report.JobStatsReport = append(job_report.JobStatsReport, stats)
 	}
 
 	reportJobStatus(job_report)

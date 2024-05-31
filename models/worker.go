@@ -2,7 +2,6 @@ package models
 
 import (
 	"time"
-	//"ezliveStreaming/job"
 )
 
 const WORKER_STATE_IDLE = "idle"
@@ -41,6 +40,14 @@ type WorkerInfo struct {
 type WorkerJobReport struct {
 	WorkerId string
 	StoppedJobs []string
+	JobStatsReport []LiveJobStats
+}
+
+// Id: job ID
+// ingress_bandwidth_kbps: instantaneous ingress (ingest) bandwidth. By default, "iftop" reads bandwidth every 10s.
+type LiveJobStats struct {
+	Id string
+	Ingress_bandwidth_kbps int64
 }
 
 type JobLoad struct {

@@ -2,12 +2,14 @@ FROM maxutility2011/ezlivestreaming_baseimage:v5.1
 
 USER streamer
 
+RUN sudo apt install iftop -y
+
 RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/src \
     && mkdir /home/streamer/conf \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src/ \
-    && git clone -b main https://github.com/maxutility2011/ezLiveStreaming.git 
+    && git clone -b stats https://github.com/maxutility2011/ezLiveStreaming.git 
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
     && /usr/local/go/bin/go build worker_app.go \
@@ -17,7 +19,8 @@ RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
 RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && /usr/local/go/bin/go build worker_transcoder.go \
     && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/worker_transcoder /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/packager /home/streamer/bins/
+    && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/packager /home/streamer/bins/ \
+    && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_iftop.sh /home/streamer/bins/
 
 ENV PATH="${PATH}:/home/streamer/bins"
 
