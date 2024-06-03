@@ -260,7 +260,7 @@ var job_scheduler_url string
 // TODO: Need to move "jobs" to Redis or find a way to recover jobs when worker_app crashes
 // TODO: Need to constantly monitor job health. Need to re-assign a job to a new worker
 //       when the existing worker crashes.
-var jobs = make(map[string]job.LiveJob) // Live jobs assigned to this worker
+var jobs = make(map[string]job.LiveJob) // Live jobs that have been assigned to this worker since the worker started (including past jobs and running jobs)
 var running_jobs *list.List // Live jobs actively running on this worker
 var my_worker_id string
 var my_public_ip string
@@ -442,7 +442,7 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
-func getJobStats(j job.LiveJob) models.LiveJobStats {
+func collectJobStats(j job.LiveJob) models.LiveJobStats {
 	var stats models.LiveJobStats
 	stats.Id = j.Id
 
@@ -468,7 +468,7 @@ func getJobStats(j job.LiveJob) models.LiveJobStats {
 			bandwidth *= 1000
 		}
 
-		Log.Println("!!!Ingress bandwidth: ", bandwidth)
+		Log.Println("Ingress bandwidth: ", bandwidth)
 	}
 
 	stats.Ingress_bandwidth_kbps = bandwidth
@@ -531,10 +531,24 @@ func checkJobStatus() {
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
-			j.Stats = getJobStats(j.Job)
+			stats := collectJobStats(j.Job)
+			lj, ok := getJobById(j.Job.Id) 
+			if !ok {
+				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
+			} else {
+				lj.Ingress_bandwidth_kbps = stats.Ingress_bandwidth_kbps // cache the bandwidth reading
+			}
 		}()
 
-		job_report.JobStatsReport = append(job_report.JobStatsReport, j.Stats)
+		var stats models.LiveJobStats
+		lj, ok := getJobById(j.Job.Id) 
+		if !ok {
+			Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
+		} else {
+			stats.Ingress_bandwidth_kbps = lj.Ingress_bandwidth_kbps // get the cached bandwidth reading from the last stats collection
+		}
+
+		job_report.JobStatsReport = append(job_report.JobStatsReport, stats)
 	}
 
 	reportJobStatus(job_report)
