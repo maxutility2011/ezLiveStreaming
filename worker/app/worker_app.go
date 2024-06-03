@@ -31,6 +31,7 @@ type WorkerAppConfig struct {
 type RunningJob struct {
 	Job job.LiveJob
 	Command *exec.Cmd
+	Stats models.LiveJobStats
 }
 
 type IPIFY_RESPONSE struct {
@@ -252,7 +253,7 @@ var rtmp_port_base = 1935 // TODO: Make this configurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var available_rtmp_ports *list.List
 var scheduler_heartbeat_interval = "1s" 
-var job_status_check_interval = "5s" // not less than 1s
+var job_status_check_interval = "3s" // not less than 1s
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
@@ -529,8 +530,11 @@ func checkJobStatus() {
 	// Let's collect stats for the active jobs (after removing all the stopped jobs).
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j = RunningJob(e.Value.(RunningJob))
-		stats := getJobStats(j.Job)
-		job_report.JobStatsReport = append(job_report.JobStatsReport, stats)
+		go func() {
+			j.Stats = getJobStats(j.Job)
+		}()
+
+		job_report.JobStatsReport = append(job_report.JobStatsReport, j.Stats)
 	}
 
 	reportJobStatus(job_report)
