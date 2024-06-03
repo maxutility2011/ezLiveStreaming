@@ -902,7 +902,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
 				if j.Time_last_worker_report_ms > 0 {
-					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) * j.Ingress_bandwidth_kbps / 8000
+					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) * j.Ingress_bandwidth_kbps / 8
 				}
 					
 				j.Total_up_seconds = (time.Now().UnixMilli() - j.Time_created.UnixMilli()) / 1000
