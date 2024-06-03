@@ -258,6 +258,17 @@ ezLiveStreaming uses the default Redis port, 6379. A full list of all the Redis 
 
 ![screenshot](diagrams/playback_nodrm.png)
 
+# Life cycle of a live job
+
+The life cycle (state machine) of a live job is shown in the diagram below.
+![screenshot](diagrams/job_lifecycle.png)
+
+A live job can be in one of the 4 states at any moment: 
+- *created*: When a new job request is received and passed the job validation, a new job is created.
+- *running*: When a job is launched and running, but not ingesting (since live input is yet to be received).
+- *streaming*: When the live input is received and the live transcoder is ingesting, transcoding and outputting HLS/DASH stream.
+- *stopped*: When the live channel is stopped. 
+
 # List of API methods
 
 ## Create Job
