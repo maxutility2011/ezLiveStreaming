@@ -446,8 +446,8 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
-	var bandwidth int64
-	bandwidth = 0
+	var r int64
+	r = 0
 	if err != nil {
        	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s", j.Id, err, string(out))
     } else {
@@ -464,10 +464,12 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 		if bandwidth_unit == "Mb" {
 			bandwidth *= 1000
 		}
+
+		r = int64(bandwidth)
 	}
 
-	Log.Println("Ingress bandwidth: ", bandwidth)
-	return bandwidth
+	Log.Println("Ingress bandwidth: ", r)
+	return r
 }
 
 func checkJobStatus() {
