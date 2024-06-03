@@ -541,6 +541,7 @@ func checkJobStatus() {
 		}()
 
 		var stats models.LiveJobStats
+		stats.Id = j.Job.Id
 		lj, ok := getJobById(j.Job.Id) 
 		if !ok {
 			Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
