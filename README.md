@@ -265,7 +265,7 @@ The life cycle (state machine) of a live job is shown in the diagram below.
 
 A live job can be in one of the 4 states at any moment: 
 - *created*: When a new job request is received and passed the job validation, a new job is created.
-- *running*: When a job is launched and running, but not ingesting (since live input is yet to be received).
+- *running*: When a job is launched and running, but not ingesting (live input is yet to be received).
 - *streaming*: When the live input is received and the live transcoder is ingesting, transcoding and outputting HLS/DASH stream.
 - *stopped*: When the live channel is stopped. 
 
@@ -334,10 +334,10 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 - on failure: 500 internal server error <br>
 **Response body**: On success, the server returns the original request body, plus the created job ID, timestamps and job state. Otherwise, the result. <br>
 
+![screenshot](diagrams/create_job.png)
+
 ## Job validation
 The api_server will validate the specification of new jobs. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response ("Job_validation_warnings").
-
-![screenshot](diagrams/create_job.png)
 
 ## Transcoding parameter definitions
 
