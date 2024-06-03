@@ -445,8 +445,6 @@ func getJobStats(j job.LiveJob) models.LiveJobStats {
 	var stats models.LiveJobStats
 	stats.Id = j.Id
 
-	Log.Println("!!!getJobStats")
-
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
