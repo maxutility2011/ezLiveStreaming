@@ -377,34 +377,34 @@ List a single job given by its ID. <br>
 - on invalid job id: 404 not found <br>
 **Response body**: specified as follows <br>
 
+![screenshot](diagrams/get_job.png)
+
 ## Specification of job response
 | Field | Definition | 
 | --- | --- |
 | Id | Job ID | 
 | Spec | Job request specification | 
-| Job_validation_warnings | Warnings from the job validation. Warnings are non-critical issues that might be of concern to the user, but do not prevent the system from creating and launching the live channel | 
+| Job_validation_warnings | Warnings from job validation. Warnings are non-critical issues that might be of concern to the user, but do not prevent the system from creating and launching the live channel | 
 | StreamKey | Stream key in the RTMP ingest URL |
 | RtmpIngestPort | Port number in the RTMP ingest URL  |  
 | Playback_url | The playback URL of the live channel | 
-| Time_created | Time when the job was accepted and created in (human-readable format) | 
+| Time_created | Time when the job was accepted and created (in human-readable format) | 
 | Time_received_by_scheduler | Time when the job was received by the job scheduler (in human-readable format) | 
 | Time_received_by_worker | Time when the job was received by the assigned live worker (in human-readable format) | 
 | Assigned_worker_id | The ID of the worker to which this job is assigned | 
-| State | The job state. Valid values are: created, running (running but not ingesting, i.e., no input), streaming (ingesting and outputting, i.e., input is received and live transcoding is in progress), stopped (the live channel is stopped) | 
+| State | The job state. Valid values are: *created*, *running* (running but not ingesting, i.e., no input), *streaming* (ingesting and outputting, i.e., input is received and live transcoding is in progress), *stopped* (the live channel is stopped) | 
 | DrmEncryptionKeyInfo.Key_id | DRM key ID | 
 | DrmEncryptionKeyInfo.Content_id | DRM content ID. Same as job ID | 
 | DrmEncryptionKeyInfo.Time_created | Time when the DRM key pair is created | 
-| Time_last_worker_report_ms | **Stats** Time in millisecond when the last report about this job is received from the assigned worker | 
-| Ingress_bandwidth_kbps | **Stats** The bitrate (bandwidth) of the live input | 
-| Total_bytes_ingested | **Stats** Total bytes ingested since the job was created or last resumed | 
-| Total_up_seconds | **Stats** Total elapsed seconds since the job was created | 
-| Total_active_seconds | **Stats** Total seconds which this job has been actively ingesting/transcoding since it was created or last resumed | 
+| Time_last_worker_report_ms | (**Stats**) Time in millisecond when the last report about this job is received from the assigned worker | 
+| Ingress_bandwidth_kbps | (**Stats**) The bitrate (bandwidth) of the live input | 
+| Total_bytes_ingested | (**Stats**) Total bytes ingested since the job was created or last resumed | 
+| Total_up_seconds | (**Stats**) Total elapsed seconds since the job was created | 
+| Total_active_seconds | (**Stats**) Total seconds which this job has been actively ingesting/transcoding since it was created or last resumed | 
 
 ## Live stats
 
 ezLiveStreaming supports display of live transcoding/streaming stats. Currently, only live ingesting stats are displayed. To receive the live stats of a job, send a GET one job request to the server and the stats are included in the response. You may obtain the stats from the reponse and display them in the UI or feed them to your backend monitoring system. The list of stats are given in the above table.
-
-![screenshot](diagrams/get_job.png)
 
 ## Stop a job
 Stop a job given by its ID. Upon request, the associated worker_transcoder instance will be stopped but the job info and states will remain in Redis. When the job is resumed in the future, the job ID, stream key and all the transcoding and packaging parameters remain the same. <br>
