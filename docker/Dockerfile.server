@@ -7,7 +7,7 @@ RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/src \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src \
-    && git clone -b stats https://github.com/maxutility2011/ezLiveStreaming.git \
+    && git clone -b main https://github.com/maxutility2011/ezLiveStreaming.git \
     && sudo cp -rf /home/streamer/src/ezLiveStreaming/demo /var/www/html/
 
 RUN cd /home/streamer/src/ezLiveStreaming/api_server \
