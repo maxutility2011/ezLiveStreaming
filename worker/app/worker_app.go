@@ -464,10 +464,9 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 		if bandwidth_unit == "Mb" {
 			bandwidth *= 1000
 		}
-
-		Log.Println("Ingress bandwidth: ", bandwidth)
 	}
 
+	Log.Println("Ingress bandwidth: ", bandwidth)
 	return bandwidth
 }
 
