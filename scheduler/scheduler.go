@@ -901,16 +901,16 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
-				if j.Time_last_worker_report > 0 {
-					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report) * j.Ingress_bandwidth_kbps / 1000
+				if j.Time_last_worker_report_ms > 0 {
+					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) * j.Ingress_bandwidth_kbps / 8000
 				}
 					
-				j.Total_up_time = time.Now().UnixMilli() - j.Time_created.UnixMilli()
-				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps && j.Time_last_worker_report > 0 {
-					j.Total_active_time += (time.Now().UnixMilli() - j.Time_last_worker_report)
+				j.Total_up_seconds = (time.Now().UnixMilli() - j.Time_created.UnixMilli()) / 1000
+				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps && j.Time_last_worker_report_ms > 0 {
+					j.Total_active_seconds += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) / 1000
 				}
 
-				j.Time_last_worker_report = time.Now().UnixMilli()
+				j.Time_last_worker_report_ms = time.Now().UnixMilli()
 				createUpdateJob(j)
 			} else {
 				Log.Println("Failed to get job id = ", j_stats.Id, " when handling new job stats from worker id=", report.WorkerId)
