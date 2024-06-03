@@ -403,7 +403,7 @@ func launchJob(j job.LiveJob) error {
 }
 
 func reportJobStatus(report models.WorkerJobReport) error {
-	Log.Println("Sending job status report at time =", time.Now())
+	//Log.Println("Sending job status report at time =", time.Now())
 	job_status_url := job_scheduler_url + "/" + "jobstatus"
 
 	b, _ := json.Marshal(report)
@@ -445,13 +445,15 @@ func getJobStats(j job.LiveJob) models.LiveJobStats {
 	var stats models.LiveJobStats
 	stats.Id = j.Id
 
+	Log.Println("!!!getJobStats")
+
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
 	var bandwidth int64
 	bandwidth = 0
 	if err != nil {
-       	fmt.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s", j.Id, err, string(out))
+       	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s", j.Id, err, string(out))
     } else {
 		iftop_output := string(out)
 		bandwidth_unit := iftop_output[len(iftop_output) - 3 : len(iftop_output) - 1]
@@ -459,22 +461,18 @@ func getJobStats(j job.LiveJob) models.LiveJobStats {
 
 		bandwidth, err := strconv.ParseFloat(bandwidth_value, 64)
 		if err != nil {
-			fmt.Printf("Invalid bandwidth reading: %s (unit: %s)", bandwidth_value, bandwidth_unit)
+			Log.Printf("Invalid bandwidth reading: %s (unit: %s)", bandwidth_value, bandwidth_unit)
 			bandwidth = 0
 		}
 
 		if bandwidth_unit == "Mb" {
 			bandwidth *= 1000
 		}
+
+		Log.Println("!!!Ingress bandwidth: ", bandwidth)
 	}
 
 	stats.Ingress_bandwidth_kbps = bandwidth
-	/*stats.total_bytes_ingested += job_status_check_interval * bandwidth
-	stats.total_up_time += job_status_check_interval
-	if stats.ingress_bandwidth_kbps > 0 {
-		stats.total_active_time += job_status_check_interval
-	}*/
-
 	return stats
 }
 
