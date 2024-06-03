@@ -252,7 +252,7 @@ var rtmp_port_base = 1935 // TODO: Make this configurable
 var max_rtmp_ports = 15 // TODO: Make this configurable
 var available_rtmp_ports *list.List
 var scheduler_heartbeat_interval = "1s" 
-var job_status_check_interval = "2s" // not less than 1s
+var job_status_check_interval = "5s" // not less than 1s
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
