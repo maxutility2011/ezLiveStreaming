@@ -532,11 +532,13 @@ func checkJobStatus() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
 			stats := collectJobStats(j.Job)
+			Log.Printf("Measured bandwidth: %d\n", stats.Ingress_bandwidth_kbps)
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 			} else {
 				lj.Ingress_bandwidth_kbps = stats.Ingress_bandwidth_kbps // cache the bandwidth reading
+				createUpdateJob(lj)
 			}
 		}()
 
