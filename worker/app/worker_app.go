@@ -442,9 +442,7 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
-func collectJobStats(j job.LiveJob, stats *models.LiveJobStats) {
-	(*stats).Id = j.Id
-
+func readIngressBandwidth(j job.LiveJob) int64 {
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
@@ -470,7 +468,7 @@ func collectJobStats(j job.LiveJob, stats *models.LiveJobStats) {
 		Log.Println("Ingress bandwidth: ", bandwidth)
 	}
 
-	(*stats).Ingress_bandwidth_kbps = bandwidth
+	return bandwidth
 }
 
 func checkJobStatus() {
@@ -529,14 +527,13 @@ func checkJobStatus() {
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
-			var stats models.LiveJobStats
-			collectJobStats(j.Job, &stats)
-			Log.Printf("Measured bandwidth: %d\n", stats.Ingress_bandwidth_kbps)
+			bw := readIngressBandwidth(j.Job)
+			Log.Printf("Measured bandwidth: %d\n", bw)
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 			} else {
-				lj.Ingress_bandwidth_kbps = stats.Ingress_bandwidth_kbps // cache the bandwidth reading
+				lj.Ingress_bandwidth_kbps = bw // cache the bandwidth reading
 				createUpdateJob(lj)
 			}
 		}()
