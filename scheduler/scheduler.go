@@ -892,8 +892,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 		// Handle job stats report
 		for _, j_stats := range report.JobStatsReport {
-			fmt.Printf("Stats of jod Id = %s:\n", j_stats.Id)
-			fmt.Printf("  - Ingress_bandwidth_kbps: %d, ingest_bandwidth_threshold_kbps: %d\n", j_stats.Ingress_bandwidth_kbps, ingest_bandwidth_threshold_kbps)
 			j, ok := getJobById(j_stats.Id)
 			if ok {
 				if j_stats.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps { // Job is actively ingesting
@@ -903,9 +901,12 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
-				j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report) * j.Ingress_bandwidth_kbps
-				j.Total_up_time += (time.Now().UnixMilli() - j.Time_last_worker_report)
-				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps {
+				if j.Time_last_worker_report > 0 {
+					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report) * j.Ingress_bandwidth_kbps / 1000
+				}
+					
+				j.Total_up_time = time.Now().UnixMilli() - j.Time_created.UnixMilli()
+				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps && j.Time_last_worker_report > 0 {
 					j.Total_active_time += (time.Now().UnixMilli() - j.Time_last_worker_report)
 				}
 

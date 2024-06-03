@@ -529,7 +529,6 @@ func checkJobStatus() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
 			bw := readIngressBandwidth(j.Job)
-			Log.Printf("Measured bandwidth: %d\n", bw)
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
