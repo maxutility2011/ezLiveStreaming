@@ -48,6 +48,7 @@ type WorkerJobReport struct {
 type LiveJobStats struct {
 	Id string
 	Ingress_bandwidth_kbps int64
+	Transcoding_cpu_utilization string
 }
 
 type JobLoad struct {

@@ -82,6 +82,7 @@ type LiveJob struct {
 	// Job stats:
 	Time_last_worker_report_ms int64 
 	Ingress_bandwidth_kbps int64 // reported by worker
+	Transcoding_cpu_utilization string // reported by worker
 	Total_bytes_ingested int64 // total bytes ingested since the job was launched.
 	Total_up_seconds int64 // elapsed time since the job was launched/resumed.
 	Total_active_seconds int64 // elapsed time since the job becomes active (ingesting).

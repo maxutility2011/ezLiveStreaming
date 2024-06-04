@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"regexp"
 	"os/signal"
 	"syscall"
 	"time"
@@ -443,17 +444,35 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
-func readCpuUtil(j job.LiveJob) int64 {
+func readCpuUtil(j RunningJob) string {
 	procs, err := ps.Processes()
 	if err != nil {
 		Log.Println("Failed to get all the processes (go-ps)", err)
 	}
 
+	var r string
 	for _, proc := range procs {
-		Log.Printf("Executable: %s, Parent process id: %d\n", proc.Executable(), proc.PPid())
+		Log.Printf("Executable: %s, parent process_id: %d, worker_transcoder_pid: %s\n", proc.Executable(), proc.PPid(), j.Command.Process.Pid)
+		if proc.Executable() == "ffmpeg" && proc.PPid() == j.Command.Process.Pid {
+			cpuReaderCmd := exec.Command("sh", "/home/streamer/bins/start_cpuutil_reader.sh", strconv.Itoa(proc.Pid()))
+			out, err := cpuReaderCmd.CombinedOutput()
+			if err != nil {
+				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s", j.Job.Id, err, string(out))
+		 	} else {
+			 	ps_output := string(out)
+				re := regexp.MustCompile("[0-9].") // CPU util is a float, so match all the digits and "."
+				r = strings.Join(re.FindAllString(ps_output, -1), "")
+			}
+		}
 	}
 
-	return 0
+	if r == "" {
+		Log.Printf("Failed to read cpu util for job id = %s\n", j.Job.Id)
+	} else {
+		Log.Printf("Transcoder cpu util for job id = %s equals: %s\n", j.Job.Id, r)
+	}
+
+	return r
 }
 
 func readIngressBandwidth(j job.LiveJob) int64 {
@@ -543,12 +562,13 @@ func checkJobStatus() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
 			bw := readIngressBandwidth(j.Job)
-			readCpuUtil(j.Job)
+			cpu := readCpuUtil(j)
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 			} else {
 				lj.Ingress_bandwidth_kbps = bw // cache the bandwidth reading
+				lj.Transcoding_cpu_utilization = cpu // cache the cpu_util reading
 				createUpdateJob(lj)
 			}
 		}()
@@ -560,6 +580,7 @@ func checkJobStatus() {
 			Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 		} else {
 			stats.Ingress_bandwidth_kbps = lj.Ingress_bandwidth_kbps // get the cached bandwidth reading from the last stats collection
+			stats.Transcoding_cpu_utilization = lj.Transcoding_cpu_utilization // get the cached cpu_util reading from the last stats collection
 		}
 
 		job_report.JobStatsReport = append(job_report.JobStatsReport, stats)
