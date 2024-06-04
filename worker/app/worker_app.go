@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"container/list"
+	"github.com/mitchellh/go-ps"
 	"ezliveStreaming/models"
 	"ezliveStreaming/job"
 )
@@ -442,6 +443,20 @@ func reportJobStatus(report models.WorkerJobReport) error {
 	return nil
 }
 
+func readCpuUtil(j job.LiveJob) int64 {
+	procs, err := ps.Processes()
+	if err != nil {
+		Log.Println("Failed to get all the processes (go-ps)", err)
+	}
+
+	for _, proc := range procs {
+		//fmt.Println(proc.Executable())
+		Log.Println(proc.Executable())
+	}
+
+	return 0
+}
+
 func readIngressBandwidth(j job.LiveJob) int64 {
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
@@ -524,11 +539,12 @@ func checkJobStatus() {
 		running_jobs.Remove(prev_e)
 	}
 
-	// Let's collect stats for the active jobs (after removing all the stopped jobs).
+	// Now let's collect stats for the active jobs (after removing all the stopped jobs).
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
 			bw := readIngressBandwidth(j.Job)
+			readCpuUtil(j.Job)
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)

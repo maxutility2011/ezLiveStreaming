@@ -54,22 +54,24 @@ While the provided UI is only developed for demo purposes and can only serve a s
 
 # Quickstart
 
-This section shows how to set up a basic ezLiveStreaming system that consists of one instance of api_server, job scheduler, ezKey_server and a single instance of live transcoding worker. However, for any type of microservices, you can always scale up the cluster manually or via the autoscaling services provided by your cloud platforms. For example, you can run as many api_server instances behind a web API load balancer such as Nginx. You can also add as many live workers to the worker cluster to accommodate more live streams.  
+This section shows how to set up a basic ezLiveStreaming system that consists of one instance of api_server, job scheduler, ezKey_server and a single instance of live transcoding worker. However, for any type of microservices, you can always scale up the cluster manually or via the autoscaling services provided by your cloud platforms. For example, you can run as many api_server instances behind a web API load balancer such as Nginx. You can also add as many live workers to the worker cluster to accommodate more live streams. The new workers will automatically connect to the job scheduler right after they are launched.  
 
 All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you will see terms like *live job*, *live channel* and *live stream* which are used interchangeably. 
 
 ## Prerequisites:
 
-- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 22.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I'm using a two server setup. 
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. 
 
-- You need to install docker, docker-compose, git and aws-cli. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
+- You need to install **docker**, **docker-compose**, **git** and **aws-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker.
 
 - You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on any machine with camera.
 
-- You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
+- You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You also need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
+
+The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 24.04. Within the base image, ffmpeg 6.1.1 is pre-installed. 
 
 ## Step 1: Launch the servers
-Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 22.04. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
+Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
 
 ## Step 2: Get ezLiveStreaming source
 On both management and worker servers, check out the source code from github.
@@ -353,7 +355,7 @@ The api_server will validate the specification of new jobs. A new job request wi
 | Time_shift_buffer_depth | integer | DASH time_shift_buffer_depth in second (applicable to HLS too), i.e., DVR window size | [0 - 14400] |
 | Drm | json | DRM configuration | n/a |
 | Disable_clear_key | boolean | whether clear key DRM is disabled | 0/1 |
-| Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine"m "PlayReady") |
+| Protection_system | string | DRM protection system | "FairPlay" (other systems to be added, e.g., "Widewine",  "PlayReady") |
 | Protection_scheme | string | DRM protection (encryption) scheme | "cbcs", "cenc" |
 | S3_output | json | S3 output configuration | n/a |
 | Bucket | string | S3 bucket name | n/a |
