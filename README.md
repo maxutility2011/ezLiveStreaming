@@ -13,7 +13,7 @@ If you have any questions regarding this project, please email to Bo Zhang at ma
 - live HLS streaming with AV1 video codec,
 - clear key DRM protection, 
 - uploading transcoder outputs to AWS S3,
-- displaying live transcoding stats (currently, only live ingesting stats are displayed)
+- displaying live transcoding stats,
 - standard-compliant media transcoding and formatting which potentially work with any video players.
 
 ## Supported media codecs
@@ -29,30 +29,32 @@ Audio:
 # High-level architecture
 
 ezLiveStreaming consists of 5 microservices that can be independently scaled,
-- live API server
-- live job scheduler
-- live transcoding worker
-- a simple clear-key DRM key server called **ezKey_server**
+- **api_server**: live API server
+- **scheduler**: live job scheduler
+- **worker**: live transcoding worker
+- **ezKey_server**: a simple clear-key DRM key server 
 - Redis data store
 
-## Management workflow
+## Live stream management workflow
 ![screenshot](diagrams/architecture_diagram.png)
 
-The API server exposes API endpoints to users for submitting and managing their live streams. The API server receives job requests from users and sends them to the job scheduler via a job queue (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the job request to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server requests DRM encrypt/decrypt key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
+The API server exposes API endpoints to users for submitting live job requests and managing their live channels. The API server receives job requests from users and sends them to the job scheduler via a **job queue** (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the new job to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server obtains DRM encrypt (decrypt) key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
 ## Live stream data flow
 
 ![screenshot](diagrams/data_flow.png)
 
-The live stream data flow on a live worker server is shown in the above diagram. To run a live channel, the worker launches a ffmpeg transcoder and a Shaka packager. From left to right, the contribution encoder generates and sends a live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs *N* number of output MPEG-TS streams, where *N* is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and write to local disk. The worker runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to the viewers via CDN.
+The live stream data flow on a live worker server is shown in the above diagram. To run a live channel, the worker launches a ffmpeg transcoder and/or a Shaka packager. From left to right, the contribution encoder generates and sends a live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs *N* number of output MPEG-TS streams, where *N* is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and writes to local disk. The worker runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to the viewers via CDN.
+
+If a user specifies AV1 video codec, the worker only launches a ffmpeg instance for both transcoding and packaging. This is because Shaka packager currently does not recognize AV1 video encapsulated in MPEG-TS streams.
 
 # How to integrate ezLiveStreaming
 
-While the provided UI is only for demo purposes and can only serve a single live job, you can build your own Web catalog system to create and manage all the jobs using ezLiveStreaming's Web APIs. The detail of the APIs are specified in the following sections of this document.
+While the provided UI is only developed for demo purposes and can only serve a single live job, you can still use ezLiveStreaming's Web APIs to build your own Web catalog system to create and manage all your jobs. The detail of the APIs are specified in the following sections of this document. Your catalog system may provide one web page for creating new jobs and another page for listing all the current jobs. The new job page allows users to edit job request and submit to the server using the *create_job* API. The listing_jobs page allow users to view all the jobs using the *get_all_jobs* API. If users click on a specific job from the listing_jobs page, they are directed to a per-job page that shows the detail of that job. Users can also stop, reconfigure then resume a job from that page. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
 
-Since all the job states are kept in Redis and are ready to be served via ezLiveStreaming's Web API, all you need to do is to implement a Web catalog system for creating and managing your live jobs. For example, your catalog system may provide a page for creating a new job and a landing page for listing all the current jobs. If users click on a specific job from the landing page, they are directed to a per-job page that shows the detail of that job or they can also stop, reconfigure then resume the job. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
+# Running ezLiveStreaming
 
-# Quickstart
+This section shows how to set up a basic ezLiveStreaming system that consists of one instance of api_server, job scheduler, ezKey_server and a single instance of live transcoding worker. However, for any type of microservices, you can always scale up the cluster manually or via the autoscaling services provided by your cloud platforms. For example, you can run as many api_server instances behind a web API load balancer such as Nginx. You can also add as many live workers to the worker cluster to accommodate more live streams.  
 
 All the microservices in ezLiveStreaming run in docker and can be built, created and launched with docker-compose in a few steps as follows. Through out this document, you will see terms like *live job*, *live channel* and *live stream* which are used interchangeably. 
 
