@@ -52,7 +52,7 @@ If a user specifies AV1 video codec, the worker only launches a ffmpeg instance 
 
 While the provided UI is only developed for demo purposes and can only serve a single live job, you can still use ezLiveStreaming's Web APIs to build your own Web catalog system to create and manage all your jobs. The detail of the APIs are specified in the following sections of this document. Your catalog system may provide one web page for creating new jobs and another page for listing all the current jobs. The new job page allows users to edit job request and submit to the server using the *create_job* API. The listing_jobs page allow users to view all the jobs using the *get_all_jobs* API. If users click on a specific job from the listing_jobs page, they are directed to a per-job page that shows the detail of that job. Users can also stop, reconfigure then resume a job from that page. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
 
-# Running ezLiveStreaming
+# Quickstart
 
 This section shows how to set up a basic ezLiveStreaming system that consists of one instance of api_server, job scheduler, ezKey_server and a single instance of live transcoding worker. However, for any type of microservices, you can always scale up the cluster manually or via the autoscaling services provided by your cloud platforms. For example, you can run as many api_server instances behind a web API load balancer such as Nginx. You can also add as many live workers to the worker cluster to accommodate more live streams.  
 
