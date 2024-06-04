@@ -460,6 +460,7 @@ func readCpuUtil(j RunningJob) string {
 				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s", j.Job.Id, err, string(out))
 		 	} else {
 			 	ps_output := string(out)
+				Log.Printf("ps output: ", ps_output)
 				re := regexp.MustCompile("[0-9].") // CPU util is a float, so match all the digits and "."
 				r = strings.Join(re.FindAllString(ps_output, -1), "")
 			}
