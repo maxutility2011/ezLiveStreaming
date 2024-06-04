@@ -450,7 +450,7 @@ func readCpuUtil(j job.LiveJob) int64 {
 	}
 
 	for _, proc := range procs {
-		Log.Println(proc.PPid())
+		Log.Printf("Executable: %s, Parent process id: %d\n", proc.Executable(), proc.PPid())
 	}
 
 	return 0
