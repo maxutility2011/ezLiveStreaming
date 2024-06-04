@@ -1,8 +1,8 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding video/audio codec, resolutions, bitrate and frame rate, etc. to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. A simple transcoding UI for demo purposes is also provided. However, in practice you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding a/v codec, resolution, bitrate and frame rate, etc. to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. A simple transcoding UI for demo purposes is also provided. However, in practice you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. 
 
-If you have any questions regarding this project, please email to: maxutility2011@gmail.com.
+If you have any questions regarding this project, please email to Bo Zhang at maxutility2011@gmail.com.
 
 ## What can ezLiveStreaming do?
 
