@@ -11,6 +11,7 @@ const RTMP = "rtmp"
 const MPEGTS = "mpegts"
 const FMP4 = "fmp4"
 const udp_port_base = 10001
+const ffprobe_output_port_distance_from_base = 1000
 const HLS = "hls"
 const DASH = "dash"
 const H264_CODEC = "h264"
@@ -28,6 +29,7 @@ const DASH_MPD_FILE_NAME = "master.mpd"
 const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
 const drm_label_allmedia = "allmedia"
+const input_json_file_name = "input_info.json"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -206,8 +208,8 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	ffmpegArgs = append(ffmpegArgs, "-f")
 	ffmpegArgs = append(ffmpegArgs, MPEGTS)
 
-	ffprobe_output := "udp://127.0.0.1:" + strconv.Itoa(port_base + 1000)
-	ffmpegArgs = append(ffmpegArgs, ffprobe_output)
+	ffprobe_output_url := generateFfprobeOutputUrl(port_base)
+	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 	//ffmpegArgs = append(ffmpegArgs, "|") 
 
 	// ffprobe
@@ -229,6 +231,32 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	*/
 
     return ffmpegArgs
+}
+
+func generateFfprobeOutputUrl(port_base int) string {
+	return "udp://127.0.0.1:" + strconv.Itoa(port_base + ffprobe_output_port_distance_from_base)
+}
+
+func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
+	var ffprobeArgs []string
+	
+	ffprobeArgs = append(ffprobeArgs, "-i")
+	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
+	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
+
+	ffprobeArgs = append(ffprobeArgs, "-v")
+	ffprobeArgs = append(ffprobeArgs, "quiet")
+
+	ffprobeArgs = append(ffprobeArgs, "-print_format")
+	ffprobeArgs = append(ffprobeArgs, "json")
+
+	ffprobeArgs = append(ffprobeArgs, "-show_format")
+	ffprobeArgs = append(ffprobeArgs, "-show_streams")
+
+	ffprobeArgs = append(ffprobeArgs, ">")
+	ffprobeArgs = append(ffprobeArgs, media_output_path + input_json_file_name)
+
+	return ffprobeArgs
 }
 
 func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
