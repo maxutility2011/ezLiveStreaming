@@ -239,7 +239,19 @@ func generateFfprobeOutputUrl(port_base int) string {
 
 func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	var ffprobeArgs []string
-	
+	ffprobeArgs = append(ffprobeArgs, "start_ffprobe.sh")
+
+	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
+	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
+
+	ffprobeArgs = append(ffprobeArgs, media_output_path + input_json_file_name) 
+	return ffprobeArgs
+}
+
+/*
+func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
+	var ffprobeArgs []string
+
 	ffprobeArgs = append(ffprobeArgs, "-i")
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
@@ -258,6 +270,7 @@ func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 
 	return ffprobeArgs
 }
+*/
 
 func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
     var packagerArgs []string 

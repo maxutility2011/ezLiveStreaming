@@ -560,7 +560,7 @@ func main() {
         Log.Println("FFprobe arguments: ")
         Log.Println(job.ArgumentArrayToString(ffprobeArgs))
 
-        ffprobeCmd := exec.Command("ffprobe", ffprobeArgs...)
+        ffprobeCmd := exec.Command("sh", ffprobeArgs...)
 
 	    var errFfprobe error
         errFfprobe = nil
