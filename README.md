@@ -398,6 +398,13 @@ List a single job given by its ID. <br>
 | Field | Definition | 
 | --- | --- |
 | Id | Job ID | 
+| State | The job state. Valid values are: *created*, *running* (running but not ingesting, i.e., no input), *streaming* (ingesting and outputting, i.e., input is received and live transcoding is in progress), *stopped* (the live channel is stopped) | 
+| Time_last_worker_report_ms | (**Stats**) Time in millisecond when the last report about this job is received from the assigned worker | 
+| Ingress_bandwidth_kbps | (**Stats**) The bitrate (bandwidth) of the live input | 
+| Transcoding_cpu_utilization | (**Stats**) The CPU utilization (%) by the live transcoder of this job | 
+| Total_bytes_ingested | (**Stats**) Total bytes ingested since the job was created or last resumed | 
+| Total_up_seconds | (**Stats**) Total elapsed seconds since the job was created | 
+| Total_active_seconds | (**Stats**) Total seconds which this job has been actively ingesting/transcoding since it was created or last resumed | 
 | Spec | Job request specification | 
 | Job_validation_warnings | Warnings from job validation. Warnings are non-critical issues that might be of concern to the user, but do not prevent the system from creating and launching the live channel | 
 | StreamKey | Stream key in the RTMP ingest URL |
@@ -407,16 +414,9 @@ List a single job given by its ID. <br>
 | Time_received_by_scheduler | Time when the job was received by the job scheduler (in human-readable format) | 
 | Time_received_by_worker | Time when the job was received by the assigned live worker (in human-readable format) | 
 | Assigned_worker_id | The ID of the worker to which this job is assigned | 
-| State | The job state. Valid values are: *created*, *running* (running but not ingesting, i.e., no input), *streaming* (ingesting and outputting, i.e., input is received and live transcoding is in progress), *stopped* (the live channel is stopped) | 
 | DrmEncryptionKeyInfo.Key_id | DRM key ID | 
 | DrmEncryptionKeyInfo.Content_id | DRM content ID. Same as job ID | 
 | DrmEncryptionKeyInfo.Time_created | Time when the DRM key pair is created | 
-| Time_last_worker_report_ms | (**Stats**) Time in millisecond when the last report about this job is received from the assigned worker | 
-| Ingress_bandwidth_kbps | (**Stats**) The bitrate (bandwidth) of the live input | 
-| Transcoding_cpu_utilization | (**Stats**) The CPU utilization (%) by the live transcoder of this job | 
-| Total_bytes_ingested | (**Stats**) Total bytes ingested since the job was created or last resumed | 
-| Total_up_seconds | (**Stats**) Total elapsed seconds since the job was created | 
-| Total_active_seconds | (**Stats**) Total seconds which this job has been actively ingesting/transcoding since it was created or last resumed | 
 
 ## Live stats
 

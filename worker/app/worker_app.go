@@ -269,6 +269,8 @@ var my_public_ip string
 var last_confirmed_heartbeat_time time.Time
 var worker_app_config WorkerAppConfig
 
+const cpu_utilization_threshold = 5.0
+
 func getCpuCapacity() string {
 	return "5000"
 }
@@ -560,8 +562,24 @@ func checkJobStatus() {
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		j = RunningJob(e.Value.(RunningJob))
 		go func() {
-			bw := readIngressBandwidth(j.Job)
 			cpu := readCpuUtil(j)
+			cpu_float, err := strconv.ParseFloat(cpu, 64)
+			if err != nil {
+				Log.Printf("Invalid cpu utilization reading: %s", cpu)
+				cpu = "NaN"
+				return
+			}
+			
+			var bw int64
+			// Bandwidth reader (iftop) blocks when there is no incoming traffic (cpu util reader does not block), 
+			// so is this goroutine. So, to avoid iftop blocking, we call iftop to read bandwidth only when cpu 
+			// utilization goes above a threshold value so we know for sure that the transcoder is ingesting. 
+			if cpu_float >= cpu_utilization_threshold {
+				bw = readIngressBandwidth(j.Job)
+			} else {
+				bw = 0
+			}
+
 			lj, ok := getJobById(j.Job.Id) 
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
