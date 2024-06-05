@@ -239,7 +239,7 @@ func generateFfprobeOutputUrl(port_base int) string {
 
 func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	var ffprobeArgs []string
-	ffprobeArgs = append(ffprobeArgs, "start_ffprobe.sh")
+	ffprobeArgs = append(ffprobeArgs, "/home/streamer/bins/start_ffprobe.sh")
 
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
