@@ -413,13 +413,14 @@ List a single job given by its ID. <br>
 | DrmEncryptionKeyInfo.Time_created | Time when the DRM key pair is created | 
 | Time_last_worker_report_ms | (**Stats**) Time in millisecond when the last report about this job is received from the assigned worker | 
 | Ingress_bandwidth_kbps | (**Stats**) The bitrate (bandwidth) of the live input | 
+| Transcoding_cpu_utilization | (**Stats**) The CPU utilization (%) by the live transcoder of this job | 
 | Total_bytes_ingested | (**Stats**) Total bytes ingested since the job was created or last resumed | 
 | Total_up_seconds | (**Stats**) Total elapsed seconds since the job was created | 
 | Total_active_seconds | (**Stats**) Total seconds which this job has been actively ingesting/transcoding since it was created or last resumed | 
 
 ## Live stats
 
-ezLiveStreaming supports display of live transcoding/streaming stats. Currently, only live ingesting stats are displayed. To receive the live stats of a job, send a GET one job request to the server and the stats are included in the response. You may obtain the stats from the reponse and display them in the UI or feed them to your backend monitoring system. The list of stats are given in the above table.
+ezLiveStreaming supports display of live transcoding/streaming stats. To receive the live stats of a job, send a GET one job request to the server and the stats are included in the response. You may obtain the stats from the reponse and display them in the UI or feed them to your backend monitoring system. The list of stats are shown in the above table.
 
 ## Stop a job
 Stop a job given by its ID. Upon request, the associated worker_transcoder instance will be stopped but the job info and states will remain in Redis. When the job is resumed in the future, the job ID, stream key and all the transcoding and packaging parameters remain the same. <br>

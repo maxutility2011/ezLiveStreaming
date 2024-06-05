@@ -533,6 +533,11 @@ func getJobById(jid string) (job.LiveJob, bool) {
 	return j, true
 }
 
+func resetJobStats(j *job.LiveJob) {
+	(*j).Ingress_bandwidth_kbps = 0
+	(*j).Transcoding_cpu_utilization = ""
+}
+
 // This function ONLY set job state to "stopped". It does not stop the jobs
 func stopWorkerJobs(wid string) error {
 	w, err := redis.HGet(redis_client.REDIS_KEY_WORKER_LOADS, wid)
@@ -553,6 +558,8 @@ func stopWorkerJobs(wid string) error {
 		j, ok := getJobById(j_load.Id)
 		if ok {
 			j.State = job.JOB_STATE_STOPPED
+			resetJobStats(&j)
+			Log.Printf("bw: %d, cpu: %s%\n", j.Ingress_bandwidth_kbps, j.Transcoding_cpu_utilization)
 			createUpdateJob(j)
 			stopped_jobs_count++
 		} else {
