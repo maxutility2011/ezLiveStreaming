@@ -9,7 +9,7 @@ RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/conf \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src/ \
-    && git clone -b main https://github.com/maxutility2011/ezLiveStreaming.git 
+    && git clone -b input_info https://github.com/maxutility2011/ezLiveStreaming.git 
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
     && /usr/local/go/bin/go build worker_app.go \
