@@ -226,6 +226,7 @@ function stopLiveFeed() {
 }
 
 function showJob() {
+    showJobTimer = setTimeout(showJob, 1000);
     let show_job_url = api_server_url + "jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
