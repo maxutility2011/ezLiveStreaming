@@ -632,7 +632,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, variant_playlist_format_value)
 	}
 
-	// Pipe to ffprobe
+	// Pipe to ffprobe: It seems like the ffmpeg passthrough output has to be after the HLS/DASH media output in the command line options.
 	ffmpegArgs = append(ffmpegArgs, "-c")
 	ffmpegArgs = append(ffmpegArgs, "copy")
 	
