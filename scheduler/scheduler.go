@@ -901,6 +901,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
+				j.Transcoding_cpu_utilization = j_stats.Transcoding_cpu_utilization
 				if j.Time_last_worker_report_ms > 0 {
 					j.Total_bytes_ingested += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) * j.Ingress_bandwidth_kbps / 8
 				}

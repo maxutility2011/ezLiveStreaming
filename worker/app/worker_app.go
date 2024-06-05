@@ -452,7 +452,6 @@ func readCpuUtil(j RunningJob) string {
 
 	var r string
 	for _, proc := range procs {
-		Log.Printf("Executable: %s, parent process_id: %d, worker_transcoder_pid: %s\n", proc.Executable(), proc.PPid(), j.Command.Process.Pid)
 		if proc.Executable() == "ffmpeg" && proc.PPid() == j.Command.Process.Pid {
 			cpuReaderCmd := exec.Command("sh", "/home/streamer/bins/start_cpuutil_reader.sh", strconv.Itoa(proc.Pid()))
 			out, err := cpuReaderCmd.CombinedOutput()
@@ -460,7 +459,6 @@ func readCpuUtil(j RunningJob) string {
 				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s", j.Job.Id, err, string(out))
 		 	} else {
 			 	ps_output := string(out)
-				Log.Printf("ps output: %s\n", ps_output)
 				re := regexp.MustCompile(".[0-9]") // CPU util is a float, so we match all the digits and "."
 				r = strings.Join(re.FindAllString(ps_output, -1), "")
 			}
@@ -470,7 +468,7 @@ func readCpuUtil(j RunningJob) string {
 	if r == "" {
 		Log.Printf("Failed to read cpu util for job id = %s\n", j.Job.Id)
 	} else {
-		Log.Printf("Transcoder cpu util for job id = %s equals: %s\n", j.Job.Id, r)
+		Log.Printf("Transcoder cpu util for job id = %s equals: %s%\n", j.Job.Id, r)
 	}
 
 	return r
