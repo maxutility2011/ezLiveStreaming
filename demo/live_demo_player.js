@@ -157,7 +157,7 @@ function playVideo() {
   if (!hasAv1) {
     reloadPlayer()
   } else {
-    let msg = "The built-in player does not support AV1 codec. Please use https://hlsjs.video-dev.org/demo/ to stream.";
+    let msg = "The built-in player does not support AV1 codec. Please use https://hlsjs.video-dev.org/demo/";
     window.alert(msg);
   }
 }
