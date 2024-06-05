@@ -599,6 +599,14 @@ func main() {
         Log.Println("Errors starting ffprobe: ", errFfprobe, " ffprobe output: ", string(out))
     }
 
+    // 1. FFmpeg pipes the passed-through (original) input stream over mpegts-udp to FFprobe.
+    // 2. FFprobe analyzes the input stream and output input_info.json to the job's base media output path.
+    // 3. Worker_transcoder uploads input_info.json to S3, both frontend and backend can download and use the info.
+    // 4. FFprobe analyzes the input stream, output input_info.json then exit immediately. 
+    //    There is no need for worker_transcoder to kill it.
+    //    Also, FFprobe exits and does not cause FFmpeg to crash.
+    // 5. It takes FFprobe ~5 seconds to analyze the input stream, so be patient if you don't see input_info.json.
+
     // Create local output paths. Shaka packager may have already created the paths.
     for _, sd := range local_media_output_path_subdirs {
         sd = local_media_output_path + sd

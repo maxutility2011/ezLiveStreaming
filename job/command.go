@@ -210,27 +210,8 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 
 	ffprobe_output_url := generateFfprobeOutputUrl(port_base)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
-	//ffmpegArgs = append(ffmpegArgs, "|") 
-
-	// ffprobe
-	/*ffmpegArgs = append(ffmpegArgs, "ffprobe") 
-	ffmpegArgs = append(ffmpegArgs, "-i")
-	ffmpegArgs = append(ffmpegArgs, "-")
-
-	ffmpegArgs = append(ffmpegArgs, "-v")
-	ffmpegArgs = append(ffmpegArgs, "quiet")
-
-	ffmpegArgs = append(ffmpegArgs, "-print_format")
-	ffmpegArgs = append(ffmpegArgs, "json")
-
-	ffmpegArgs = append(ffmpegArgs, "-show_format")
-	ffmpegArgs = append(ffmpegArgs, "-show_streams")
-
-	ffmpegArgs = append(ffmpegArgs, ">")
-	ffmpegArgs = append(ffmpegArgs, "input_info.json")
-	*/
-
-    return ffmpegArgs
+	
+	return ffmpegArgs
 }
 
 func generateFfprobeOutputUrl(port_base int) string {
@@ -247,30 +228,6 @@ func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	ffprobeArgs = append(ffprobeArgs, media_output_path + input_json_file_name) 
 	return ffprobeArgs
 }
-
-/*
-func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
-	var ffprobeArgs []string
-
-	ffprobeArgs = append(ffprobeArgs, "-i")
-	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
-	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
-
-	ffprobeArgs = append(ffprobeArgs, "-v")
-	ffprobeArgs = append(ffprobeArgs, "quiet")
-
-	ffprobeArgs = append(ffprobeArgs, "-print_format")
-	ffprobeArgs = append(ffprobeArgs, "json")
-
-	ffprobeArgs = append(ffprobeArgs, "-show_format")
-	ffprobeArgs = append(ffprobeArgs, "-show_streams")
-
-	ffprobeArgs = append(ffprobeArgs, ">")
-	ffprobeArgs = append(ffprobeArgs, media_output_path + input_json_file_name)
-
-	return ffprobeArgs
-}
-*/
 
 func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
     var packagerArgs []string 
@@ -582,6 +539,16 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		}
 	} 	
 
+	// Pipe to ffprobe
+	ffmpegArgs = append(ffmpegArgs, "-c")
+	ffmpegArgs = append(ffmpegArgs, "copy")
+
+	ffmpegArgs = append(ffmpegArgs, "-f")
+	ffmpegArgs = append(ffmpegArgs, MPEGTS)
+
+	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
+	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
+	
 	if j.Output.Stream_type == DASH {
 		// Streaming params (HLS, DASH, DRM, etc.)
 		ffmpegArgs = append(ffmpegArgs, "-seg_duration")
