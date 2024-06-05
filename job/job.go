@@ -65,6 +65,15 @@ const JOB_STATE_STOPPED = "stopped" // Stopped
 
 type LiveJob struct {
 	Id string
+	State string
+	// Job stats:
+	Time_last_worker_report_ms int64 
+	Ingress_bandwidth_kbps int64 // reported by worker
+	Transcoding_cpu_utilization string // reported by worker
+	Total_bytes_ingested int64 // total bytes ingested since the job was launched.
+	Total_up_seconds int64 // elapsed time since the job was launched/resumed.
+	Total_active_seconds int64 // elapsed time since the job becomes active (ingesting).
+	// End job stats
 	Spec LiveJobSpec
 	Job_validation_warnings string
 	StreamKey string
@@ -75,15 +84,7 @@ type LiveJob struct {
 	Time_received_by_scheduler time.Time
 	Time_received_by_worker time.Time
 	Assigned_worker_id string
-	State string
 	DrmEncryptionKeyInfo models.KeyInfo
 	Stop bool // A flag indicating the job is to be stopped
 	Delete bool // A flag indicating the job is to be deleted
-	// Job stats:
-	Time_last_worker_report_ms int64 
-	Ingress_bandwidth_kbps int64 // reported by worker
-	Transcoding_cpu_utilization string // reported by worker
-	Total_bytes_ingested int64 // total bytes ingested since the job was launched.
-	Total_up_seconds int64 // elapsed time since the job was launched/resumed.
-	Total_active_seconds int64 // elapsed time since the job becomes active (ingesting).
 }
