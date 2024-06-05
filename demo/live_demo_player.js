@@ -235,23 +235,31 @@ function showJob() {
         if (show_job_req.readyState === show_job_req.DONE) {
           if (show_job_req.status === 200) {
             let job_resp = show_job_req.response;
-            let j = JSON.parse(job_resp)
+            let j = JSON.parse(job_resp);
             job_id = j.Id;
 
             playback_url = j.Playback_url;
             ingest_url = j.RtmpIngestUrl;
             drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
             drm_key = j.DrmEncryptionKeyInfo.Key;
+            warnings = j.Job_validation_warnings;
+            jstate = j.State;
+            bw = j.Ingress_bandwidth_kbps;
+            cpu = j.Transcoding_cpu_utilization;
 
-            let je = {}
-            je.playback_url = playback_url
-            je.rtmp_ingest_url = ingest_url
-            je.drm_key_id = drm_key_id
-            je.drm_key = drm_key            
+            let je = {};
+            je.playback_url = playback_url;
+            je.rtmp_ingest_url = ingest_url;
+            je.drm_key_id = drm_key_id;
+            je.drm_key = drm_key;
+            je.job_state = jstate;
+            je.validation_warnings = warnings;
+            je.ingress_bandwidth_kbps = bw; 
+            je.transcoding_cpu_utilization = cpu;    
 
-            job_essentials.innerHTML = JSON.stringify(je, null, 2)
-            response_code.innerHTML = "status code=" + show_job_req.status
-            response_body.innerHTML = JSON.stringify(j, null, 2)
+            job_essentials.innerHTML = JSON.stringify(je, null, 2);
+            response_code.innerHTML = "status code=" + show_job_req.status;
+            response_body.innerHTML = JSON.stringify(j, null, 2);
           } else {
             let job_resp = this.response;
             window.alert(job_resp);
