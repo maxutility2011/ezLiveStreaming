@@ -153,11 +153,17 @@ window.addEventListener("DOMContentLoaded", (event) => {
 });
     
 function playVideo() {
+  if (!hasAv1) {
     reloadPlayer()
+  } else {
+    let msg = "The built-in player does not support AV1 codec. Please use https://hlsjs.video-dev.org/demo/";
+    window.alert(msg);
+  }
 }
 
 var showJobTimer = null;
 var playbackTimer = null;
+var hasAv1 = false;
 
 function startShowJobTimer() {
     showJobTimer = setTimeout(showJob, 1000);
@@ -309,6 +315,12 @@ function createJob() {
         }
     } else {
         j = JSON.parse(sample_live_job)
+        j.Output.Video_outputs.forEach((o) => {
+          if (o.Codec == "av1") {
+            hasAv1 = true;
+          }
+        })
+
         job_body = JSON.stringify(j)
         job_request.innerHTML = JSON.stringify(j, null, 2)
     }
