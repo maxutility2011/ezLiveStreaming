@@ -538,16 +538,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			ffmpegArgs = append(ffmpegArgs, ao.Bitrate)
 		}
 	} 	
-
-	// Pipe to ffprobe
-	ffmpegArgs = append(ffmpegArgs, "-c")
-	ffmpegArgs = append(ffmpegArgs, "copy")
-
-	ffmpegArgs = append(ffmpegArgs, "-f")
-	ffmpegArgs = append(ffmpegArgs, MPEGTS)
-
-	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
-	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 	
 	if j.Output.Stream_type == DASH {
 		// Streaming params (HLS, DASH, DRM, etc.)
@@ -641,6 +631,16 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		variant_playlist_format_value := "stream_%v/playlist.m3u8"
 		ffmpegArgs = append(ffmpegArgs, variant_playlist_format_value)
 	}
+
+	// Pipe to ffprobe
+	ffmpegArgs = append(ffmpegArgs, "-c")
+	ffmpegArgs = append(ffmpegArgs, "copy")
+	
+	ffmpegArgs = append(ffmpegArgs, "-f")
+	ffmpegArgs = append(ffmpegArgs, MPEGTS)
+	
+	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
+	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
     return ffmpegArgs, local_media_output_path_subdirs
 }
