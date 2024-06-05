@@ -152,18 +152,18 @@ window.addEventListener("DOMContentLoaded", (event) => {
     video = document.getElementById('video');
 });
     
+var hasAv1 = false;
 function playVideo() {
   if (!hasAv1) {
     reloadPlayer()
   } else {
-    let msg = "The built-in player does not support AV1 codec. Please use https://hlsjs.video-dev.org/demo/";
+    let msg = "The built-in player does not support AV1 codec. Please use https://hlsjs.video-dev.org/demo/ to stream.";
     window.alert(msg);
   }
 }
 
 var showJobTimer = null;
 var playbackTimer = null;
-var hasAv1 = false;
 
 function startShowJobTimer() {
     showJobTimer = setTimeout(showJob, 1000);
@@ -232,7 +232,7 @@ function stopLiveFeed() {
 }
 
 function showJob() {
-    showJobTimer = setTimeout(showJob, 1000);
+    showJobTimer = setTimeout(showJob, 5000);
     let show_job_url = api_server_url + "jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
@@ -308,7 +308,12 @@ function createJob() {
     if (job_request.value != "") {
         job_body = job_request.value;
         try {
-            JSON.parse(job_body)
+            j = JSON.parse(job_body)
+            j.Output.Video_outputs.forEach((o) => {
+              if (o.Codec == "av1") {
+                hasAv1 = true;
+              }
+            })
         } catch (e) {
             window.alert("Invalid JSON")
             return
