@@ -199,6 +199,32 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:" + strconv.Itoa(port_base + i + 1 + k))
 	}
 
+	// Pipe to ffprobe
+	ffmpegArgs = append(ffmpegArgs, "-c")
+	ffmpegArgs = append(ffmpegArgs, "copy")
+
+	ffmpegArgs = append(ffmpegArgs, "-f")
+	ffmpegArgs = append(ffmpegArgs, MPEGTS)
+	ffmpegArgs = append(ffmpegArgs, "-")
+	ffmpegArgs = append(ffmpegArgs, "|") 
+
+	// ffprobe
+	ffmpegArgs = append(ffmpegArgs, "ffprobe") 
+	ffmpegArgs = append(ffmpegArgs, "-i")
+	ffmpegArgs = append(ffmpegArgs, "-")
+
+	ffmpegArgs = append(ffmpegArgs, "-v")
+	ffmpegArgs = append(ffmpegArgs, "quiet")
+
+	ffmpegArgs = append(ffmpegArgs, "-print_format")
+	ffmpegArgs = append(ffmpegArgs, "json")
+
+	ffmpegArgs = append(ffmpegArgs, "-show_format")
+	ffmpegArgs = append(ffmpegArgs, "-show_streams")
+
+	ffmpegArgs = append(ffmpegArgs, ">")
+	ffmpegArgs = append(ffmpegArgs, "input_info.json")
+
     return ffmpegArgs
 }
 
