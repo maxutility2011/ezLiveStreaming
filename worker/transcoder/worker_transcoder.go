@@ -554,30 +554,6 @@ func main() {
             Log.Println("Errors starting ffmpeg: ", errEncoder, " ffmpeg output: ", string(out))
             //os.Exit(1)
         }
-
-        // Start ffprobe to receive passed-through input stream from ffmpeg and extract input info
-        ffprobeArgs := job.GenerateFfprobeArgs(j, local_media_output_path)
-        Log.Println("FFprobe arguments: ")
-        Log.Println(job.ArgumentArrayToString(ffprobeArgs))
-
-        ffprobeCmd := exec.Command("sh", ffprobeArgs...)
-
-	    var errFfprobe error
-        errFfprobe = nil
-	    go func() {
-		    out, errFfprobe = ffprobeCmd.CombinedOutput() // This line blocks when ffprobeCmd launch succeeds
-		    if errFfprobe != nil {
-        	    Log.Println("Errors starting ffprobe: ", errFfprobe, " ffprobe output: ", string(out))
-                //os.Exit(1)
-		    }
-	    }()
-
-        // Wait 100ms before ffprobe fully starts
-        time.Sleep(100 * time.Millisecond)
-        if (errFfprobe != nil) {
-            Log.Println("Errors starting ffprobe: ", errFfprobe, " ffprobe output: ", string(out))
-            //os.Exit(1)
-        }
     } else { // Start ffmpeg-alone
         ffmpegArgs, local_media_output_path_subdirs = job.JobSpecToEncoderArgs(j, local_media_output_path)
         Log.Println("FFmpeg-alone arguments: ")
@@ -599,6 +575,28 @@ func main() {
             Log.Println("Errors starting ffmpeg-alone: ", errEncoder, " ffmpeg-alone output: ", string(out))
             //os.Exit(1)
         }
+    }
+
+    // Start ffprobe to receive passed-through input stream from ffmpeg and extract input stream info
+    ffprobeArgs := job.GenerateFfprobeArgs(j, local_media_output_path)
+    Log.Println("FFprobe arguments: ")
+    Log.Println(job.ArgumentArrayToString(ffprobeArgs))
+    
+    ffprobeCmd := exec.Command("sh", ffprobeArgs...)
+    
+    var errFfprobe error
+    errFfprobe = nil
+    go func() {
+        out, errFfprobe = ffprobeCmd.CombinedOutput() // This line blocks when ffprobeCmd launch succeeds
+        if errFfprobe != nil {
+            Log.Println("Errors starting ffprobe: ", errFfprobe, " ffprobe output: ", string(out))
+        }
+    }()
+    
+    // Wait 100ms before ffprobe fully starts
+    time.Sleep(100 * time.Millisecond)
+    if (errFfprobe != nil) {
+        Log.Println("Errors starting ffprobe: ", errFfprobe, " ffprobe output: ", string(out))
     }
 
     // Create local output paths. Shaka packager may have already created the paths.
