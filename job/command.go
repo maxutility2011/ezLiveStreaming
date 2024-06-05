@@ -206,7 +206,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	ffmpegArgs = append(ffmpegArgs, "-f")
 	ffmpegArgs = append(ffmpegArgs, MPEGTS)
 
-	ffprobe_output := append(ffmpegArgs, "udp://127.0.0.1:" + strconv.Itoa(port_base + 1000))
+	ffprobe_output := "udp://127.0.0.1:" + strconv.Itoa(port_base + 1000)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output)
 	//ffmpegArgs = append(ffmpegArgs, "|") 
 
