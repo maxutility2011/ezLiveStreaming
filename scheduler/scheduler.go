@@ -369,6 +369,8 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		Log.Println("Job id=", j2.Id, " is successfully launched on worker id = ", wid, " at time = ", j2.Time_received_by_worker)
 	} else if j.Stop { // The assigned worker confirmed the success of job stop, there is nothing scheduler needs to do at this moment. Worker load will be updated upon the next worker report when the worker_transcoder process (of this job) is terminated.
 		j.State = job.JOB_STATE_STOPPED
+		resetJobStats(&j)
+		Log.Printf("bw: %d, cpu: %s%\n", j.Ingress_bandwidth_kbps, j.Transcoding_cpu_utilization)
 		j.Assigned_worker_id = "" // A different worker will be assigned when the job is resumed later on
 		j.RtmpIngestUrl = "" // RtmpIngestUrl will change when the job is resumed and a new worker is assigned 
 		j.Stop = false // Reset the flag
@@ -884,6 +886,8 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			j, ok := getJobById(jid)
 			if ok {
 				j.State = job.JOB_STATE_STOPPED
+				resetJobStats(&j)
+				Log.Printf("bw: %d, cpu: %s%\n", j.Ingress_bandwidth_kbps, j.Transcoding_cpu_utilization)
 				createUpdateJob(j)
 			} else {
 				Log.Println("Failed to get job id = ", jid, " when handling new job status from worker id=", report.WorkerId)
