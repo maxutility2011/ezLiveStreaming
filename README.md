@@ -419,6 +419,8 @@ List a single job given by its ID. <br>
 | DrmEncryptionKeyInfo.Content_id | DRM content ID. Same as job ID | 
 | DrmEncryptionKeyInfo.Time_created | Time when the DRM key pair is created | 
 
+The demo UI will periodically send GET one job request to refresh the job state and stats. The response body will be shown in the bottom-left corner and also some variable information will be highlighted in the bottom-right corner, such as current job state, job stats, input_info_url, etc. Your own Web catalog system would have periodically refresh those variable information. For example, the job state changes from "running" to "streaming" after you start to push live input feed. The job stats such as ingress bandwidth usage and cpu usage change over time as well. Those are information that you have to constantly monitor.
+
 ## Live stats
 
 ezLiveStreaming supports display of live transcoding/streaming stats. To receive the live stats of a job, send a GET one job request to the server and the stats are included in the response. You may obtain the stats from the reponse and display them in the UI or feed them to your backend monitoring system. The list of stats are shown in the above table.
