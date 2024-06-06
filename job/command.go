@@ -29,7 +29,7 @@ const DASH_MPD_FILE_NAME = "master.mpd"
 const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
 const drm_label_allmedia = "allmedia"
-const input_json_file_name = "input_info.json"
+const Input_json_file_name = "input_info.json"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -225,7 +225,7 @@ func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
 
-	ffprobeArgs = append(ffprobeArgs, media_output_path + input_json_file_name) 
+	ffprobeArgs = append(ffprobeArgs, media_output_path + Input_json_file_name) 
 	return ffprobeArgs
 }
 

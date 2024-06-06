@@ -36,6 +36,7 @@ var local_media_output_path string
 
 const transcoder_status_check_interval = "2s"
 const stream_file_upload_interval = "0.1s"
+const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
@@ -163,6 +164,36 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
     */
 
     return err
+}
+
+func set_upload_input_info_timer(local_media_output_path string, remote_media_output_path string) {
+    d3, _ := time.ParseDuration(upload_input_info_file_wait_time)
+    uploadInputInfoFileTimer := time.NewTimer(d3)
+    <-uploadInputInfoFileTimer.C
+    uploadInputInfoFile(local_media_output_path, remote_media_output_path)
+}
+
+func uploadInputInfoFile(local_media_output_path string, remote_media_output_path string) error {
+    f, err := os.Stat(local_media_output_path + job.Input_json_file_name)
+    if err != nil {
+        Log.Printf("File %s not found\n", local_media_output_path + job.Input_json_file_name)
+        set_upload_input_info_timer(local_media_output_path, remote_media_output_path)
+        return err
+    }
+
+    if f.Size() == 0 {
+        Log.Printf("Empty file %s\n", local_media_output_path + job.Input_json_file_name)
+        set_upload_input_info_timer(local_media_output_path, remote_media_output_path)
+        return errors.New("do_not_upload_empty_file")
+    }
+
+    err = s3.Upload(local_media_output_path + job.Input_json_file_name, job.Input_json_file_name, remote_media_output_path)
+    if err != nil {
+        Log.Printf("Failed to upload %s to %s", local_media_output_path + job.Input_json_file_name, remote_media_output_path)
+        return err
+    }
+
+    return nil
 }
 
 // Scan upload_list in fifo order and upload qualified stream files to cloud storage
@@ -706,6 +737,8 @@ func main() {
 			}
 		}
 	}(ticker)
+
+    set_upload_input_info_timer(local_media_output_path, remote_media_output_path_base)
 
     <-quit
 }
