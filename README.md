@@ -214,7 +214,7 @@ streamer     156  0.0  0.4   5016  4140 pts/0    S    11:17   0:00 -bash
 streamer     165  0.0  0.4   8332  4156 pts/0    R+   11:17   0:00 ps aux
 
 ```
-If the new channel is up and running, you should see 4 worker processes running: 
+If the new channel is up and running, you should see the following worker processes running: 
 - worker_app: long-living daemon process for worker and live job management
 - worker_transcoder: a one per job process for coordinating live media ingesting, transcoding, packaging and stream file upload
 - packager (Shaka packager): the live media packager
