@@ -38,7 +38,7 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 ## Live stream management workflow
 ![screenshot](diagrams/architecture_diagram.png)
 
-The API server exposes API endpoints to users for submitting live job requests and managing their live channels. The API server receives job requests from users and sends them to the job scheduler via a **job queue** (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the new job to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server obtains DRM encrypt (decrypt) key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
+The API server exposes API endpoints to users for submitting 呢哇live job requests and managing their live channels. The API server receives job requests from users and sends them to the job scheduler via a **job queue** (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the new job to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server obtains DRM encrypt (decrypt) key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
 ## Live stream data flow
 
@@ -74,7 +74,7 @@ The microservices of ezLiveStreaming runs on a base docker image built out of Ub
 Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
 
 ## Step 2: Get ezLiveStreaming source
-On both management and worker servers, check out the source code from github.
+On both management and worker servers, get the source code from github.
 ```
 git clone https://github.com/maxutility2011/ezLiveStreaming.git
 ```
@@ -111,7 +111,7 @@ In [scheduler/config.json](scheduler/config.json), put your own job queue name i
 
 No change is needed in *drm_key_server/config.json*.
 
-In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). You can leave other configuration options as is.
+In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. *SchedulerUrl* allows the worker to find the job scheduler. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). If you have a cluster of job scheduler running behind a load balancer, you can put the URL of the load balance in *SchedulerUrl*. You can leave other configuration options as is. 
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 
@@ -168,9 +168,9 @@ The demo UI provides a list of job request templates. Please choose one and the 
 - hls live without drm 
 - hls live with av1 codec
 
-After the job request is loaded in the editor, put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. If you want to enable clear-key DRM, you can copy-paste the content of [sample_live_job.json](sample_live_job.json) to create a protected live channel. Detail about DRM setup will be explained later.
+After the job request is loaded in the editor, put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. 
 
-![screenshot](diagrams/demo_step2.png)
+![screenshot](diagrams/demo_create_job.png)
 
 On the backend, ezLiveStreaming will create a new worker for your new channel. On the worker server, verify the worker container is running,
 ```
@@ -208,10 +208,13 @@ streamer      61  0.0  0.4   5016  4204 pts/0    S    07:39   0:00 -bash
 streamer      68  0.0  0.4   8332  4140 pts/0    R+   07:39   0:00 ps aux
 ```
 If the new channel is up and running, you should see 4 worker processes running: 
-- worker_app
-- worker_transcoder
-- packager (Shaka packager)
-- ffmpeg
+- worker_app: long-living daemon process for worker and live job management
+- worker_transcoder: a one per job process for coordinating live media ingesting, transcoding, packaging and stream file upload
+- packager (Shaka packager): the live media packager
+- ffmpeg: the live media transcoder
+- start_iftop.sh: monitoring ingress bandwidth usage
+- start_cpuutil_reader.sh: monitoring cpu usage by ffmpeg transcoder
+- ffprobe: analyzing the live input stream and generating input info file
 
 The ffmpeg process is ready to receive your live RTMP input stream.
 ![screenshot](diagrams/verify_new_channel.png)
