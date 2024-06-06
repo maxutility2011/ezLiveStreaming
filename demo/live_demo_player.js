@@ -253,6 +253,7 @@ function showJob() {
             jstate = j.State;
             bw = j.Ingress_bandwidth_kbps;
             cpu = j.Transcoding_cpu_utilization;
+            input_info = j.Input_info_url;
 
             let je = {};
             je.playback_url = playback_url;
@@ -262,7 +263,8 @@ function showJob() {
             je.job_state = jstate;
             je.validation_warnings = warnings;
             je.ingress_bandwidth_kbps = bw; 
-            je.transcoding_cpu_utilization = cpu;    
+            je.transcoding_cpu_utilization = cpu;  
+            je.input_info = input_info;
 
             job_essentials.innerHTML = JSON.stringify(je, null, 2);
             response_code.innerHTML = "status code=" + show_job_req.status;
