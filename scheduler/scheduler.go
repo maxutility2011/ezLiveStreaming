@@ -911,6 +911,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					j.State = job.JOB_STATE_RUNNING
 				}
 
+				j.Input_info_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + j.Id + "/" + job.Input_json_file_name
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
 				j.Transcoding_cpu_utilization = j_stats.Transcoding_cpu_utilization
 				if j.Time_last_worker_report_ms > 0 {
