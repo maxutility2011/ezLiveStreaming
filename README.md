@@ -195,24 +195,31 @@ ps aux
 ```
 Expect output as follows,
 ```
-streamer@1abfdfe0f6fe:~$ ps aux
+streamer@fb722f15c8f2:~$ ps aux
 USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-streamer       1  0.0  0.1   2800  1080 ?        Ss   07:25   0:00 /bin/sh -c /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_a
-streamer       7  0.1  2.7 1231516 26376 ?       Sl   07:25   0:00 /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.j
-streamer      31  0.0  1.1 1237864 10856 ?       Sl   07:29   0:00 worker_transcoder -job_id=4f115985-f9be-4fea-9d0c-0421115715a1 -param={"Input"
-streamer      35  0.0 10.5 1091680 102280 ?      Sl   07:29   0:00 packager in=udp://127.0.0.1:10001,stream=video,init_segment=/tmp/output_4f1159
-streamer      42  0.0  4.4 275364 43424 ?        SL   07:29   0:00 ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1936/live/5ae4760f-49a0-41a9-979d-00
-streamer      49  0.3  0.4   4588  3964 pts/0    Ss   07:39   0:00 /bin/bash
-root          60  0.0  0.3   6744  3740 pts/0    S    07:39   0:00 su - streamer
-streamer      61  0.0  0.4   5016  4204 pts/0    S    07:39   0:00 -bash
-streamer      68  0.0  0.4   8332  4140 pts/0    R+   07:39   0:00 ps aux
+streamer       1  0.0  0.0   2800    92 ?        Ss   11:14   0:00 /bin/sh -c /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_a
+streamer       7  0.1  1.2 1231556 12348 ?       Sl   11:14   0:00 /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.j
+streamer      12  0.1  0.8 1237900 8644 ?        Sl   11:14   0:00 worker_transcoder -job_id=db848937-2eab-43ce-86fe-76b70178f527 -param={"Input"
+streamer      18  0.0 10.4 1091680 102024 ?      Sl   11:14   0:00 packager in=udp://127.0.0.1:10001,stream=video,init_segment=/tmp/output_db8489
+streamer      22  0.0  4.2 275364 40928 ?        SL   11:14   0:00 ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1935/live/567ce9c4-7011-448b-84ff-4a
+streamer      27  0.0  0.0   2800    92 ?        S    11:14   0:00 sh /home/streamer/bins/start_ffprobe.sh udp://127.0.0.1:11001 /tmp/output_db84
+streamer      28  0.1  4.2 290944 40860 ?        SLl  11:14   0:00 ffprobe -i udp://127.0.0.1:11001 -v quiet -print_format json -show_format -sho
+streamer      36  0.0  0.0   2800   164 ?        S    11:14   0:00 sh /home/streamer/bins/start_iftop.sh 1935
+root          37  0.0  0.5  13708  5428 ?        S    11:14   0:00 sudo iftop -t -s 1 -f port 1935
+streamer      38  0.0  0.0   4096   556 ?        S    11:14   0:00 awk /send and receive/ {print $6}
+root          40  0.0  0.5 173300  5684 ?        Sl   11:14   0:00 iftop -t -s 1 -f port 1935
+streamer     142  0.5  0.4   4588  3932 pts/0    Ss   11:17   0:00 /bin/bash
+root         155  0.0  0.3   6748  3820 pts/0    S    11:17   0:00 su - streamer
+streamer     156  0.0  0.4   5016  4140 pts/0    S    11:17   0:00 -bash
+streamer     165  0.0  0.4   8332  4156 pts/0    R+   11:17   0:00 ps aux
+
 ```
 If the new channel is up and running, you should see 4 worker processes running: 
 - worker_app: long-living daemon process for worker and live job management
 - worker_transcoder: a one per job process for coordinating live media ingesting, transcoding, packaging and stream file upload
 - packager (Shaka packager): the live media packager
 - ffmpeg: the live media transcoder
-- start_iftop.sh: monitoring ingress bandwidth usage
+- start_iftop.sh (iftop and awk): monitoring ingress bandwidth usage
 - start_cpuutil_reader.sh: monitoring cpu usage by ffmpeg transcoder
 - ffprobe: analyzing the live input stream and generating input info file
 
