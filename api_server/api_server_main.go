@@ -125,8 +125,6 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 		//lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 	}
 
-	lj.Input_info_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + job.Input_json_file_name
-	
 	//j.IngestUrls = make([]string)
 	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
 	//j.IngestUrls = append(j.IngestUrls, RtmpIngestUrl)

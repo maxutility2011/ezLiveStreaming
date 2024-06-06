@@ -911,7 +911,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					j.State = job.JOB_STATE_RUNNING
 				}
 
-				j.Input_info_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + j.Id + "/" + job.Input_json_file_name
 				j.Ingress_bandwidth_kbps = j_stats.Ingress_bandwidth_kbps
 				j.Transcoding_cpu_utilization = j_stats.Transcoding_cpu_utilization
 				if j.Time_last_worker_report_ms > 0 {
@@ -921,6 +920,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				j.Total_up_seconds = (time.Now().UnixMilli() - j.Time_created.UnixMilli()) / 1000
 				if j.Ingress_bandwidth_kbps > ingest_bandwidth_threshold_kbps && j.Time_last_worker_report_ms > 0 {
 					j.Total_active_seconds += (time.Now().UnixMilli() - j.Time_last_worker_report_ms) / 1000
+					j.Input_info_url = "https://" + j.Spec.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + j.Id + "/" + job.Input_json_file_name
 				}
 
 				j.Time_last_worker_report_ms = time.Now().UnixMilli()
