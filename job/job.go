@@ -74,11 +74,12 @@ type LiveJob struct {
 	Total_up_seconds int64 // elapsed time since the job was launched/resumed.
 	Total_active_seconds int64 // elapsed time since the job becomes active (ingesting).
 	// End job stats
+	Playback_url string
+	RtmpIngestPort int
+	Input_info_url string
 	Spec LiveJobSpec
 	Job_validation_warnings string
 	StreamKey string
-	Playback_url string
-	RtmpIngestPort int
 	RtmpIngestUrl string
 	Time_created time.Time
 	Time_received_by_scheduler time.Time
