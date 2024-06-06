@@ -147,10 +147,18 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
         return err
     }
 
+    f, errStat := os.Stat(local_media_output_path + models.DrmKeyInfoFileName)
+    if errStat != nil {
+        Log.Printf("File %s not found\n", local_media_output_path + models.DrmKeyInfoFileName)
+        return errStat
+    }
+
     // Next, upload the local key file and key info file to cloud storage
     err = s3.Upload(local_media_output_path + models.DrmKeyFileName, models.DrmKeyFileName, remote_media_output_path)
     if err != nil {
         Log.Printf("Failed to upload %s to %s", local_media_output_path + models.DrmKeyFileName, remote_media_output_path)
+    } else {
+        Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_media_output_path + job.Input_json_file_name)
     }
 
     // Key info file contains key_id and key in plain text. 
@@ -191,6 +199,8 @@ func uploadInputInfoFile(local_media_output_path string, remote_media_output_pat
     if err != nil {
         Log.Printf("Failed to upload %s to %s", local_media_output_path + job.Input_json_file_name, remote_media_output_path)
         return err
+    } else {
+        Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_media_output_path + job.Input_json_file_name)
     }
 
     return nil
