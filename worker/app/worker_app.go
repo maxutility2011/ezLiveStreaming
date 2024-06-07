@@ -488,7 +488,7 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	if err != nil {
        	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", j.Id, err, string(out))
     } else {
-		bandwidth := 0
+		var bandwidth float64
 		iftop_output := string(out)
 		if iftop_output == "0b" { // TODO: iftop return "0b" when the measured bandwidth is zero. This is subject to change if iftop is updated.
 			Log.Printf("Unable to read bandwidth. Iftop output: %s\n", iftop_output)
@@ -497,7 +497,7 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 			bandwidth_unit := iftop_output[len(iftop_output) - 3 : len(iftop_output) - 1]
 			bandwidth_value := iftop_output[: len(iftop_output) - 3]
 
-			bandwidth, err := strconv.ParseFloat(bandwidth_value, 64)
+			bandwidth, err = strconv.ParseFloat(bandwidth_value, 64)
 			if err != nil {
 				Log.Printf("Invalid bandwidth reading: %s (unit: %s)\n", bandwidth_value, bandwidth_unit)
 				bandwidth = 0
