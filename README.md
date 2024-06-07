@@ -1,6 +1,6 @@
 # ezLiveStreaming
 
-ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding a/v codec, resolution, bitrate and frame rate, etc. to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. A simple transcoding UI for demo purposes is also provided. However, in practice you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. 
+ezLiveStreaming is a highly scalable and efficient live transcoding system written in Go. ezLiveStreaming provides friendly and industry-standard API for users to create and manage their live streams via web requests. A user can create a new live stream by submitting a *create_stream* request to the API server and specify how she wants the live stream to be transcoded and streamed, for example, what transcoding a/v codec, resolution, bitrate and frame rate, etc. to use for transcoding video streams, and what protocols (Apple-HLS or MPEG-DASH) to use for streaming to the viewers. ezLiveStreaming outputs and uploads stream media segments and manifests/playlists to cloud origin servers such as AWS S3. The microservices in ezLiveStreaming are all containerized and clustered, and are built to be stateless so you can easily add or remove server instances when workload changes. A simple transcoding UI for demo purposes is also provided. However, in practice you may prefer to integrate ezLiveStreaming into your own systems through its live transcoding API. 
 
 If you have any questions regarding this project, please email to Bo Zhang at maxutility2011@gmail.com.
 
@@ -346,12 +346,12 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 - on success: 201 created <br>
 - on bad request: 400 bad request <br>
 - on failure: 500 internal server error <br>
-**Response body**: On success, the server returns the original request body, plus the created job ID, timestamps and job state. Otherwise, the result. <br>
+**Response body**: On success, the server returns the original request body, plus the created job ID, timestamps and job state/stats. Otherwise, the error message on why the request was rejected. <br>
 
 ![screenshot](diagrams/create_job.png)
 
 ## Job validation
-The api_server will validate the specification of new jobs. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response ("Job_validation_warnings").
+The api_server will validate the specification of each new job. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response ("Job_validation_warnings").
 
 ## Transcoding parameter definitions
 
@@ -429,7 +429,7 @@ List a single job given by its ID. <br>
 | DrmEncryptionKeyInfo.Content_id | DRM content ID. Same as job ID | 
 | DrmEncryptionKeyInfo.Time_created | Time when the DRM key pair is created | 
 
-The demo UI will periodically send GET one job request to refresh the job state and stats. The response body will be shown in the bottom-left corner and also some variable information will be highlighted in the bottom-right corner, such as current job state, job stats, input_info_url, etc. Your own Web catalog system would have periodically refresh those variable information. For example, the job state changes from "running" to "streaming" after you start to push live input feed. The job stats such as ingress bandwidth usage and cpu usage change over time as well. Those are information that you have to constantly monitor. 
+The demo UI will periodically send GET one job request to refresh the job state and stats. The response body will be shown in the bottom-left corner and certain key information and job state/stats will be highlighted in the bottom-right corner. Also, you may like to constantly monitor the state and stats of your jobs. For example, the job state changes from "running" to "streaming" after you start pushing live input feed. The job stats such as ingress bandwidth usage and cpu usage change over time as well. A part of future work is to support streaming the job stats to data analytics platforms such as Datadog or Dynatrace, etc.
 
 ## Live stats
 
