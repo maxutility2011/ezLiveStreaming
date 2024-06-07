@@ -59,7 +59,7 @@ If a user specifies AV1 video codec, the worker only launches a ffmpeg instance 
 
 # How to integrate ezLiveStreaming
 
-While the provided UI is only developed for demo purposes and can only serve a single live job, you can still use ezLiveStreaming's Web APIs to build your own Web catalog system to create and manage all your jobs. The detail of the APIs are specified in the following sections of this document. Your catalog system may provide one web page for creating new jobs and another page for listing all the current jobs. The new job page allows users to edit job request and submit to the server using the *create_job* API. The listing_jobs page allow users to view all the jobs using the *get_all_jobs* API. If users click on a specific job from the listing_jobs page, they are directed to a per-job page that shows the detail of that job. Users can also stop, reconfigure then resume a job from that page. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
+While the provided UI is only developed for demo purposes and can only serve a single live job, you can still use ezLiveStreaming's Web APIs to build your own Web catalog system to create and manage all your jobs. The detail of the APIs are specified in the following sections of this document. Your catalog system may provide one web page for creating new jobs and another page for listing all the current jobs. The new job page allows users to edit job request and submit to the server using the *create_job* API. The listing_jobs page allows users to view all the jobs using the *get_all_jobs* API. If users click on a specific job from the listing_jobs page, they are directed to a per-job page that shows the detail of that job. Users can also stop, reconfigure then resume a job from that page. All these behaviors are backed by the web API of ezLiveStreaming and its backend functions.
 
 # Quickstart
 
@@ -224,8 +224,8 @@ streamer     165  0.0  0.4   8332  4156 pts/0    R+   11:17   0:00 ps aux
 
 ```
 If the new channel is up and running, you should see the following worker processes running: 
-- worker_app: long-living daemon process for worker and live job management
-- worker_transcoder: a one per job process for coordinating live media ingesting, transcoding, packaging and stream file upload
+- worker_app: a long-living daemon process for worker and live job management
+- worker_transcoder: an one per job process for coordinating live media ingesting, transcoding, packaging and stream file upload
 - packager (Shaka packager): the live media packager
 - ffmpeg: the live media transcoder
 - start_iftop.sh (iftop and awk): monitoring ingress bandwidth usage

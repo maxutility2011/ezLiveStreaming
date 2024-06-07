@@ -491,6 +491,7 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 
 		bandwidth, err := strconv.ParseFloat(bandwidth_value, 64)
 		if err != nil {
+			Log.Printf("Iftop output: %s\n", iftop_output)
 			Log.Printf("Invalid bandwidth reading: %s (unit: %s)", bandwidth_value, bandwidth_unit)
 			bandwidth = 0
 		}
