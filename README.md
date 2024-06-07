@@ -26,6 +26,15 @@ Audio:
 - aac
 - mp3
 
+## Roadmap
+
+- Dynamic Ad Insertion (DAI)
+- low-latency live streaming
+- subtitles and captions
+- multiple audios
+- timed metadata
+- outputting log and stats to 3rd party data analytics platforms
+
 # High-level architecture
 
 ezLiveStreaming consists of 5 microservices that can be independently scaled,
