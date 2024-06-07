@@ -458,7 +458,7 @@ func readCpuUtil(j RunningJob) string {
 			cpuReaderCmd := exec.Command("sh", "/home/streamer/bins/start_cpuutil_reader.sh", strconv.Itoa(proc.Pid()))
 			out, err := cpuReaderCmd.CombinedOutput()
 			if err != nil {
-				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s", j.Job.Id, err, string(out))
+				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s\n", j.Job.Id, err, string(out))
 		 	} else {
 			 	ps_output := string(out)
 				re := regexp.MustCompile(".[0-9]") // CPU util is a float, so we match all the digits and "."
@@ -483,10 +483,12 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	var r int64
 	r = 0
 	if err != nil {
-       	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s", j.Id, err, string(out))
+       	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", j.Id, err, string(out))
     } else {
+		bandwidth := 0
 		iftop_output := string(out)
 		if iftop_output == "0b" { // TODO: iftop return "0b" when the measured bandwidth is zero. This is subject to change if iftop is updated.
+			Log.Printf("Unable to read bandwidth. Iftop output: %s\n", iftop_output)
 			bandwidth = 0
 		} else {
 			bandwidth_unit := iftop_output[len(iftop_output) - 3 : len(iftop_output) - 1]
@@ -494,7 +496,7 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 
 			bandwidth, err := strconv.ParseFloat(bandwidth_value, 64)
 			if err != nil {
-				Log.Printf("Invalid bandwidth reading: %s (unit: %s)", bandwidth_value, bandwidth_unit)
+				Log.Printf("Invalid bandwidth reading: %s (unit: %s)\n", bandwidth_value, bandwidth_unit)
 				bandwidth = 0
 			}
 
@@ -569,7 +571,7 @@ func checkJobStatus() {
 			cpu := readCpuUtil(j)
 			cpu_float, err := strconv.ParseFloat(cpu, 64)
 			if err != nil {
-				Log.Printf("Invalid cpu utilization reading: %s", cpu)
+				Log.Printf("Invalid cpu utilization reading: %s\n", cpu)
 				cpu = "NaN"
 				return
 			}

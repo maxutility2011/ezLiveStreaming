@@ -67,7 +67,7 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
     process2, err2 := os.FindProcess(int(command2.Process.Pid))
 
     if err1 != nil && err2 != nil {
-        Log.Printf("Neither ffmpeg nor packager is found. Worker_transcoder exiting...")
+        Log.Println("Neither ffmpeg nor packager is found. Worker_transcoder exiting...")
         os.Exit(0)
     } else if err1 == nil && err2 != nil {
         err := process1.Signal(syscall.Signal(syscall.SIGTERM))
@@ -88,7 +88,7 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
     Log.Printf("process.Signal on pid %d returned: %v\n", command2.Process.Pid, err2)
 
     if err1 != nil && err2 != nil {
-        Log.Printf("Neither ffmpeg nor packager is running. Worker_transcoder exiting...")
+        Log.Println("Neither ffmpeg nor packager is running. Worker_transcoder exiting...")
         os.Exit(0)
     } else if err1 == nil && err2 != nil {
         err := process1.Signal(syscall.Signal(syscall.SIGTERM))
@@ -104,14 +104,14 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
 func writeKeyFile(key string, keyFileName string) error {
     bin, err := hex.DecodeString(key)
     if err != nil {
-        Log.Printf("Failed to write key file. Error: ", err)
+        Log.Println("Failed to write key file. Error: ", err)
         return err
     }
 
     b := []byte(bin)
     err = os.WriteFile(keyFileName, b, 0644)
     if err != nil {
-        Log.Printf("Failed to write key file. Error: ", err)
+        Log.Println("Failed to write key file. Error: ", err)
     }
 
     return err
@@ -121,7 +121,7 @@ func writeKeyInfoFile(k models.KeyInfo, keyInfoFileName string) error {
     b, _ := json.Marshal(k)
     err := os.WriteFile(keyInfoFileName, b, 0644)
     if err != nil {
-        Log.Printf("Failed to write key info file. Error: ", err)
+        Log.Println("Failed to write key info file. Error: ", err)
     }
 
     return err
@@ -132,7 +132,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
 	bytesKeyInfoSpec := []byte(keyInfoStr)
     err := json.Unmarshal(bytesKeyInfoSpec, &k)
     if err != nil {
-        Log.Printf("Failed to unmarshal key info (createUploadDrmKeyFile). Error: ", err)
+        Log.Println("Failed to unmarshal key info (createUploadDrmKeyFile). Error: ", err)
         return err
     }
 
@@ -156,7 +156,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
     // Next, upload the local key file and key info file to cloud storage
     err = s3.Upload(local_media_output_path + models.DrmKeyFileName, models.DrmKeyFileName, remote_media_output_path)
     if err != nil {
-        Log.Printf("Failed to upload %s to %s", local_media_output_path + models.DrmKeyFileName, remote_media_output_path)
+        Log.Printf("Failed to upload %s to %s\n", local_media_output_path + models.DrmKeyFileName, remote_media_output_path)
     } else {
         Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_media_output_path + job.Input_json_file_name)
     }
@@ -167,7 +167,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
     /*
     err = s3.Upload(local_media_output_path + models.DrmKeyInfoFileName, models.DrmKeyInfoFileName, remote_media_output_path)
     if err != nil {
-        Log.Printf("Failed to upload %s to %s", local_media_output_path + models.DrmKeyInfoFileName, remote_media_output_path)
+        Log.Printf("Failed to upload %s to %s\n", local_media_output_path + models.DrmKeyInfoFileName, remote_media_output_path)
     }
     */
 
@@ -197,7 +197,7 @@ func uploadInputInfoFile(local_media_output_path string, remote_media_output_pat
 
     err = s3.Upload(local_media_output_path + job.Input_json_file_name, job.Input_json_file_name, remote_media_output_path)
     if err != nil {
-        Log.Printf("Failed to upload %s to %s", local_media_output_path + job.Input_json_file_name, remote_media_output_path)
+        Log.Printf("Failed to upload %s to %s\n", local_media_output_path + job.Input_json_file_name, remote_media_output_path)
         return err
     } else {
         Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_media_output_path + job.Input_json_file_name)
@@ -261,7 +261,7 @@ func uploadFiles() {
 
             prev_e = e
         } else {
-            Log.Printf("Item %s is NOT ready to be uploaded.", f.File_path)
+            Log.Printf("Item %s is NOT ready to be uploaded.\n", f.File_path)
             prev_e = nil
         }
     } 
@@ -305,10 +305,10 @@ func uploadOneFile(local_file string, remote_path_base string) error {
         rendition_name = local_file[posSecondLastSingleSlash + 1 : posLastSingleSlash] + "/"
     }
 
-    Log.Printf("Uploading %s to %s", local_file, remote_path_base + rendition_name + file_name)
+    Log.Printf("Uploading %s to %s\n", local_file, remote_path_base + rendition_name + file_name)
     err = s3.Upload(local_file, file_name, remote_path_base + rendition_name)
     if err != nil {
-        Log.Printf("Failed to upload: %s to %s. Error: %v", local_file, remote_path_base + rendition_name + file_name, err)
+        Log.Printf("Failed to upload: %s to %s. Error: %v\n", local_file, remote_path_base + rendition_name + file_name, err)
         return err
     } else {
         Log.Printf("Successfully uploaded %d bytes (%s) to S3\n", f.Size(), local_file)
@@ -653,7 +653,7 @@ func main() {
         sd = local_media_output_path + sd
         _, err_fstat := os.Stat(sd);
         if errors.Is(err_fstat, os.ErrNotExist) {
-            Log.Printf("Path %s does not exist. Creating it...", sd)
+            Log.Printf("Path %s does not exist. Creating it...\n", sd)
             err1 = os.Mkdir(sd, 0777)
             if err1 != nil {
                 Log.Println("Failed to mkdir: ", sd, " Error: ", err1)

@@ -152,13 +152,13 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 				lj.DrmEncryptionKeyInfo = k
 				Log.Printf("DRM Key INFO: key_id: %s, key: %s, content_id: %s\n", lj.DrmEncryptionKeyInfo.Key_id, lj.DrmEncryptionKeyInfo.Key, lj.DrmEncryptionKeyInfo.Content_id)
 			} else {
-				Log.Printf("Failed to get DRM info. Do not protect the live stream")
+				Log.Printf("Failed to get DRM info. Do not protect the live stream\n")
 			}
 		} else {
-			Log.Printf("Failed to create DRM key. Do not protect the live stream")
+			Log.Printf("Failed to create DRM key. Do not protect the live stream\n")
 		}
 	} else {
-		Log.Printf("DRM is not configured. Do not protect the live stream")
+		Log.Printf("DRM is not configured. Do not protect the live stream\n")
 	}
 
 	e := createUpdateJob(lj)
@@ -535,7 +535,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					return
 				} else {
 					res := "Cannot stop a non-existent job id = " + jid
-					Log.Printf(res)
+					Log.Println(res)
 					http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
 					return
 				}
@@ -592,14 +592,14 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			j, err := getJobById(jid)
 			if err != nil {
 				res := "Cannot delete a non-existent job id = " + jid
-				Log.Printf(res)
+				Log.Println(res)
 				http.Error(w, "404 not found\n  Error: " + res, http.StatusNotFound)
 				return
 			}
 
 			if (j.State != job.JOB_STATE_STOPPED) {
 				res := "Cannot delete a running job. Please stop the job first."
-				Log.Printf(res)
+				Log.Println(res)
 				http.Error(w, "403 forbidden\n  Error: " + res, http.StatusForbidden)
 				return
 			}
@@ -611,12 +611,12 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
         		w.WriteHeader(http.StatusOK)
 
 				res := "Successfully deleted job " + jid
-				Log.Printf(res)
+				Log.Println(res)
         		w.Write([]byte(res))
 				return
 			} else {
 				res := "Failed to delete job " + jid + ". Error: " + err.Error()
-				Log.Printf(res)
+				Log.Println(res)
                 http.Error(w, res, http.StatusInternalServerError)
 				return
 			}
