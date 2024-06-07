@@ -462,7 +462,10 @@ func readCpuUtil(j RunningJob) string {
 		 	} else {
 			 	ps_output := string(out)
 				re := regexp.MustCompile(".[0-9]") // CPU util is a float, so we match all the digits and "."
-				r = strings.Join(re.FindAllString(ps_output, -1), "")
+				//r = strings.Join(re.FindAllString(ps_output, -1), "")
+				for _, s := range re.FindAllString(ps_output, -1) {
+					r += strings.TrimSpace(s)
+				}
 			}
 		}
 	}
