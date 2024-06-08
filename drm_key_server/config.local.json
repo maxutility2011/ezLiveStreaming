@@ -1,8 +1,0 @@
-{
-    "Server_hostname": "0.0.0.0",
-    "Server_port": "5080",
-    "Redis": {
-        "RedisIp": "172.17.0.4",
-        "RedisPort": "6379"
-    }
-}

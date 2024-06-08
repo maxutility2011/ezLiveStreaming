@@ -1,10 +1,10 @@
 package job
 
 import (
-	"strings"
-	"strconv"
 	"encoding/json"
 	"ezliveStreaming/models"
+	"strconv"
+	"strings"
 )
 
 const RTMP = "rtmp"
@@ -41,42 +41,42 @@ func HasAV1Output(j LiveJobSpec) bool {
 	r := false
 	for i := range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
-        if vo.Codec == AV1_CODEC {
+		if vo.Codec == AV1_CODEC {
 			r = true
 			break
 		}
-    }
+	}
 
 	return r
 }
 
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
 func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
-	var ffmpegArgs []string 
-    if strings.Contains(j.Input.Url, RTMP) {
-        ffmpegArgs = append(ffmpegArgs, "-f")
-        ffmpegArgs = append(ffmpegArgs, "flv")
+	var ffmpegArgs []string
+	if strings.Contains(j.Input.Url, RTMP) {
+		ffmpegArgs = append(ffmpegArgs, "-f")
+		ffmpegArgs = append(ffmpegArgs, "flv")
 
-    	ffmpegArgs = append(ffmpegArgs, "-listen")
-    	ffmpegArgs = append(ffmpegArgs, "1")
-    }
+		ffmpegArgs = append(ffmpegArgs, "-listen")
+		ffmpegArgs = append(ffmpegArgs, "1")
+	}
 
-    // In the input URL, replace external hostname with anyaddr (0.0.0.0) 
-    // The live contribution encoder must use an input URL with external hostname, e.g., rtmp://ec2-34-202-195-77.compute-1.amazonaws.com:1935/live/app.
-    // However, FFmpeg transcoder running in docker must listen on anyaddr (0.0.0.0).
-    posLastColon := strings.LastIndex(j.Input.Url, ":")
-    ffmpegListeningUrl := "rtmp://0.0.0.0:"
-    ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posLastColon + 1: ]
+	// In the input URL, replace external hostname with anyaddr (0.0.0.0)
+	// The live contribution encoder must use an input URL with external hostname, e.g., rtmp://ec2-34-202-195-77.compute-1.amazonaws.com:1935/live/app.
+	// However, FFmpeg transcoder running in docker must listen on anyaddr (0.0.0.0).
+	posLastColon := strings.LastIndex(j.Input.Url, ":")
+	ffmpegListeningUrl := "rtmp://0.0.0.0:"
+	ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posLastColon+1:]
 
-    ffmpegArgs = append(ffmpegArgs, "-i")
-    ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
+	ffmpegArgs = append(ffmpegArgs, "-i")
+	ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
 	kf := "expr:gte(t,n_forced*"
 	kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
 	kf += ")"
 
 	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
-    ffmpegArgs = append(ffmpegArgs, kf)
+	ffmpegArgs = append(ffmpegArgs, kf)
 
 	port_base := j.Input.JobUdpPortBase
 
@@ -114,7 +114,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		}
 
 		// If the original job spec specifies a non-0 and valid frame rate, we add framerate by adding the filter.
-		// If frame rate is not specified or an invalid value is specified, the job validator sets it to 0 so we 
+		// If frame rate is not specified or an invalid value is specified, the job validator sets it to 0 so we
 		// don't use frame rate filter and  the original frame rate of the input stream will remain in the output stream.
 		if vo.Framerate > 0 {
 			ffmpegArgs = append(ffmpegArgs, "-filter:v")
@@ -132,7 +132,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 			} else if vo.Height > 720 {
 				h26xProfile = "high"
 			}
-	
+
 			ffmpegArgs = append(ffmpegArgs, "-profile:v")
 			ffmpegArgs = append(ffmpegArgs, h26xProfile)
 		}
@@ -170,11 +170,11 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 			ffmpegArgs = append(ffmpegArgs, strconv.Itoa(vo.Threads))
 		}
 
-		ffmpegArgs = append(ffmpegArgs, "-an") 
+		ffmpegArgs = append(ffmpegArgs, "-an")
 
 		ffmpegArgs = append(ffmpegArgs, "-f")
 		ffmpegArgs = append(ffmpegArgs, MPEGTS)
-		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:" + strconv.Itoa(port_base + i))
+		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:"+strconv.Itoa(port_base+i))
 	}
 
 	// Audio renditions
@@ -198,7 +198,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 
 		ffmpegArgs = append(ffmpegArgs, "-f")
 		ffmpegArgs = append(ffmpegArgs, MPEGTS)
-		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:" + strconv.Itoa(port_base + i + 1 + k))
+		ffmpegArgs = append(ffmpegArgs, "udp://127.0.0.1:"+strconv.Itoa(port_base+i+1+k))
 	}
 
 	// Pipe to ffprobe
@@ -210,12 +210,12 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 
 	ffprobe_output_url := generateFfprobeOutputUrl(port_base)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
-	
+
 	return ffmpegArgs
 }
 
 func generateFfprobeOutputUrl(port_base int) string {
-	return "udp://127.0.0.1:" + strconv.Itoa(port_base + ffprobe_output_port_distance_from_base)
+	return "udp://127.0.0.1:" + strconv.Itoa(port_base+ffprobe_output_port_distance_from_base)
 }
 
 func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
@@ -225,22 +225,22 @@ func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffprobeArgs = append(ffprobeArgs, ffprobe_output_url)
 
-	ffprobeArgs = append(ffprobeArgs, media_output_path + Input_json_file_name) 
+	ffprobeArgs = append(ffprobeArgs, media_output_path+Input_json_file_name)
 	return ffprobeArgs
 }
 
 func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
-    var packagerArgs []string 
+	var packagerArgs []string
 	var local_media_output_path_subdirs []string
 	port_base := j.Input.JobUdpPortBase
 
 	var key models.KeyInfo
 	if drmKeyInfo != "" {
-        bytesKeyInfoSpec := []byte(drmKeyInfo)
-        json.Unmarshal(bytesKeyInfoSpec, &key)
-    }
+		bytesKeyInfoSpec := []byte(drmKeyInfo)
+		json.Unmarshal(bytesKeyInfoSpec, &key)
+	}
 
-	// In the ffmpeg command, video outputs come first and use the lower UDP ports, starting from the port base. 
+	// In the ffmpeg command, video outputs come first and use the lower UDP ports, starting from the port base.
 	// Audio outputs follow and use the higher UDP ports.
 	var i int
 	for i = range j.Output.Video_outputs {
@@ -248,7 +248,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 
 		// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
 		video_output := "in="
-		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base + i)
+		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base+i)
 		video_output += instream
 
 		stream_selector := "stream=video"
@@ -283,7 +283,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		ao := j.Output.Audio_outputs[k]
 
 		audio_output := "in="
-		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base + i + 1 + k)
+		instream := "udp://127.0.0.1:" + strconv.Itoa(port_base+i+1+k)
 		audio_output += instream
 
 		stream_selector := "stream=audio"
@@ -340,7 +340,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 
 		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
-		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth) 
+		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
 
 		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
@@ -355,7 +355,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 	} else if j.Output.Stream_type == HLS {
 		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
-		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth) 
+		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
 
 		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
@@ -365,21 +365,21 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 
 		hls_playlist_type_option := "--hls_playlist_type"
 		packagerArgs = append(packagerArgs, hls_playlist_type_option)
-		hls_playlist_type_value := "live" 
+		hls_playlist_type_value := "live"
 		packagerArgs = append(packagerArgs, hls_playlist_type_value)
 
-		// Configure DRM protection 
+		// Configure DRM protection
 		if drmKeyInfo != "" {
 			/*
-			protection_system_option := "--protection_systems"
-			packagerArgs = append(packagerArgs, protection_system_option)
-			protection_system_value := j.Output.Drm.Protection_system 
-			packagerArgs = append(packagerArgs, protection_system_value)
+				protection_system_option := "--protection_systems"
+				packagerArgs = append(packagerArgs, protection_system_option)
+				protection_system_value := j.Output.Drm.Protection_system
+				packagerArgs = append(packagerArgs, protection_system_value)
 			*/
 
 			protection_scheme_option := "--protection_scheme"
 			packagerArgs = append(packagerArgs, protection_scheme_option)
-			protection_scheme_value := j.Output.Drm.Protection_scheme 
+			protection_scheme_value := j.Output.Drm.Protection_scheme
 			packagerArgs = append(packagerArgs, protection_scheme_value)
 
 			// Use clear key
@@ -390,13 +390,13 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 				keys_option := "--keys"
 				packagerArgs = append(packagerArgs, keys_option)
 
-				key_label_value := "label=" + drm_label_allmedia 
+				key_label_value := "label=" + drm_label_allmedia
 				key_id_value := "key_id=" + key.Key_id
 				key_value := "key=" + key.Key
 
 				iv, _ := models.Random_16bytes_as_string()
 				iv_value := "iv=" + iv
-				
+
 				keys_value := key_label_value + ":" + key_id_value + ":" + key_value + ":" + iv_value
 				packagerArgs = append(packagerArgs, keys_value)
 
@@ -414,47 +414,47 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		packagerArgs = append(packagerArgs, m3u8_output_path)
 	}
 
-    return packagerArgs, local_media_output_path_subdirs
+	return packagerArgs, local_media_output_path_subdirs
 }
 
-// This function is for AV1 ONLY!! 
+// This function is for AV1 ONLY!!
 // Contribution: ffmpeg -re -i 1.mp4 -c copy -f flv rtmp://127.0.0.1:1935/live/app
-// Regular latency: 
+// Regular latency:
 // ffmpeg -f flv -listen 1 -i rtmp://172.17.0.3:1935/live/b1326cd4-9f89-418f-11b-9fe2c19784f5 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -seg_duration 4 -window_size 15 -extra_window_size 15 -remove_at_exit 1 -adaptation_sets 'id=0,streams=v id=1,streams=a' -f dash /var/www/html/1.mpd
 // Low latency: ffmpeg -f flv -listen 1 -i rtmp://0.0.0.0:1935/live/app -vf scale=w=640:h=360 -c:v libx264 -profile:v baseline -an -use_template 1 -adaptation_sets "id=0,streams=v id=1,streams=a" -seg_duration 4 -utc_timing_url https://time.akamai.com/?iso -window_size 15 -extra_window_size 15 -remove_at_exit 1 -f dash /var/www/html/[job_ib]/1.mpd
 func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []string) {
-    var ffmpegArgs []string 
-    if strings.Contains(j.Input.Url, RTMP) {
-        ffmpegArgs = append(ffmpegArgs, "-f")
-        ffmpegArgs = append(ffmpegArgs, "flv")
+	var ffmpegArgs []string
+	if strings.Contains(j.Input.Url, RTMP) {
+		ffmpegArgs = append(ffmpegArgs, "-f")
+		ffmpegArgs = append(ffmpegArgs, "flv")
 
-    	ffmpegArgs = append(ffmpegArgs, "-listen")
-    	ffmpegArgs = append(ffmpegArgs, "1")
+		ffmpegArgs = append(ffmpegArgs, "-listen")
+		ffmpegArgs = append(ffmpegArgs, "1")
 	}
 
-	// In the input URL, replace external hostname with anyaddr (0.0.0.0) 
-    // The live contribution encoder must use an input URL with external hostname, e.g., rtmp://ec2-34-202-195-77.compute-1.amazonaws.com:1935/live/app.
-    // However, FFmpeg transcoder running in docker must listen on anyaddr (0.0.0.0).
-    posLastColon := strings.LastIndex(j.Input.Url, ":")
-    ffmpegListeningUrl := "rtmp://0.0.0.0:"
-    ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posLastColon + 1: ]
+	// In the input URL, replace external hostname with anyaddr (0.0.0.0)
+	// The live contribution encoder must use an input URL with external hostname, e.g., rtmp://ec2-34-202-195-77.compute-1.amazonaws.com:1935/live/app.
+	// However, FFmpeg transcoder running in docker must listen on anyaddr (0.0.0.0).
+	posLastColon := strings.LastIndex(j.Input.Url, ":")
+	ffmpegListeningUrl := "rtmp://0.0.0.0:"
+	ffmpegListeningUrl = ffmpegListeningUrl + j.Input.Url[posLastColon+1:]
 
-    ffmpegArgs = append(ffmpegArgs, "-i")
-    ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
+	ffmpegArgs = append(ffmpegArgs, "-i")
+	ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
 	kf := "expr:gte(t,n_forced*"
 	kf += strconv.Itoa(j.Output.Segment_duration)
 	kf += ")"
 
 	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
-    ffmpegArgs = append(ffmpegArgs, kf)
+	ffmpegArgs = append(ffmpegArgs, kf)
 
 	var local_media_output_path_subdirs []string
 	i := 0
 	// Video encoding params
 	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
-		local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_" + strconv.Itoa(i))
+		local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_"+strconv.Itoa(i))
 
 		ffmpegArgs = append(ffmpegArgs, "-map")
 		ffmpegArgs = append(ffmpegArgs, "v:0")
@@ -522,7 +522,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	} else {
 		for k := range j.Output.Audio_outputs {
 			ao := j.Output.Audio_outputs[k]
-			local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_" + strconv.Itoa(i+k+1))
+			local_media_output_path_subdirs = append(local_media_output_path_subdirs, "stream_"+strconv.Itoa(i+k+1))
 
 			ffmpegArgs = append(ffmpegArgs, "-map")
 			ffmpegArgs = append(ffmpegArgs, "a:0")
@@ -537,8 +537,8 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			ffmpegArgs = append(ffmpegArgs, "-b:a")
 			ffmpegArgs = append(ffmpegArgs, ao.Bitrate)
 		}
-	} 	
-	
+	}
+
 	if j.Output.Stream_type == DASH {
 		// Streaming params (HLS, DASH, DRM, etc.)
 		ffmpegArgs = append(ffmpegArgs, "-seg_duration")
@@ -625,7 +625,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 			vsr = vsr + "a:" + strconv.Itoa(i) + " "
 		}
 
-		vsr = vsr[: len(vsr)-1]
+		vsr = vsr[:len(vsr)-1]
 		ffmpegArgs = append(ffmpegArgs, vsr)
 
 		variant_playlist_format_value := "stream_%v/playlist.m3u8"
@@ -635,12 +635,12 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	// Pipe to ffprobe: It seems like the ffmpeg passthrough output has to be after the HLS/DASH media output in the command line options.
 	ffmpegArgs = append(ffmpegArgs, "-c")
 	ffmpegArgs = append(ffmpegArgs, "copy")
-	
+
 	ffmpegArgs = append(ffmpegArgs, "-f")
 	ffmpegArgs = append(ffmpegArgs, MPEGTS)
-	
+
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
-    return ffmpegArgs, local_media_output_path_subdirs
+	return ffmpegArgs, local_media_output_path_subdirs
 }

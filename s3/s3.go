@@ -1,10 +1,10 @@
 package s3
 
 import (
-	"os"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"os"
 )
 
 // https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/go/example_code/s3/s3_upload_object.go
@@ -23,8 +23,8 @@ func Upload(local_file_path string, remote_file_name string, bucketname string) 
 	uploader := s3manager.NewUploader(sess)
 	_, err = uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucketname),
-		Key: aws.String(remote_file_name),
-		Body: file,
+		Key:    aws.String(remote_file_name),
+		Body:   file,
 	})
 
 	if err != nil {
@@ -33,4 +33,3 @@ func Upload(local_file_path string, remote_file_name string, bucketname string) 
 
 	return nil
 }
-

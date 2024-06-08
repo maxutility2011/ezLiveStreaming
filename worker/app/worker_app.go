@@ -1,39 +1,39 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"container/list"
+	"encoding/json"
 	"errors"
+	"ezliveStreaming/job"
+	"ezliveStreaming/models"
+	"flag"
+	"fmt"
+	"github.com/mitchellh/go-ps"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"os/exec"
-	"regexp"
 	"os/signal"
+	"regexp"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
-	"net/http"
-	"bytes"
-	"flag"
-	"strings"
-	"log"
-	"strconv"
-	"io/ioutil"
-	"encoding/json"
-	"container/list"
-	"github.com/mitchellh/go-ps"
-	"ezliveStreaming/models"
-	"ezliveStreaming/job"
 )
 
 type WorkerAppConfig struct {
-	SchedulerUrl string
-	GetPublicIpUrl string
-	WorkerPort string
+	SchedulerUrl      string
+	GetPublicIpUrl    string
+	WorkerPort        string
 	WorkerUdpPortBase int
 }
 
 type RunningJob struct {
-	Job job.LiveJob
+	Job     job.LiveJob
 	Command *exec.Cmd
-	Stats models.LiveJobStats
+	Stats   models.LiveJobStats
 }
 
 type IPIFY_RESPONSE struct {
@@ -51,11 +51,11 @@ func createJob(j job.LiveJob) (error, string) {
 		return e, ""
 	}
 
-	j2, ok := getJobById(j.Id) 
+	j2, ok := getJobById(j.Id)
 	if !ok {
 		Log.Println("Error: Failed to find job ID: ", j.Id)
 		return e, ""
-	} 
+	}
 
 	Log.Printf("New job created: %+v\n", j2)
 	return nil, j.Id
@@ -72,7 +72,7 @@ func getJobById(jid string) (job.LiveJob, bool) {
 }
 
 func deleteJob(jid string) error {
-	delete(jobs, jid) 
+	delete(jobs, jid)
 	return nil
 }
 
@@ -94,8 +94,8 @@ func stopJob(jid string) error {
 		jobFound = true
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {
-        	Log.Printf("Process id = %d (Job id = %s) not found in stopJob. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
-    	} else {
+			Log.Printf("Process id = %d (Job id = %s) not found in stopJob. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
+		} else {
 			err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
 			Log.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 == nil {
@@ -125,48 +125,48 @@ func stopJob(jid string) error {
 }
 
 func main_server_handler(w http.ResponseWriter, r *http.Request) {
-    Log.Println("----------------------------------------")
-    Log.Println("Received new request:")
-    Log.Println(r.Method, r.URL.Path)
+	Log.Println("----------------------------------------")
+	Log.Println("Received new request:")
+	Log.Println(r.Method, r.URL.Path)
 
-    posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
-    UrlLastPart := r.URL.Path[posLastSingleSlash + 1 :]
+	posLastSingleSlash := strings.LastIndex(r.URL.Path, "/")
+	UrlLastPart := r.URL.Path[posLastSingleSlash+1:]
 
-    // Remove trailing "/" if any
-    if len(UrlLastPart) == 0 {
-        path_without_trailing_slash := r.URL.Path[0 : posLastSingleSlash]
-        posLastSingleSlash = strings.LastIndex(path_without_trailing_slash, "/")
-        UrlLastPart = path_without_trailing_slash[posLastSingleSlash + 1 :]
-    } 
+	// Remove trailing "/" if any
+	if len(UrlLastPart) == 0 {
+		path_without_trailing_slash := r.URL.Path[0:posLastSingleSlash]
+		posLastSingleSlash = strings.LastIndex(path_without_trailing_slash, "/")
+		UrlLastPart = path_without_trailing_slash[posLastSingleSlash+1:]
+	}
 
 	if strings.Contains(r.URL.Path, liveJobsEndpoint) {
 		if !(r.Method == "POST" || r.Method == "GET" || r.Method == "PUT" || r.Method == "DELETE") {
-            err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
-            Log.Println(err)
-            http.Error(w, "405 method not allowed\n  Error: " + err, http.StatusMethodNotAllowed)
-            return
-        }
+			err := "Method = " + r.Method + " is not allowed to " + r.URL.Path
+			Log.Println(err)
+			http.Error(w, "405 method not allowed\n  Error: "+err, http.StatusMethodNotAllowed)
+			return
+		}
 
 		if r.Method == "POST" && UrlLastPart != liveJobsEndpoint {
 			res := "POST to " + r.URL.Path + "is not allowed"
 			Log.Println(res)
-			http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
+			http.Error(w, "400 bad request\n  Error: "+res, http.StatusBadRequest)
 		} else if r.Method == "POST" && UrlLastPart == liveJobsEndpoint {
 			if r.Body == nil {
-            	res := "Error New live job without job specification"
-            	Log.Println("Error New live job without job specifications")
-            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            	return
-        	}
+				res := "Error New live job without job specification"
+				Log.Println("Error New live job without job specifications")
+				http.Error(w, "400 bad request\n  Error: "+res, http.StatusBadRequest)
+				return
+			}
 
 			var job job.LiveJob
 			e := json.NewDecoder(r.Body).Decode(&job)
 			if e != nil {
-            	res := "Failed to decode job request"
-            	Log.Println("Error happened in JSON marshal. Err: %s", e)
-            	http.Error(w, "400 bad request\n  Error: " + res, http.StatusBadRequest)
-            	return
-        	}
+				res := "Failed to decode job request"
+				Log.Println("Error happened in JSON marshal. Err: %s", e)
+				http.Error(w, "400 bad request\n  Error: "+res, http.StatusBadRequest)
+				return
+			}
 
 			e1, jid := createJob(job)
 			if e1 != nil {
@@ -199,20 +199,20 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			// Get all jobs: /jobs/
 			if UrlLastPart == liveJobsEndpoint {
 				FileContentType := "application/json"
-        		w.Header().Set("Content-Type", FileContentType)
-        		w.WriteHeader(http.StatusOK)
-        		json.NewEncoder(w).Encode(jobs)
+				w.Header().Set("Content-Type", FileContentType)
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(jobs)
 				return
 			} else { // Get one job: /jobs/[job_id]
 				job, ok := jobs[UrlLastPart]
 				if ok {
 					FileContentType := "application/json"
-        			w.Header().Set("Content-Type", FileContentType)
-        			w.WriteHeader(http.StatusOK)
-        			json.NewEncoder(w).Encode(job)
+					w.Header().Set("Content-Type", FileContentType)
+					w.WriteHeader(http.StatusOK)
+					json.NewEncoder(w).Encode(job)
 				} else {
 					Log.Println("Non-existent job id: ", UrlLastPart)
-                    http.Error(w, "Non-existent job id: " + UrlLastPart, http.StatusNotFound)
+					http.Error(w, "Non-existent job id: "+UrlLastPart, http.StatusNotFound)
 				}
 
 				return
@@ -229,7 +229,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
 				} else if e.Error() == "jobNotFound" {
 					http.Error(w, "404 internal server error\n  Error: ", http.StatusNotFound)
-				}else {
+				} else {
 					Log.Println("Job id = ", jid, " failed to stop")
 					http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
 				}
@@ -246,24 +246,25 @@ func readConfig() {
 		Log.Println(err)
 	}
 
-	defer configFile.Close() 
+	defer configFile.Close()
 	config_bytes, _ := ioutil.ReadAll(configFile)
 	json.Unmarshal(config_bytes, &worker_app_config)
 }
 
 var rtmp_port_base = 1935 // TODO: Make this configurable
-var max_rtmp_ports = 15 // TODO: Make this configurable
+var max_rtmp_ports = 15   // TODO: Make this configurable
 var available_rtmp_ports *list.List
-var scheduler_heartbeat_interval = "1s" 
+var scheduler_heartbeat_interval = "1s"
 var job_status_check_interval = "3s" // not less than 1s
 var worker_app_config_file_path = "worker_app_config.json"
 var Log *log.Logger
 var job_scheduler_url string
+
 // TODO: Need to move "jobs" to Redis or find a way to recover jobs when worker_app crashes
 // TODO: Need to constantly monitor job health. Need to re-assign a job to a new worker
 //       when the existing worker crashes.
 var jobs = make(map[string]job.LiveJob) // Live jobs that have been assigned to this worker since the worker started (including past jobs and running jobs)
-var running_jobs *list.List // Live jobs actively running on this worker
+var running_jobs *list.List             // Live jobs actively running on this worker
 var my_worker_id string
 var my_public_ip string
 var last_confirmed_heartbeat_time time.Time
@@ -334,13 +335,13 @@ func launchJob(j job.LiveJob) error {
 	// total_outputs: total number of output renditions across all the live jobs on this worker.
 	// WorkerUdpPortBase + total_outputs: the port base of the new job.
 	j.Spec.Input.JobUdpPortBase = worker_app_config.WorkerUdpPortBase + total_outputs
-	
+
 	b1, err1 := json.Marshal(j.Spec)
 	if err1 != nil {
 		Log.Println("Failed to marshal job output (launchJob). Error: ", err1)
 		return err1
 	}
-	
+
 	var b2 []byte
 	var err2 error
 	if j.DrmEncryptionKeyInfo.Key_id != "" {
@@ -383,22 +384,22 @@ func launchJob(j job.LiveJob) error {
 		out, err_transcoder = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
 		if err_transcoder != nil {
 			//running_jobs.Remove(je) // Cleanup if transcoderCmd fails
-			
+
 			// Let's not remove the failed job from running_jobs here, but leave it to function checkJobStatus()
 			// checkJobStatus() does more than just removing the job, it also updates worker load with scheduler
-        	Log.Println("Errors running worker transcoder: ", string(out))
+			Log.Println("Errors running worker transcoder: ", string(out))
 		}
 	}()
 
-	// Wait 100ms to get transcoderCmd (which runs in its own go routine) result (err2). 
+	// Wait 100ms to get transcoderCmd (which runs in its own go routine) result (err2).
 
-	// If we don't wait, err2=nil (its initial value) will always be returned before 
+	// If we don't wait, err2=nil (its initial value) will always be returned before
 	// transcoderCmd.CombinedOutput() finishes and returns the real result. This will cause inconsistency
-	// when launchJob() returns nil (success) but transcoderCmd.CombinedOutput() actually fails. 
+	// when launchJob() returns nil (success) but transcoderCmd.CombinedOutput() actually fails.
 
-	// On the other hand, if transcoderCmd succeeds, the go routine (transcoderCmd.CombinedOutput) blocks until 
-	// ffmpeg stops (e.g., when the user issues a stop_job request). In this case, err2 will not be 
-	// updated when the sleep ends thus err2=nil will be returned (which is valid). 
+	// On the other hand, if transcoderCmd succeeds, the go routine (transcoderCmd.CombinedOutput) blocks until
+	// ffmpeg stops (e.g., when the user issues a stop_job request). In this case, err2 will not be
+	// updated when the sleep ends thus err2=nil will be returned (which is valid).
 	time.Sleep(100 * time.Millisecond)
 	if transcoderCmd.Process != nil {
 		Log.Println("Worker transcoder process id: ", transcoderCmd.Process.Pid)
@@ -413,34 +414,34 @@ func reportJobStatus(report models.WorkerJobReport) error {
 
 	b, _ := json.Marshal(report)
 	req, err := http.NewRequest(http.MethodPost, job_status_url, bytes.NewReader(b))
-    if err != nil {
-        Log.Println("Error: Failed to POST to: ", job_status_url)
+	if err != nil {
+		Log.Println("Error: Failed to POST to: ", job_status_url)
 		// TODO: Need to retry registering new worker instead of giving up
-        return errors.New("StatusReportFailure_fail_to_post")
-    }
-	
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        Log.Println("Failed to POST job status: ", job_status_url)
-		return err
-    }
-	
-	/*
-    defer resp.Body.Close()
-    bodyBytes, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        Log.Println("Error: Failed to read response body (reportJobStatus)")
-        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
-    }
+		return errors.New("StatusReportFailure_fail_to_post")
+	}
 
-	var hb_resp models.WorkerHeartbeat
-	json.Unmarshal(bodyBytes, &hb_resp)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Log.Println("Failed to POST job status: ", job_status_url)
+		return err
+	}
+
+	/*
+	    defer resp.Body.Close()
+	    bodyBytes, err := ioutil.ReadAll(resp.Body)
+	    if err != nil {
+	        Log.Println("Error: Failed to read response body (reportJobStatus)")
+	        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
+	    }
+
+		var hb_resp models.WorkerHeartbeat
+		json.Unmarshal(bodyBytes, &hb_resp)
 	*/
 
 	// TODO: Need to handle error response (other than http code 200)
 	if resp.StatusCode != http.StatusOK {
 		Log.Println("Bad response from scheduler (reportJobStatus)")
-        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
+		return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
 	}
 
 	return nil
@@ -459,8 +460,8 @@ func readCpuUtil(j RunningJob) string {
 			out, err := cpuReaderCmd.CombinedOutput()
 			if err != nil {
 				Log.Printf("Errors starting cpuReader for job id = %s. Error: %v, iftop output: %s\n", j.Job.Id, err, string(out))
-		 	} else {
-			 	ps_output := string(out)
+			} else {
+				ps_output := string(out)
 				re := regexp.MustCompile(".[0-9]") // CPU util is a float, so we match all the digits and "."
 				//r = strings.Join(re.FindAllString(ps_output, -1), "")
 				for _, s := range re.FindAllString(ps_output, -1) {
@@ -486,16 +487,16 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	var r int64
 	r = 0
 	if err != nil {
-       	Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", j.Id, err, string(out))
-    } else {
+		Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", j.Id, err, string(out))
+	} else {
 		var bandwidth float64
 		iftop_output := string(out)
 		if iftop_output == "0b" { // TODO: iftop return "0b" when the measured bandwidth is zero. This is subject to change if iftop is updated.
 			Log.Printf("Unable to read bandwidth. Iftop output: %s\n", iftop_output)
 			bandwidth = 0
 		} else {
-			bandwidth_unit := iftop_output[len(iftop_output) - 3 : len(iftop_output) - 1]
-			bandwidth_value := iftop_output[: len(iftop_output) - 3]
+			bandwidth_unit := iftop_output[len(iftop_output)-3 : len(iftop_output)-1]
+			bandwidth_value := iftop_output[:len(iftop_output)-3]
 
 			bandwidth, err = strconv.ParseFloat(bandwidth_value, 64)
 			if err != nil {
@@ -529,7 +530,7 @@ func checkJobStatus() {
 	var j RunningJob
 	for e := running_jobs.Front(); e != nil; e = e.Next() {
 		// Remove stopped jobs and update scheduler
-		if (prev_e != nil && (!jobProcessFound || !jobProcessRunning)) {
+		if prev_e != nil && (!jobProcessFound || !jobProcessRunning) {
 			j = RunningJob(prev_e.Value.(RunningJob))
 			job_report.StoppedJobs = append(job_report.StoppedJobs, j.Job.Id)
 			running_jobs.Remove(prev_e)
@@ -548,20 +549,20 @@ func checkJobStatus() {
 
 		process, err1 := os.FindProcess(int(j.Command.Process.Pid))
 		if err1 != nil {
-            Log.Printf("Process id = %d (Job id = %s) not found. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
+			Log.Printf("Process id = %d (Job id = %s) not found. Error: %v\n", j.Command.Process.Pid, j.Job.Id, err1)
 			jobProcessFound = false
-        } else {
+		} else {
 			err2 = process.Signal(syscall.Signal(0))
 			Log.Printf("process.Signal 0 on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
 			if err2 != nil {
 				jobProcessRunning = false
 			}
-        }
+		}
 
 		prev_e = e
 	}
 
-	if (prev_e != nil && (!jobProcessFound || !jobProcessRunning)) {
+	if prev_e != nil && (!jobProcessFound || !jobProcessRunning) {
 		j = RunningJob(prev_e.Value.(RunningJob))
 		job_report.StoppedJobs = append(job_report.StoppedJobs, j.Job.Id)
 		running_jobs.Remove(prev_e)
@@ -578,22 +579,22 @@ func checkJobStatus() {
 				cpu = "NaN"
 				return
 			}
-			
+
 			var bw int64
-			// Bandwidth reader (iftop) blocks when there is no incoming traffic (cpu util reader does not block), 
-			// so is this goroutine. So, to avoid iftop blocking, we call iftop to read bandwidth only when cpu 
-			// utilization goes above a threshold value so we know for sure that the transcoder is ingesting. 
+			// Bandwidth reader (iftop) blocks when there is no incoming traffic (cpu util reader does not block),
+			// so is this goroutine. So, to avoid iftop blocking, we call iftop to read bandwidth only when cpu
+			// utilization goes above a threshold value so we know for sure that the transcoder is ingesting.
 			if cpu_float >= cpu_utilization_threshold {
 				bw = readIngressBandwidth(j.Job)
 			} else {
 				bw = 0
 			}
 
-			lj, ok := getJobById(j.Job.Id) 
+			lj, ok := getJobById(j.Job.Id)
 			if !ok {
 				Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 			} else {
-				lj.Ingress_bandwidth_kbps = bw // cache the bandwidth reading
+				lj.Ingress_bandwidth_kbps = bw       // cache the bandwidth reading
 				lj.Transcoding_cpu_utilization = cpu // cache the cpu_util reading
 				createUpdateJob(lj)
 			}
@@ -601,11 +602,11 @@ func checkJobStatus() {
 
 		var stats models.LiveJobStats
 		stats.Id = j.Job.Id
-		lj, ok := getJobById(j.Job.Id) 
+		lj, ok := getJobById(j.Job.Id)
 		if !ok {
 			Log.Println("Error: Failed to find job ID (checkJobStatus): ", j.Job.Id)
 		} else {
-			stats.Ingress_bandwidth_kbps = lj.Ingress_bandwidth_kbps // get the cached bandwidth reading from the last stats collection
+			stats.Ingress_bandwidth_kbps = lj.Ingress_bandwidth_kbps           // get the cached bandwidth reading from the last stats collection
 			stats.Transcoding_cpu_utilization = lj.Transcoding_cpu_utilization // get the cached cpu_util reading from the last stats collection
 		}
 
@@ -624,22 +625,22 @@ func sendHeartbeat() error {
 	//Log.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
 	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
 	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
-    if err != nil {
-        Log.Println("Error: Failed to POST to: ", worker_heartbeat_url)
+	if err != nil {
+		Log.Println("Error: Failed to POST to: ", worker_heartbeat_url)
 		// TODO: Need to retry registering new worker instead of giving up
-        return errors.New("HeartbeatFailure_fail_to_post")
-    }
-	
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        Log.Println("Failed to POST heartbeat: ", worker_heartbeat_url)
+		return errors.New("HeartbeatFailure_fail_to_post")
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Log.Println("Failed to POST heartbeat: ", worker_heartbeat_url)
 		return err
-    }
+	}
 
 	// TODO: Need to handle error response (other than http code 200)
 	if resp.StatusCode != http.StatusOK {
 		Log.Println("Bad response from scheduler (sendHeartbeat)")
-        return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
+		return errors.New("HeartbeatFailure_fail_to_read_scheduler_response")
 	}
 
 	last_confirmed_heartbeat_time = hb.LastHeartbeatTime
@@ -651,26 +652,26 @@ func getPublicIp() (string, error) {
 	if worker_app_config.GetPublicIpUrl != "" {
 		get_public_ip_url = worker_app_config.GetPublicIpUrl
 	}
-	 
-	Log.Println("Getting public IP from: ", get_public_ip_url) 
+
+	Log.Println("Getting public IP from: ", get_public_ip_url)
 	req, err1 := http.NewRequest(http.MethodGet, get_public_ip_url, nil)
-    if err1 != nil {
-        Log.Println("Error: Failed to create GET request to: ", get_public_ip_url)
-        return public_ip, errors.New("http_get_request_creation_failure")
-    }
-	
-    resp, err2 := http.DefaultClient.Do(req)
-    if err2 != nil {
-        Log.Println("Error: Failed to send GET to: ", get_public_ip_url)
-        return public_ip, errors.New("http_get_request_send_failure")
-    }
-	
-    defer resp.Body.Close()
-    bodyBytes, err3 := ioutil.ReadAll(resp.Body)
-    if err3 != nil {
-        Log.Println("Error: Failed to read response body from: ", get_public_ip_url)
-        return public_ip, errors.New("http_get_response_parsing_failure")
-    }
+	if err1 != nil {
+		Log.Println("Error: Failed to create GET request to: ", get_public_ip_url)
+		return public_ip, errors.New("http_get_request_creation_failure")
+	}
+
+	resp, err2 := http.DefaultClient.Do(req)
+	if err2 != nil {
+		Log.Println("Error: Failed to send GET to: ", get_public_ip_url)
+		return public_ip, errors.New("http_get_request_send_failure")
+	}
+
+	defer resp.Body.Close()
+	bodyBytes, err3 := ioutil.ReadAll(resp.Body)
+	if err3 != nil {
+		Log.Println("Error: Failed to read response body from: ", get_public_ip_url)
+		return public_ip, errors.New("http_get_response_parsing_failure")
+	}
 
 	var ipify IPIFY_RESPONSE
 	err := json.Unmarshal(bodyBytes, &ipify)
@@ -698,54 +699,54 @@ func registerWorker(conf WorkerAppConfig) error {
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
 	new_worker_request.HeartbeatInterval = scheduler_heartbeat_interval
-	
+
 	b, _ := json.Marshal(new_worker_request)
 
-	Log.Println("Registering new worker at: ", register_new_worker_url, " at time = ", time.Now()) 
+	Log.Println("Registering new worker at: ", register_new_worker_url, " at time = ", time.Now())
 	req, err1 := http.NewRequest(http.MethodPost, register_new_worker_url, bytes.NewReader(b))
-    if err1 != nil {
-        Log.Println("Error: Failed to POST to: ", register_new_worker_url)
-        return errors.New("http_post_request_creation_failure")
-    }
-	
-    resp, err2 := http.DefaultClient.Do(req)
-    if err2 != nil {
-        Log.Println("Error: Failed to POST to: ", register_new_worker_url)
-        return errors.New("http_post_request_send_failure")
-    }
-	
-    defer resp.Body.Close()
-    bodyBytes, err3 := ioutil.ReadAll(resp.Body)
-    if err3 != nil {
-        Log.Println("Error: Failed to read response body")
-        return errors.New("http_post_response_parsing_failure")
-    }
+	if err1 != nil {
+		Log.Println("Error: Failed to POST to: ", register_new_worker_url)
+		return errors.New("http_post_request_creation_failure")
+	}
+
+	resp, err2 := http.DefaultClient.Do(req)
+	if err2 != nil {
+		Log.Println("Error: Failed to POST to: ", register_new_worker_url)
+		return errors.New("http_post_request_send_failure")
+	}
+
+	defer resp.Body.Close()
+	bodyBytes, err3 := ioutil.ReadAll(resp.Body)
+	if err3 != nil {
+		Log.Println("Error: Failed to read response body")
+		return errors.New("http_post_response_parsing_failure")
+	}
 
 	var wkr models.LiveWorker
 	json.Unmarshal(bodyBytes, &wkr)
 	my_worker_id = wkr.Id
-	// The public IP of the worker. This is the public IP of the host VM of the worker docker container. 
+	// The public IP of the worker. This is the public IP of the host VM of the worker docker container.
 	// For example, if the worker docker runs on an EC2 VM host, this is the public IP of that VM.
 	// We need to know the host VM's public IP for live ingesting.
-	my_public_ip = wkr.Info.ServerIp 
+	my_public_ip = wkr.Info.ServerIp
 	Log.Printf("Worker registered successfully with worker id: %s and my public IP is %s\n", my_worker_id, my_public_ip)
 	return nil
 }
 
 func main() {
 	var logfile, err1 = os.Create("/home/streamer/log/worker_app.log")
-    if err1 != nil {
-        panic(err1)
-    }
+	if err1 != nil {
+		panic(err1)
+	}
 
-    configPtr := flag.String("config", "", "config file path")
-    flag.Parse()
+	configPtr := flag.String("config", "", "config file path")
+	flag.Parse()
 
 	if *configPtr != "" {
 		worker_app_config_file_path = *configPtr
 	}
 
-    Log = log.New(logfile, "", log.LstdFlags)
+	Log = log.New(logfile, "", log.LstdFlags)
 	readConfig()
 	job_scheduler_url = worker_app_config.SchedulerUrl
 
@@ -756,7 +757,7 @@ func main() {
 	}
 
 	available_rtmp_ports = list.New()
-	for p := rtmp_port_base; p < rtmp_port_base + max_rtmp_ports; p++ {
+	for p := rtmp_port_base; p < rtmp_port_base+max_rtmp_ports; p++ {
 		available_rtmp_ports.PushBack(p)
 	}
 
@@ -768,18 +769,19 @@ func main() {
 	quit := make(chan struct{})
 	go func(ticker *time.Ticker) {
 		for {
-		   select {
-			case <-ticker.C: {
-				// Worker ID is assigned by scheduler only when worker registration succeeded.
-				if my_worker_id == "" {
-					err1 = registerWorker(worker_app_config)
-					if err1 != nil {
-						Log.Println("Failed to register worker. Try again later.")
+			select {
+			case <-ticker.C:
+				{
+					// Worker ID is assigned by scheduler only when worker registration succeeded.
+					if my_worker_id == "" {
+						err1 = registerWorker(worker_app_config)
+						if err1 != nil {
+							Log.Println("Failed to register worker. Try again later.")
+						}
+					} else {
+						sendHeartbeat()
 					}
-				} else {
-					sendHeartbeat() 
 				}
-			}
 			case <-quit:
 				ticker.Stop()
 				return
@@ -793,10 +795,11 @@ func main() {
 	quit1 := make(chan struct{})
 	go func(ticker1 *time.Ticker) {
 		for {
-		   select {
-			case <-ticker1.C: {
-				checkJobStatus()
-			}
+			select {
+			case <-ticker1.C:
+				{
+					checkJobStatus()
+				}
 			case <-quit1:
 				ticker1.Stop()
 				return
@@ -806,10 +809,10 @@ func main() {
 
 	shutdown := make(chan os.Signal, 1)
 	// syscall.SIGKILL cannot be handled
-    signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
-    go func() {
-        <-shutdown
-        Log.Println("Shutting down!")
+	signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-shutdown
+		Log.Println("Shutting down!")
 
 		for e := running_jobs.Front(); e != nil; e = e.Next() {
 			j := RunningJob(e.Value.(RunningJob))
@@ -819,23 +822,23 @@ func main() {
 			} else {
 				err2 := process.Signal(syscall.Signal(syscall.SIGTERM))
 				Log.Printf("process.Signal.SIGTERM on pid %d (Job id = %s) returned: %v\n", j.Command.Process.Pid, j.Job.Id, err2)
-				// The following cleanup steps are not necessarily needed since the whole worker_app 
+				// The following cleanup steps are not necessarily needed since the whole worker_app
 				// is being shutting down. But let's keep them here.
 				if err2 == nil {
 					releaseRtmpPort(j.Job.RtmpIngestPort)
-					deleteJob(j.Job.Id) 
+					deleteJob(j.Job.Id)
 				}
 			}
 		}
 
-        os.Exit(0)
-    }()
+		os.Exit(0)
+	}()
 
 	// Worker app provides web API for handling new job requests received from the job scheduler
 	worker_app_addr := "0.0.0.0:" + worker_app_config.WorkerPort
 	http.HandleFunc("/", main_server_handler)
-    fmt.Println("API server listening on: ", worker_app_addr)
-    err := http.ListenAndServe(worker_app_addr, nil)
+	fmt.Println("API server listening on: ", worker_app_addr)
+	err := http.ListenAndServe(worker_app_addr, nil)
 	if err != nil {
 		fmt.Println("Server failed to start. Error: ", err)
 	}

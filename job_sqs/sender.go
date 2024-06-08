@@ -47,10 +47,10 @@ func (sender SqsSender) SendMsg(data string, dedupId string) error {
 			},
 		},
 		MessageGroupId: aws.String("livejob"),
-		MessageBody: aws.String(data),
-		QueueUrl:    queueURL,
+		MessageBody:    aws.String(data),
+		QueueUrl:       queueURL,
 	})
-	
+
 	if err1 != nil {
 		return err1
 	}

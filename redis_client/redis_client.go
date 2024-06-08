@@ -1,26 +1,26 @@
 package redis_client
 
 import (
-	"fmt"
-	"time"
 	"context"
 	"encoding/json"
-	"github.com/redis/go-redis/v9" // redis_client.go is ONLY tested against go-redis v9!!! 
+	"fmt"
+	"github.com/redis/go-redis/v9" // redis_client.go is ONLY tested against go-redis v9!!!
+	"time"
 )
 
 type RedisClient struct {
-	RedisIp string
+	RedisIp   string
 	RedisPort string
-	Ctx context.Context
-	Client *redis.Client
+	Ctx       context.Context
+	Client    *redis.Client
 }
 
 type RedisConfig struct {
-	RedisIp string
+	RedisIp   string
 	RedisPort string
 }
 
-// The following constants define all the Redis keys including hash tables (accessed by HSET/HGET) 
+// The following constants define all the Redis keys including hash tables (accessed by HSET/HGET)
 // and variables (accessed by SET/GET)
 const REDIS_KEY_ALLJOBS = "jobs"
 const REDIS_KEY_ALLWORKERS = "workers"
@@ -33,9 +33,9 @@ func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.C
 	redisAddr := redis_ip + ":" + redis_port
 	fmt.Println("Creating Redis client and connecting to redisAddr: ", redisAddr)
 	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
+		Addr:     redisAddr,
 		Password: "",
-		DB: 0,
+		DB:       0,
 	})
 
 	return client, context.Background()
@@ -44,13 +44,13 @@ func (rc RedisClient) CreateClient(redis_ip string, redis_port string) (*redis.C
 // HSET (value is string)
 // htable: the hash table that the k/v is to be inserted. For example, "job1" (k) with its value (v)
 //	       is inserted to a table called "jobs".
-// k: HSET field 
+// k: HSET field
 // v: HSET value
 func (rc RedisClient) HSetStruct(htable string, k string, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
-	}	
+	}
 
 	err = rc.Client.HSet(rc.Ctx, htable, k, string(b)).Err()
 	return err
@@ -63,8 +63,8 @@ func (rc RedisClient) HSetString(htable string, k string, v string) error {
 }
 
 // HGET
-// htable: the hash table that the k/v is to be got from. 
-// k: HGET member 
+// htable: the hash table that the k/v is to be got from.
+// k: HGET member
 func (rc RedisClient) HGet(htable string, k string) (string, error) {
 	v, err := rc.Client.HGet(rc.Ctx, htable, k).Result()
 	return v, err
@@ -94,8 +94,8 @@ func (rc RedisClient) HGetAll(htable string) ([]string, error) {
 }
 
 // HSCAN
-// htable: the hash table that the k/v is to be got from. 
-// k: HSCAN key 
+// htable: the hash table that the k/v is to be got from.
+// k: HSCAN key
 func (rc RedisClient) HScan(htable string) ([]string, error) {
 	// In go-redis v9, HSCAN.Result() returns "keys, cursor, err"
 	keys, _, err := rc.Client.HScan(rc.Ctx, htable, 0, "", 0).Result()
@@ -166,20 +166,20 @@ func (rc RedisClient) QPushString(qname string, v string) error {
 
 func (rc RedisClient) QFront(qname string) (string, error) {
 	elements, err := rc.Client.LRange(rc.Ctx, qname, -1, -1).Result()
-	var r string 
+	var r string
 	if err == nil {
 		r = elements[0]
-	} 
+	}
 
 	return r, err
 }
 
 func (rc RedisClient) QPop(qname string) (string, error) {
 	element, err := rc.Client.RPop(rc.Ctx, qname).Result()
-	var r string 
+	var r string
 	if err == nil {
 		r = element
-	} 
+	}
 
 	return r, err
 }

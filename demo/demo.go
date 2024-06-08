@@ -1,4 +1,4 @@
-package demo 
+package demo
 
 type CreateLiveFeedSpec struct {
 	RtmpIngestUrl string

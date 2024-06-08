@@ -2,8 +2,8 @@ package models
 
 import (
 	"crypto/rand"
-	"time"
 	"fmt"
+	"time"
 )
 
 var DrmKeyFileName = "key.bin"
@@ -14,16 +14,16 @@ type CreateKeyRequest struct {
 }
 
 type CreateKeyResponse struct {
-    Key_id string
-    Content_id string
-    Time_created time.Time
+	Key_id       string
+	Content_id   string
+	Time_created time.Time
 }
 
 type KeyInfo struct {
-	Key_id string
-	Key string
-    Content_id string
-    Time_created time.Time
+	Key_id       string
+	Key          string
+	Content_id   string
+	Time_created time.Time
 }
 
 func Random_16bytes_as_string() (string, error) {

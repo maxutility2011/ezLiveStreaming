@@ -7,26 +7,26 @@ import (
 	"errors"
 )
 
-var valid_stream_type_values = []string {"hls", "dash"}
-var valid_segment_format_values = []string {"fmp4"}
-var valid_video_codec_values = []string {"h264", "h265", "av1"}
-var valid_audio_codec_values = []string {"aac", "mp3"}
-var valid_bitrate_units = []string {"k", "K"}
-var valid_h26x_presets = []string {"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
+var valid_stream_type_values = []string{"hls", "dash"}
+var valid_segment_format_values = []string{"fmp4"}
+var valid_video_codec_values = []string{"h264", "h265", "av1"}
+var valid_audio_codec_values = []string{"aac", "mp3"}
+var valid_bitrate_units = []string{"k", "K"}
+var valid_h26x_presets = []string{"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
 
-const max_fragment_duration = 10 // second
-const max_segment_duration = 10 // second
+const max_fragment_duration = 10            // second
+const max_segment_duration = 10             // second
 const default_time_shift_buffer_depth = 120 // second
-const max_time_shift_buffer_depth = 14400 // second
+const max_time_shift_buffer_depth = 14400   // second
 const max_video_outputs = 10
 const max_audio_outputs = 5
-const max_video_framerate = 60 // fps
-const min_video_framerate = 0 // fps
-const max_video_resolution_height = 1080 // pixel
-const max_video_resolution_width = 1920 // pixel
-const max_video_output_bitrate = 5000 // kbps
-const max_audio_output_bitrate = 256 // kbps
-const max_peak_to_average_bitrate_ratio = 2 // X 2
+const max_video_framerate = 60                    // fps
+const min_video_framerate = 0                     // fps
+const max_video_resolution_height = 1080          // pixel
+const max_video_resolution_width = 1920           // pixel
+const max_video_output_bitrate = 5000             // kbps
+const max_audio_output_bitrate = 256              // kbps
+const max_peak_to_average_bitrate_ratio = 2       // X 2
 const max_buffersize_to_average_bitrate_ratio = 2 // X 2
 const min_libsvtav1_preset = 12
 const min_h26x_preset = 5 // "fast"
@@ -38,7 +38,7 @@ const min_h26x_threads = 2
 const min_av1_threads = 4
 
 func contains_string(a []string, v string) bool {
-	r := false 
+	r := false
 	for _, e := range a {
 		if v == e {
 			r = true
@@ -49,7 +49,7 @@ func contains_string(a []string, v string) bool {
 }
 
 func contains_int(a []int, v int) bool {
-	r := false 
+	r := false
 	for _, e := range a {
 		if v == e {
 			r = true
@@ -85,7 +85,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	}
 
 	// Default to 2 seconds
-	if (*j).Output.Fragment_duration <= 0 || 
+	if (*j).Output.Fragment_duration <= 0 ||
 		(*j).Output.Fragment_duration > max_fragment_duration {
 		(*j).Output.Fragment_duration = 1
 	}
@@ -97,12 +97,12 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	// Low_latency_mode defaults to 0. No need to validate.
 
 	// Default to 120 seconds
-	if (*j).Output.Time_shift_buffer_depth <= 0  {
+	if (*j).Output.Time_shift_buffer_depth <= 0 {
 		(*j).Output.Time_shift_buffer_depth = default_time_shift_buffer_depth
 	}
 
 	// Time_shift_buffer_depth NOT to be higher than 4 hours
-	if (*j).Output.Time_shift_buffer_depth > max_time_shift_buffer_depth  {
+	if (*j).Output.Time_shift_buffer_depth > max_time_shift_buffer_depth {
 		(*j).Output.Time_shift_buffer_depth = max_time_shift_buffer_depth
 	}
 
@@ -117,14 +117,14 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("protection_system_and_scheme_must_both_be_set"), warnings
 		}
 
-		if !((*j).Output.Drm.Protection_system == "FairPlay" || 
-			(*j).Output.Drm.Protection_system == "Fairplay" || 
+		if !((*j).Output.Drm.Protection_system == "FairPlay" ||
+			(*j).Output.Drm.Protection_system == "Fairplay" ||
 			(*j).Output.Drm.Protection_system == "fairplay") {
 			return errors.New("protection_system_must_be_FairPlay"), warnings
 		}
 
-		if !((*j).Output.Drm.Protection_scheme == "cbcs" || 
-			(*j).Output.Drm.Protection_scheme == "CBCS" || 
+		if !((*j).Output.Drm.Protection_scheme == "cbcs" ||
+			(*j).Output.Drm.Protection_scheme == "CBCS" ||
 			(*j).Output.Drm.Protection_scheme == "Cbcs") {
 			return errors.New("protection_scheme_must_be_cbcs"), warnings
 		}
@@ -149,16 +149,16 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	for i := range (*j).Output.Video_outputs {
 		vo := (*j).Output.Video_outputs[i]
 		// Fatal error. Video codec is required
-		if vo.Codec == "" || 
+		if vo.Codec == "" ||
 			!contains_string(valid_video_codec_values, vo.Codec) {
-				return errors.New("bad_video_codec"), warnings
+			return errors.New("bad_video_codec"), warnings
 		}
-		
+
 		// Video frame rate validation
 		if vo.Framerate < min_video_framerate ||
 			vo.Framerate > max_video_framerate {
-			return errors.New("video_framerate_out_of_range"), warnings 
-		} 
+			return errors.New("video_framerate_out_of_range"), warnings
+		}
 
 		// Video resolution valiation
 		if vo.Width <= 0 || vo.Width > max_video_resolution_width {
@@ -170,13 +170,13 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		// Video (average) bitrate validation
-		bs := vo.Bitrate[: len(vo.Bitrate)-1]
+		bs := vo.Bitrate[:len(vo.Bitrate)-1]
 		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_video_bitrate"), warnings
-		} 
+		}
 
-		if !contains_string(valid_bitrate_units, vo.Bitrate[len(vo.Bitrate)-1: ]) {
+		if !contains_string(valid_bitrate_units, vo.Bitrate[len(vo.Bitrate)-1:]) {
 			return errors.New("bad_video_bitrate_unit"), warnings
 		}
 
@@ -185,33 +185,33 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		// Video max bitrate validation
-		mbs := vo.Max_bitrate[: len(vo.Max_bitrate)-1]
+		mbs := vo.Max_bitrate[:len(vo.Max_bitrate)-1]
 		mbi, err_maxbitrate := strconv.ParseInt(mbs, 10, 64)
 		if err_maxbitrate != nil {
 			return errors.New("bad_video_max_bitrate"), warnings
-		} 
+		}
 
-		if !contains_string(valid_bitrate_units, vo.Max_bitrate[len(vo.Max_bitrate)-1: ]) {
+		if !contains_string(valid_bitrate_units, vo.Max_bitrate[len(vo.Max_bitrate)-1:]) {
 			return errors.New("bad_video_bitrate_unit"), warnings
 		}
 
 		if mbi < 0 {
 			return errors.New("negative_video_max_bitrate"), warnings
 		}
-		
-		if mbi > bi * max_peak_to_average_bitrate_ratio {
+
+		if mbi > bi*max_peak_to_average_bitrate_ratio {
 			w := "- Video max_bitrate should not exceed twice of video average bitrate. "
 			warnings = append(warnings, w)
 		}
 
 		// Video buffer size validation
-		buf_s := vo.Buf_size[: len(vo.Buf_size)-1]
+		buf_s := vo.Buf_size[:len(vo.Buf_size)-1]
 		buf_i, err_bufsize := strconv.ParseInt(buf_s, 10, 64)
 		if err_bufsize != nil {
 			return errors.New("bad_video_buffer_size"), warnings
-		} 
+		}
 
-		if !contains_string(valid_bitrate_units, vo.Buf_size[len(vo.Buf_size)-1: ]) {
+		if !contains_string(valid_bitrate_units, vo.Buf_size[len(vo.Buf_size)-1:]) {
 			return errors.New("bad_video_buffer_size_unit"), warnings
 		}
 
@@ -219,7 +219,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("negative_video_buffer_size"), warnings
 		}
 
-		if buf_i > bi * max_buffersize_to_average_bitrate_ratio {
+		if buf_i > bi*max_buffersize_to_average_bitrate_ratio {
 			w := "- Video buf_size cannot exceed twice of video average bitrate. "
 			warnings = append(warnings, w)
 		}
@@ -229,7 +229,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			preset, err_preset := strconv.ParseInt(vo.Preset, 10, 64)
 			if err_preset != nil {
 				return errors.New("bad_libsvtav1_preset"), warnings
-			} 
+			}
 
 			if preset < min_libsvtav1_preset {
 				w := "- libsvtav1 presets lower than 12 will not be fast enough for real-time (live) encoding. "
@@ -285,19 +285,19 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	for i := range (*j).Output.Audio_outputs {
 		ao := (*j).Output.Audio_outputs[i]
 		// Fatal error. Audio codec is required
-		if ao.Codec == "" || 
+		if ao.Codec == "" ||
 			!contains_string(valid_audio_codec_values, ao.Codec) {
-				return errors.New("bad_audio_codec"), warnings
+			return errors.New("bad_audio_codec"), warnings
 		}
 
 		// Audio bitrate validation
-		bs := ao.Bitrate[: len(ao.Bitrate)-1]
+		bs := ao.Bitrate[:len(ao.Bitrate)-1]
 		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_audio_bitrate"), warnings
-		} 
+		}
 
-		if !contains_string(valid_bitrate_units, ao.Bitrate[len(ao.Bitrate)-1: ]) {
+		if !contains_string(valid_bitrate_units, ao.Bitrate[len(ao.Bitrate)-1:]) {
 			return errors.New("bad_audio_bitrate_unit"), warnings
 		}
 
@@ -311,5 +311,5 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 	}
 
-	return nil, warnings;
+	return nil, warnings
 }

@@ -40,7 +40,7 @@ func (receiver SqsReceiver) ReceiveMsg() (*sqs.ReceiveMessageOutput, error) {
 		QueueUrl:            queueURL,
 		MaxNumberOfMessages: aws.Int64(1),
 	})
-	
+
 	if err1 != nil {
 		return nil, err1
 	}
@@ -59,7 +59,7 @@ func (receiver SqsReceiver) DeleteMsg(messageHandle *string) error {
 		QueueUrl:      queueURL,
 		ReceiptHandle: messageHandle,
 	})
-	
+
 	if err1 != nil {
 		return err1
 	}
