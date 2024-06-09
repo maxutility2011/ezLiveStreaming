@@ -1,8 +1,6 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v5.1
+FROM maxutility2011/ezlivestreaming_baseimage:v5.2
 
 USER streamer
-
-RUN sudo apt install iftop -y
 
 RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/src \
