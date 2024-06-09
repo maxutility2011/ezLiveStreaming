@@ -15,11 +15,26 @@ var job_id;
 var listJobsTimer = null;
 var listJobsInterval = 2000
 
-var sample_live_job = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"Drm": {"Disable_clear_key": 0,"Protection_system": "FairPlay","Protection_scheme": "cbcs"},"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Crf": 27,"Threads": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Crf": 27,"Threads": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+//var sample_live_job = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"Drm": {"Disable_clear_key": 0,"Protection_system": "FairPlay","Protection_scheme": "cbcs"},"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Crf": 27,"Threads": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Crf": 27,"Threads": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var sample_live_job = '';
+$.getJSON("https://localhost:4080/specs/sample_live_job.json", function(json) {
+  sample_live_job = json;
+  console.log(sample_live_job);
+});
 
-var sample_live_job_without_drm = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Crf": 27,"Threads": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Crf": 27,"Threads": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+//var sample_live_job_without_drm = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video365k","Codec": "h264","Framerate": 25,"Width": 640,"Height": 360,"Bitrate": "365k","Max_bitrate": "500k","Buf_size": "500k","Preset": "faster","Crf": 27,"Threads": 2},{"Label": "video550k","Codec": "h264","Framerate": 25,"Width": 768,"Height": 432,"Bitrate": "550k","Max_bitrate": "750k","Buf_size": "750k","Preset": "faster","Crf": 27,"Threads": 2}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var sample_live_job_without_drm = '';
+$.getJSON("https://localhost:4080/specs/sample_live_job_without_drm.json", function(json) {
+  sample_live_job_without_drm = json;
+  console.log(sample_live_job_without_drm);
+});
 
-var sample_live_job_av1 = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video2000k","Codec": "av1","Framerate": 25,"Width": 1920,"Height": 1080,"Bitrate": "2000k","Max_bitrate": "3000k","Buf_size": "3000k","Preset": "12","Crf": 35,"Threads": 4}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+//var sample_live_job_av1 = '{"Output": {"Stream_type": "hls","Segment_format": "fmp4","Fragment_duration": 2,"Segment_duration": 4,"Low_latency_mode": 0,"Time_shift_buffer_depth": 120,"S3_output": {"Bucket": "bzhang-test-bucket-public"},"Video_outputs": [{"Label": "video2000k","Codec": "av1","Framerate": 25,"Width": 1920,"Height": 1080,"Bitrate": "2000k","Max_bitrate": "3000k","Buf_size": "3000k","Preset": "12","Crf": 35,"Threads": 4}],"Audio_outputs": [{"Codec": "aac","Bitrate": "128k"}]}}'
+var sample_live_job_av1 = '';
+$.getJSON("https://localhost:4080/specs/sample_live_job_av1.json", function(json) {
+  sample_live_job_av1 = json;
+  console.log(sample_live_job_av1);
+});
 
 var isLivefeeding = false
 

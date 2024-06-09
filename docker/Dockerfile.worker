@@ -22,7 +22,8 @@ RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && cp /home/streamer/src/ezLiveStreaming/worker/transcoder/packager /home/streamer/bins/ \
     && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_iftop.sh /home/streamer/bins/ \
     && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_cpuutil_reader.sh /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_ffprobe.sh /home/streamer/bins/
+    && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_ffprobe.sh /home/streamer/bins/ \
+    && cp -rf /home/streamer/src/ezLiveStreaming/specs /var/www/html/
 
 ENV PATH="${PATH}:/home/streamer/bins"
 
