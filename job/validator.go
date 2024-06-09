@@ -1,9 +1,7 @@
 package job
 
 import (
-	//"strings"
 	"strconv"
-	//"encoding/json"
 	"errors"
 )
 
@@ -58,10 +56,6 @@ func contains_int(a []int, v int) bool {
 
 	return r
 }
-
-/*func hasField(f string) bool {
-
-}*/
 
 func Validate(j *LiveJobSpec) (error, []string) {
 	// A general note:

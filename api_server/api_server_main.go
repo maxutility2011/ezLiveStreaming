@@ -119,15 +119,9 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 	if j.Output.Stream_type == job.DASH {
 		// Example: https://bozhang-private.s3.amazonaws.com/output_70255156-26ef-4378-811b-dfc44a7c6cb5/master.mpd
 		lj.Playback_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + job.DASH_MPD_FILE_NAME
-		//lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.DASH_MPD_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 	} else if j.Output.Stream_type == job.HLS {
 		lj.Playback_url = "https://" + j.Output.S3_output.Bucket + ".s3.amazonaws.com/output_" + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME
-		//lj.Playback_url = "http://" + server_config.Origin_server_hostname + ":" + server_config.Origin_server_port + "/" + job.Media_output_path_prefix + lj.Id + "/" + job.HLS_MASTER_PLAYLIST_FILE_NAME // Test ONLY. TODO: stream output should be uploaded to cloud storage.
 	}
-
-	//j.IngestUrls = make([]string)
-	//RtmpIngestUrl = "rtmp://" + WorkerAppIp + ":" + WorkerAppPort + "/live/" + j.StreamKey
-	//j.IngestUrls = append(j.IngestUrls, RtmpIngestUrl)
 
 	lj.Spec = j
 	lj.Time_created = time.Now()
@@ -292,13 +286,7 @@ func start_ffmpeg_live_contribution(spec demo.CreateLiveFeedSpec) error {
 		return errors.New("DuplicateLiveFeeding")
 	}
 
-	//liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-vf", "drawtext=fontfile=/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf:text='%{localtime}':fontcolor=white@0.8:x=7:y=7", "-an", "-f", "flv", spec.RtmpIngestUrl)
 	liveFeedCmd = exec.Command("ffmpeg", "-stream_loop", "-1", "-re", "-i", "/tmp/1.mp4", "-c", "copy", "-f", "flv", spec.RtmpIngestUrl)
-	/*Log.Printf("Path: " + ffmpeg.Path + " ")
-	for _, arg := range ffmpeg.Args {
-		Log.Printf(arg + " ")
-	}
-	Log.Printf("\n")*/
 
 	Log.Println("!!!Starting live feeding...")
 	go func() {
@@ -404,13 +392,6 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// TEST ONLY!!!
-			/*FileContentType_test := "application/json"
-			        	w.Header().Set("Content-Type", FileContentType_test)
-			        	w.WriteHeader(http.StatusCreated)
-			        	json.NewEncoder(w).Encode(jspec)
-						return*/
-
 			e1, j := createJob(jspec, warnings)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -509,7 +490,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 					w.WriteHeader(http.StatusAccepted)
 					e1 := stopJob(j) // Update Redis
-					j.Stop = true    // Set Stop flag to true for the local variable
+					j.Stop = true // Set Stop flag to true for the local variable
 
 					if e1 != nil {
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -556,7 +537,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 
 					w.WriteHeader(http.StatusAccepted)
 					e1 := resumeJob(j) // Update Redis
-					j.Stop = false     // Set Stop flag to false for the local variable
+					j.Stop = false // Set Stop flag to false for the local variable
 
 					if e1 != nil {
 						http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)

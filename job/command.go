@@ -266,7 +266,6 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		video_output += ("," + media_segment_template_prefix + media_segment_template)
 
 		if j.Output.Stream_type == HLS {
-			//playlist_name := "playlist_name=" + media_output_path + output_label + ".m3u8"
 			playlist_name := "playlist_name=" + media_output_path + output_label + "/playlist.m3u8"
 			video_output += ("," + playlist_name)
 		}
@@ -301,7 +300,6 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		audio_output += ("," + media_segment_template_prefix + media_segment_template)
 
 		if j.Output.Stream_type == HLS {
-			//playlist_name := "playlist_name=" + media_output_path + output_label + ".m3u8"
 			playlist_name := "playlist_name=" + media_output_path + output_label + "/playlist.m3u8"
 			audio_output += ("," + playlist_name)
 

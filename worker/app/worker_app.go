@@ -374,7 +374,6 @@ func launchJob(j job.LiveJob) error {
 	var rj RunningJob
 	rj.Job = j
 	rj.Command = transcoderCmd
-	//je := running_jobs.PushBack(rj)
 	running_jobs.PushBack(rj)
 
 	var out []byte
@@ -383,8 +382,6 @@ func launchJob(j job.LiveJob) error {
 	go func() {
 		out, err_transcoder = transcoderCmd.CombinedOutput() // This line blocks when transcoderCmd launch succeeds
 		if err_transcoder != nil {
-			//running_jobs.Remove(je) // Cleanup if transcoderCmd fails
-
 			// Let's not remove the failed job from running_jobs here, but leave it to function checkJobStatus()
 			// checkJobStatus() does more than just removing the job, it also updates worker load with scheduler
 			Log.Println("Errors running worker transcoder: ", string(out))
@@ -409,7 +406,6 @@ func launchJob(j job.LiveJob) error {
 }
 
 func reportJobStatus(report models.WorkerJobReport) error {
-	//Log.Println("Sending job status report at time =", time.Now())
 	job_status_url := job_scheduler_url + "/" + "jobstatus"
 
 	b, _ := json.Marshal(report)
@@ -425,18 +421,6 @@ func reportJobStatus(report models.WorkerJobReport) error {
 		Log.Println("Failed to POST job status: ", job_status_url)
 		return err
 	}
-
-	/*
-	    defer resp.Body.Close()
-	    bodyBytes, err := ioutil.ReadAll(resp.Body)
-	    if err != nil {
-	        Log.Println("Error: Failed to read response body (reportJobStatus)")
-	        return errors.New("StatusReportFailure_fail_to_read_scheduler_response")
-	    }
-
-		var hb_resp models.WorkerHeartbeat
-		json.Unmarshal(bodyBytes, &hb_resp)
-	*/
 
 	// TODO: Need to handle error response (other than http code 200)
 	if resp.StatusCode != http.StatusOK {
@@ -463,7 +447,6 @@ func readCpuUtil(j RunningJob) string {
 			} else {
 				ps_output := string(out)
 				re := regexp.MustCompile(".[0-9]") // CPU util is a float, so we match all the digits and "."
-				//r = strings.Join(re.FindAllString(ps_output, -1), "")
 				for _, s := range re.FindAllString(ps_output, -1) {
 					r += strings.TrimSpace(s)
 				}
@@ -622,7 +605,6 @@ func sendHeartbeat() error {
 	hb.LastHeartbeatTime = time.Now()
 	b, _ := json.Marshal(hb)
 
-	//Log.Println("Sending heartbeat at time =", hb.LastHeartbeatTime)
 	worker_heartbeat_url := job_scheduler_url + "/" + "heartbeat"
 	req, err := http.NewRequest(http.MethodPost, worker_heartbeat_url, bytes.NewReader(b))
 	if err != nil {

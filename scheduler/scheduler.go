@@ -319,8 +319,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		} else {
 			return errors.New("WorkerJobExecutionError")
 		}
-	} //else if (j.Delete && resp.StatusCode != http.StatusAccepted) {
-	//}
+	}
 
 	var e error
 	// create_job or resume_job
@@ -378,8 +377,7 @@ func sendJobToWorker(j job.LiveJob, wid string) error {
 		// j.Id and j.StreamKey will remain the same when the job is resumed
 		createUpdateJob(j)
 		Log.Println("Job id = ", j.Id, " is successfully stopped on worker id = ", wid)
-	} // else if j.Delete {
-	//}
+	} 
 
 	return e
 }
@@ -436,8 +434,7 @@ func scheduleOneJob() {
 				Log.Println("Failed to send job to a worker")
 				bufferJob(j)
 			}
-		} // else if j.Delete {
-		//}
+		}
 	}
 }
 
@@ -701,8 +698,6 @@ func check_worker_heartbeat() error {
 		time_now := time.Now().UnixMilli()
 		time_lastHeartbeat := w.LastHeartbeatTime.UnixMilli()
 
-		//Log.Println("time elapsed since last heartbeat: ", time_now - time_lastHeartbeat)
-		//Log.Println("max time allowed no heartbeat: ", int64(max_missing_heartbeats_before_suspension * hbinterval / 1000000))
 		if time_lastHeartbeat != 0 && time_now-time_lastHeartbeat > int64(max_missing_heartbeats_before_suspension*hbinterval*1000) {
 			w.State = models.WORKER_STATE_NOTAVAILABLE
 		}
@@ -814,7 +809,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					json.NewEncoder(w).Encode(worker)
 				} else {
 					Log.Println("Non-existent worker id: ", UrlLastPart)
-					http.Error(w, "Non-existent worker id: "+UrlLastPart, http.StatusNotFound)
+					http.Error(w, "Non-existent worker id: " + UrlLastPart, http.StatusNotFound)
 				}
 			}
 		}
