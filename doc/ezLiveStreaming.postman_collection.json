@@ -1,0 +1,331 @@
+{
+	"info": {
+		"_postman_id": "394fa895-27b2-4117-b686-2b8694611352",
+		"name": "ezLiveStreaming",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28359379"
+	},
+	"item": [
+		{
+			"name": "to_api_server",
+			"item": [
+				{
+					"name": "create_job",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n        \"Output\": {\r\n            \"Stream_type\": \"dash\",\r\n            \"Segment_format\": \"fmp4\",\r\n            \"Fragment_duration\": 1,\r\n            \"Segment_duration\": 4,\r\n            \"Low_latency_mode\": false,\r\n            \"Time_shift_buffer_depth\": 120,\r\n            \"Drm\": {\r\n                \"disable_clear_key\": false,\r\n                \"Protection_system\": \"clear_key\",\r\n                \"Protection_scheme\": \"cbcs\"\r\n            },\r\n            \"Video_outputs\": [\r\n                {\r\n                    \"Label\": \"video365k\",\r\n                    \"Codec\": \"h264\",\r\n                    \"Framerate\": 25,\r\n                    \"Width\": 640,\r\n                    \"Height\": 360,\r\n                    \"Bitrate\": \"365k\",\r\n                    \"Max_bitrate\": \"500k\",\r\n                    \"Buf_size\": \"500k\",\r\n                    \"Preset\": \"faster\",\r\n                    \"Threads\": 2\r\n                },\r\n                {\r\n                    \"Label\": \"video550k\",\r\n                    \"Codec\": \"h264\",\r\n                    \"Framerate\": 25,\r\n                    \"Width\": 768,\r\n                    \"Height\": 432,\r\n                    \"Bitrate\": \"550k\",\r\n                    \"Max_bitrate\": \"750k\",\r\n                    \"Buf_size\": \"750k\",\r\n                    \"Preset\": \"faster\",\r\n                    \"Threads\": 2\r\n                }\r\n            ],\r\n            \"Audio_outputs\": [\r\n                {\r\n                    \"Codec\": \"aac\",\r\n                    \"Bitrate\": \"128k\"\r\n                }\r\n            ]\r\n        }\r\n    }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://ec2-34-202-195-77.compute-1.amazonaws.com:1080/jobs",
+							"protocol": "http",
+							"host": [
+								"ec2-34-202-195-77",
+								"compute-1",
+								"amazonaws",
+								"com"
+							],
+							"port": "1080",
+							"path": [
+								"jobs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get_jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://127.0.0.1:1080/jobs/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"jobs",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get_one_job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://127.0.0.1:1080/jobs/52c60df8-98fe-42f2-b6bd-23f7467bf12f",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"jobs",
+								"52c60df8-98fe-42f2-b6bd-23f7467bf12f"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "stop_job",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "http://127.0.0.1:1080/jobs/5e0ed235-9afa-4a95-bfc3-15bd4a1a7677/stop",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"jobs",
+								"5e0ed235-9afa-4a95-bfc3-15bd4a1a7677",
+								"stop"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "resume_job",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "http://127.0.0.1:1080/jobs/5e0ed235-9afa-4a95-bfc3-15bd4a1a7677/stop",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"jobs",
+								"5e0ed235-9afa-4a95-bfc3-15bd4a1a7677",
+								"stop"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "start_live_feed",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"RtmpIngestUrl\": \"rtmp://172.17.0.3:2037/live/app\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:1080/feed",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"feed"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "start_live_feed",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"RtmpIngestUrl\": \"rtmp://172.17.0.3:2037/live/app\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:1080/feed",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "1080",
+							"path": [
+								"feed"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "to_job_scheduler",
+			"item": [
+				{
+					"name": "register_worker",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"HttpBaseUrl\": \"http://localhost:3080/\",\r\n    \"RtmpBaseUrl\": \"rtmp://localhost:1935/\",\r\n    \"Streams\": [\r\n        {\r\n            \"Url\": \"rtmp://127.0.0.1:1935\",\r\n            \"Bitrate\": \"1m\",\r\n            \"Video_codec\": \"h264\",\r\n            \"Video_resolution_height\": \"720p\"\r\n        }\r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:80/workers",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "80",
+							"path": [
+								"workers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get_workers",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "to_live_worker",
+			"item": [
+				{
+					"name": "get_per_worker_jobs (debug only!)",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "to_key_server",
+			"item": [
+				{
+					"name": "create_drm_key",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Content_id\": \"1ceea419-0878-4b78-8147-50462b232e4b\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:5080/keys/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "5080",
+							"path": [
+								"keys",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get_drm_key",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Content_id\": \"1ceea419-0878-4b78-8147-50462b232e4b\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:5080/keys/1bf51d49ed717215cc4f44bf9933341",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "5080",
+							"path": [
+								"keys",
+								"1bf51d49ed717215cc4f44bf9933341"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

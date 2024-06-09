@@ -45,13 +45,13 @@ ezLiveStreaming consists of 5 microservices that can be independently scaled,
 - Redis data store
 
 ## Live stream management workflow
-![screenshot](diagrams/architecture_diagram.png)
+![screenshot](doc/diagrams/architecture_diagram.png)
 
 The API server exposes API endpoints to users for submitting new live job requests and managing their live channels. The API server receives job requests from users and sends them to the job scheduler via a **job queue** (**AWS Simple Queue Service**). The job scheduler receives a new job request from the job queue, picks a live worker from the worker cluster then assigns the new job to it. The selected live worker launches ffmpeg/shaka packager instances to run the live channel. For live jobs with DRM protection configured, the API server obtains DRM encrypt (decrypt) key from ezKey_server, pass it to Shaka packager along with other DRM configurations for stream encryption. The API server uses a stateless design which the server does not maintain any in-memory states of live jobs. Instead, all the states are kept in Redis data store. 
 
 ## Live stream data flow
 
-![screenshot](diagrams/data_flow.png)
+![screenshot](doc/diagrams/data_flow.png)
 
 The live stream data flow on a live worker server is shown in the above diagram. To run a live channel, the worker launches a ffmpeg transcoder and/or a Shaka packager. From left to right, the contribution encoder generates and sends a live RTMP stream (SRT to be added) to the ffmpeg transcoder. The ffmpeg transcoder outputs *N* number of output MPEG-TS streams, where *N* is the number of configured output renditions in the live job request. The MPEG-TS streams are sent to Shaka packager running on the same VM. Shaka packager outputs HLS/DASH streams as fragmented MP4 segments and playlist files and writes to local disk. The worker runs a file watcher (fsnotify) which watches for new files written to the local stream output folders, then uploads any new files to the configured S3 bucket (i.e., S3_output.Bucket). The S3 buckets serves as the origin server which can deliver HLS/DASH streams to the viewers via CDN.
 
@@ -170,7 +170,7 @@ The order of starting services does not matter. The services will connect to eac
 ## Step 9: Start your live channel from the UI
 The docker file for api_server copies the demo UI source to the Nginx web root (e.g., /var/www/html/demo/). When the API server is running, a Nginx web server will be running too and can serve the demo UI at the following URL, http://[api_server_hostname]:[api_server_port]/demo/demo.html. For example, http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. On your web browser, load the ezLiveStreaming demo UI page. Again, please make sure port 4080 is open to the Internet. 
 
-![screenshot](diagrams/demo_ui.png)
+![screenshot](doc/diagrams/demo_ui.png)
 
 The demo UI provides a list of job request templates. Please choose one and the full job request will be shown in the editor section. Currently, 3 templates are provided,
 - hls live with clear-key drm
@@ -179,7 +179,7 @@ The demo UI provides a list of job request templates. Please choose one and the 
 
 After the job request is loaded in the editor, put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. 
 
-![screenshot](diagrams/demo_create_job.png)
+![screenshot](doc/diagrams/demo_create_job.png)
 
 On the backend, ezLiveStreaming will create a new worker for your new channel. On the worker server, verify the worker container is running,
 ```
@@ -233,12 +233,12 @@ If the new channel is up and running, you should see the following worker proces
 - ffprobe: analyzing the live input stream and generating input info file
 
 The ffmpeg process is ready to receive your live RTMP input stream.
-![screenshot](diagrams/verify_new_channel.png)
+![screenshot](doc/diagrams/verify_new_channel.png)
 
 ## Step 10: Feed your live channel
 On your PC, open OBS studio to broadcast a live RTMP stream that contributes to the worker service of ezLiveStreaming. Go to the demo UI and copy the *rtmp_ingest_url* (returned by api_server after creating your live channel in Step 9), e.g., "rtmp://54.91.250.183:1936/live/5ae4760f-49a0-41a9-979d-005fe9c32834". In OBS, click "Settings" then click "Stream", the following screen will show up. 
 
-![screenshot](diagrams/obs_stream_setting.png)
+![screenshot](doc/diagrams/obs_stream_setting.png)
 
 In the above screen, copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.183:1936/live/" into the "Server" box, and the RTMP stream key, e.g., "5ae4760f-49a0-41a9-979d-005fe9c32834" into the "Stream Key" box. Click "OK" to save and apply the RTMP output settings. Then, click "Start Streaming" button in the main panel to start live broadcasting to ezLiveStreaming. If OBS returns no error, that means the live broadcasting is up and running. Otherwise, go back to Step 9 and verify if all the worker services are running. Failed OBS broadcasting has three possible causes,
 1. ffmpeg or Shaka packager fails to start in worker container.
@@ -250,7 +250,7 @@ It is also possible that Step 9 does not succeed and the new channel is not even
 ## Step 11: Verify live channel output to S3
 Go to your AWS s3 console, click into your bucket, you will see a folder named like "output_4f115985-f9be-4fea-9d0c-0421115715a1/". The random string after "output_" is the live job id which should match the job id returned from the api_server in step 9. Click into the job media output folder, you will see media output like below,
 
-![screenshot](diagrams/s3_output.png)
+![screenshot](doc/diagrams/s3_output.png)
 
 For HLS, media output include m3u8 playlists and sub-folders that contain media segments. 
 
@@ -279,12 +279,12 @@ redis-cli
 ```
 ezLiveStreaming uses the default Redis port, 6379. A full list of all the Redis tables used by ezLiveStreaming can be found at the end of this document.
 
-![screenshot](diagrams/playback_nodrm.png)
+![screenshot](doc/diagrams/playback_nodrm.png)
 
 # Life cycle of a live job
 
 The life cycle (state machine) of a live job is shown in the diagram below.
-![screenshot](diagrams/job_lifecycle.png)
+![screenshot](doc/diagrams/job_lifecycle.png)
 
 A live job can be in one of the 4 states at any moment: 
 - *created*: When a new job request is received and passed the job validation, a new job is created.
@@ -357,7 +357,7 @@ Creating a new live transcoding request (a.k.a. live transcoding job or live job
 - on failure: 500 internal server error <br>
 **Response body**: On success, the server returns the original request body, plus the created job ID, timestamps and job state/stats. Otherwise, the error message on why the request was rejected. <br>
 
-![screenshot](diagrams/create_job.png)
+![screenshot](doc/diagrams/create_job.png)
 
 ## Job validation
 The api_server will validate the specification of each new job. A new job request will be rejected if it fails the validation. The server will return the specific errors for the rejection. Even if a new job request passes the validation and receives "201 created", it could still receive validation warnings. The warnings will be shown in the job response ("Job_validation_warnings").
@@ -411,7 +411,7 @@ List a single job given by its ID. <br>
 - on invalid job id: 404 not found <br>
 **Response body**: specified as follows <br>
 
-![screenshot](diagrams/get_job.png)
+![screenshot](doc/diagrams/get_job.png)
 
 ## Specification of job response
 | Field | Definition | 
@@ -456,7 +456,7 @@ Stop a job given by its ID. Upon request, the associated worker_transcoder insta
 - stopping a stopped job: 403 forbidden <br>
 **Response body**: result <br>
 
-![screenshot](diagrams/stop_job.png)
+![screenshot](doc/diagrams/stop_job.png)
 
 ## Resume a job
 Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
@@ -470,7 +470,7 @@ Resume a job given by its ID. Upon request, the stopped job will be resumed. A n
 - resuming a running job: 403 forbidden <br>
 **Response body**: result <br>
 
-![screenshot](diagrams/resume_job.png)
+![screenshot](doc/diagrams/resume_job.png)
 
 ## Delete a job
 
@@ -485,7 +485,7 @@ Delete a job given by its ID. A job must be stopped first before it can be delet
 - deleting a running job: 403 forbidden <br>
 **Response body**: result <br>
 
-![screenshot](diagrams/delete_job.png)
+![screenshot](doc/diagrams/delete_job.png)
 
 This repository also provides a postman collection including all the external and internal API provided by the API server, the job scheduler and worker_app.
 
@@ -526,7 +526,7 @@ To play the clear-key DRM-protected HLS stream, I used Shaka player (https://sha
 ```
 Please replace the key_id and key with your own ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
 
-![screenshot](diagrams/shaka_player_drm_config.png)
+![screenshot](doc/diagrams/shaka_player_drm_config.png)
 
 ### How to get the DRM key_id and key
 The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! 
@@ -551,7 +551,11 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 [demo/](demo/) provides the implementation of a simple UI demo. <br>
 
-[diagrams/](diagrams/) groups together all the diagrams found in this document. <br>
+[doc/](doc/) contains all the documentation.
+
+[doc/diagrams/](diagrams/) groups together all the diagrams found in this document. <br>
+
+[doc/ezLiveStreaming.postman_collection.json](doc/ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
 [docker/](docker/) provides all the dockerfiles for the different services. <br>
 
@@ -578,8 +582,6 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 [specs/sample_live_job_without_drm.json](specs/sample_live_job_without_drm.json) provides a sample live job request without DRM protection configuration. <br>
 
 [specs/sample_live_job_av1.json](specs/sample_live_job_without_drm.json) provides a sample live job request with AV1 video codec. <br>
-
-[ezLiveStreaming.postman_collection.json](ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
 There are five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
 
