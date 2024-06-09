@@ -17,7 +17,8 @@ RUN cd /home/streamer/src/ezLiveStreaming/api_server \
     && cd ..
 
 RUN cp /home/streamer/src/ezLiveStreaming/api_server/start_server.sh /home/streamer/bins/ \
-    && chmod +x /home/streamer/bins/start_server.sh
+    && chmod +x /home/streamer/bins/start_server.sh \
+    && sudo cp -rf /home/streamer/src/ezLiveStreaming/specs /var/www/html/
 
 ENV PATH="${PATH}:/home/streamer/bins"
 
