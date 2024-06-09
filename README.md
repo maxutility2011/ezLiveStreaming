@@ -573,11 +573,11 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 [compose.yaml](compose.yaml) is the docker compose file.
 
-[specs/sample_live_job.json](sample_live_job.json) provides a sample live job request with DRM protection configured. More job samples can be added to *spec/* and they will be loaded into the demo UI job template dropdown list automatically. <br>
+[specs/sample_live_job.json](specs/sample_live_job.json) provides a sample live job request with DRM protection configured. More job samples can be added to *spec/* and they will be loaded into the demo UI job template dropdown list automatically. <br>
 
-[specs/sample_live_job_without_drm.json](sample_live_job_without_drm.json) provides a sample live job request without DRM protection configuration. <br>
+[specs/sample_live_job_without_drm.json](specs/sample_live_job_without_drm.json) provides a sample live job request without DRM protection configuration. <br>
 
-[specs/sample_live_job_av1.json](sample_live_job_without_drm.json) provides a sample live job request with AV1 video codec. <br>
+[specs/sample_live_job_av1.json](specs/sample_live_job_without_drm.json) provides a sample live job request with AV1 video codec. <br>
 
 [ezLiveStreaming.postman_collection.json](ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
