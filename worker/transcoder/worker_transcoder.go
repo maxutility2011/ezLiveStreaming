@@ -154,7 +154,7 @@ func createUploadDrmKeyFile(keyInfoStr string, local_media_output_path string, r
 		return errStat
 	}
 
-	// Next, upload the local key file and key info file to cloud storage
+	// Next, upload the local key file to cloud storage
 	err = s3.Upload(local_media_output_path+models.DrmKeyFileName, models.DrmKeyFileName, remote_media_output_path)
 	if err != nil {
 		Log.Printf("Failed to upload %s to %s\n", local_media_output_path+models.DrmKeyFileName, remote_media_output_path)
@@ -391,7 +391,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 	// Add fmp4 init segments to init_segments_to_upload.
 	// Add an init segment to upload_list when we upload the first media data segment.
 	// Why?
-	// For AV1 video, FFmpeg takes long times (5-10 seconds) between when it creates "init.mp4" on disk
+	// For AV1 video, FFmpeg takes long time (5-10 seconds) between when it creates "init.mp4" on disk
 	// and when it actually writes "init.mp4" along with the first data segment and the variant playlist.
 	// Therefore, waiting stream_file_write_delay_ms time units (e.g., around 200ms) is not long enough
 	// for "init.mp4" to be ready for s3 upload. If we upload now, it will be an empty file in the bucket.
