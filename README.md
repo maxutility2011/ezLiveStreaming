@@ -489,6 +489,10 @@ Delete a job given by its ID. A job must be stopped first before it can be delet
 
 [doc/ezLiveStreaming.postman_collection.json](doc/ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
+# Design of scheduler and worker
+
+ezLiveStreaming comes with five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
+
 The job scheduler periodically polls the job queue and fetches one job each time. The fetched job is inserted to the back of a Redis list named "queued_jobs". "queued_jobs" is a (scheduler) local queue for caching jobs that are taken off from SQS, but are yet to be scheduled. On the other side, another thread in job scheduler periodically checks the front of "queued_jobs" for new jobs. When a new job is found in the "queued_jobs", it is assigned to a transcoding worker from the worker cluster. Different job assignment algorithms can be used, such as random assignment, round robin assignment, etc. The job scheduler is responsible for managing a live job throughout its lifecycle, for example, assigning the job to a worker, monitoring its status, restarting/reassigning the job if it fails. 
 
 The job scheduler also manages a cluster of live transcoding workers. Specifically, the scheduler assigns ID to each new worker when it starts. After that, the scheduler keeps monitoring heartbeats sent from the worker. Each worker also periodically reports job status and stats to the scheduler. If a job fails unexpectedly, the worker_app daemon can detect the termination of ffmpeg transcoder and Shaka packager, then reports the failure to the scheduler. The scheduler then removes the unexpectedly failed job from the active job list. After a job finishes either normally or unexpectedly, the scheduler updates the worker load by subtracting the estimated load (both cpu and bandwidth load) of the finished job from the current load of the corresponding worker in a timely manner, so that that worker becomes available for new jobs.
@@ -497,16 +501,17 @@ Though the job scheduler manages all the live jobs and live workers, it does not
 
 ![screenshot](doc/diagrams/worker_architecture.png)
 
-Each live worker is a virtual machine that runs ezLiveStreaming worker services. The worker runs a web service daemon called **worker_app** which communicates with the job scheduler to receive job requests, report job status, or worker status, etc. When the worker_app receives a live job request from the scheduler, it launches an instance of **worker_transcoder** to coordinate the execution of the job. Specifically, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager to run a live video channel. The worker_transcoder follows the live job request to transcode and package the stream. *job/command.go* is responsible for translating the live encoding parameter to ffmpeg and Shaka packager command-line options.
+Each live worker is a virtual machine that runs ezLiveStreaming worker services. The worker runs a single instance of a web service daemon called **worker_app** which communicates with the job scheduler to receive job requests, report job status, or worker status, etc. When the worker_app receives a live job request from the scheduler, it launches an instance of **worker_transcoder** to coordinate the execution of the job. Specifically, the worker_transcoder launches a ffmpeg transcoder and a Shaka packager to run a live channel. The worker_transcoder follows the live job request to transcode and package the stream. The code in [job/command.go](job/command.go) is responsible for translating the live encoding parameters to ffmpeg and Shaka packager command-line options.
 
-When worker_app on a live worker first starts, it registers with the job scheduler and receives a worker ID assigned by the scheduler. After that worker_app needs to send periodic heartbeat to the scheduler so that the latter knows the former is still running. If no heartbeat is received from a worker for a certain length of time, the scheduler presumes that worker is no longer running so it deletes the worker from the active worker set and also stops all the live jobs running on that worker. The worker_app also handles **stop_job** requests and **resume_job** requests to stop a running job or resumes a stopped job. 
+When worker_app on a live worker first starts, it registers with the job scheduler and receives a worker ID assigned by the scheduler. After that worker_app needs to send periodic heartbeats to the scheduler so that the latter knows the former is still running. If no heartbeat is received from a worker for a certain length of time, the scheduler presumes that worker is no longer running so it deletes the worker from the active worker list and also stops all the live jobs running on that worker. The worker_app also handles **stop_job** requests and **resume_job** requests to stop a running job or resumes a stopped job. 
 
-A worker_app not only handles normal job requests, it also handles unexpected job failures. To detect failed jobs, a worker_app periodically ping the live jobs (worker_transcoders) running on that worker VM. If a worker_transcoder does not respond, the worker_app presumes that the corresponding live job is no longer running. The worker_app reports the failed jobs to the job scheduler. The latter will adjust workload accordingly.
+A worker_app not only handles normal job requests, it also handles unexpected worker events such as job failures. To detect failed jobs, the worker_app periodically ping all the per-job worker_transcoder processes running on that worker VM. If a worker_transcoder does not respond, the worker_app presumes that the corresponding live job is no longer running (failed). The worker_app reports the failed jobs to the job scheduler. The latter will adjust the corresponding job state/stats and worker load accordingly.
 
 # DRM configuration
 
-A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new transcoding job with DRM protection configured. The transcoding job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair then associate them with the content ID. The api_server receives the key response, parses the key materials from the response, then passes it to scheduler/worker_app/worker_transcoder along with the job request (including the DRM protection configuration). Worker_transcode translates the key materials and DRM configuration to Shaka packager DRM options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. For clear-key DRM, a key file named *key.bin* is output and uploaded to S3. As per HLS specification, for clear key DRM, key.bin is a public file which contains the decrypt key in binary format. The S3 URI to *key.bin* is signaled by the *EXT-X-KEY* tag in the variant playlist. The player downloads the key file to obtain the key in order to decrypt the stream. However, clear-key DRM is ONLY for testing and debugging purposes. A full DRM workflow is needed to keep you content secure.
+A simple clear key DRM key server is implemented to generate random 16 byte key-id and key upon requests. Each live channel receives an unique key-id and key pair. Specifically, api_server sends a key request to the key server when it receives a new live job with DRM protection configured. The live job ID is used as the content ID for the live channel. The key server generates a random 16 byte key_id and key pair and associates them with the that job (i.e., job ID or content ID). The api_server receives the key response, parses the key materials from the response, then passes it to scheduler/worker_app/worker_transcoder along with the job request (including the DRM protection configuration). Worker_transcoder translates the key materials and DRM configuration to Shaka packager DRM command-line options when launching the packager. Lastly, the packager encrypts the live transcoded streams (received from ffmpeg) and outputs DRM-protected HLS streams. For clear-key DRM, a key file named *key.bin* is output and uploaded to S3. As per HLS specification, for clear key DRM, key.bin is a public file which contains the decrypt key in binary format. The S3 URI to *key.bin* is signaled by the *EXT-X-KEY* tag in the variant playlist. The player downloads the key file to obtain the key in order to decrypt the stream. Not that clear-key DRM is ONLY for testing and debugging purposes. A full DRM workflow is needed to keep you content secure.
 
+The [following DRM configuration](https://github.com/maxutility2011/ezLiveStreaming/blob/5e1d803dbb09e880a50555ede3b6f95752702e02/specs/sample_live_job.json#L9) is provided.
 ```
 "Drm": {
     "Disable_clear_key": 0,
@@ -514,7 +519,7 @@ A simple clear key DRM key server is implemented to generate random 16 byte key-
     "Protection_scheme": "cbcs"
 },
 ```
-Particularly we must set *Disable_clear_key* to 0 in order to use clear-key protection scheme. Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
+Particularly, we must set *Disable_clear_key* to 0 in order to use clear-key protection scheme. Currently, "Protection_system" must be set to "FairPlay" and "Protection_scheme" must be set to "cbcs". Supporting a full DRM workflow requires integration with 3rd party DRM services which I am happy to work on if sponsorship is provided. Currently, only video variants are DRM-protected, audio variants are not.
 
 To play the clear-key DRM-protected HLS stream, I used Shaka player (https://shaka-player-demo.appspot.com/demo) and configured key_id and key. The following section is added to the Shaka player "extra config" section,
 ```
@@ -528,24 +533,24 @@ To play the clear-key DRM-protected HLS stream, I used Shaka player (https://sha
 ```
 Please replace the key_id and key with your own ones. The above configuration tells Shaka player what key to use to decrypt the HLS media segments. Next, copy-paste the HLS master playlist url into Shaka player demo (https://shaka-player-demo.appspot.com/demo) and hit "play" button. 
 
+Actually, the above DRM key configuration is not needed if you just play the individual variant playlists instead of the master playlist. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key from there. I haven't figured out why individual variant playlists work but not the master.
+
 ![screenshot](doc/diagrams/shaka_player_drm_config.png)
 
-### How to get the DRM key_id and key
-The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the key_id and get_drm_key request provided by ezKey_server (in the postman collection) to retrieve the decrypt key. Do NOT expose the ezKey_server API to the Internet!!! 
+## How to get the DRM key_id and key
+The DRM key_id (but not the decrypt key) can be found in the get_job response from api_server. Please use the get_drm_key request to retrieve the decrypt key from the ezKey_server. The key ID must be supplied when sending the get_drm_key request. A sample get_drm_key request can be found in [doc/ezLiveStreaming.postman_collection.json](doc/ezLiveStreaming.postman_collection.json). Do NOT expose the ezKey_server API to the Internet!!! 
 
-Alternatively, a DRM key info file (called key.json) is written to local disk (but not uploaded to S3) along with the key file (key.bin). The decrypt key can be found there.
-
-Actually, the above DRM key configuration is not needed if you play the individual variant playlists instead of  the master playlist. Shaka player will download the key file (key.bin) which is given by the *URI* field in the *EXT-X-KEY* tag and get the decrypt key. I haven't figured out why individual variant playlists work but not the master.
+Alternatively, a DRM key info file in clear text, **key.json** is written to local disk (but not uploaded to S3) when a DRM-protected live channel starts. The decrypt key can be found there. The content of key.info is essentially the body of [KeyInfo](https://github.com/maxutility2011/ezLiveStreaming/blob/5e1d803dbb09e880a50555ede3b6f95752702e02/models/drm.go#L22) struct.
 
 # S3 output configuration
 
-ezLiveStreaming supports uploading transcoder outputs to AWS S3 buckets. You can configure S3 media output via the "S3_output" section,
+ezLiveStreaming supports uploading transcoder outputs to AWS S3 buckets. You can configure S3 media output via the [S3_output section](https://github.com/maxutility2011/ezLiveStreaming/blob/5e1d803dbb09e880a50555ede3b6f95752702e02/specs/sample_live_job.json#L14), e.g.,
 ```
 "S3_output": {
-    "Bucket": "bzhang-test-bucket-public"
+    "Bucket": "bzhang-test-bucket"
 }
 ```
-Currently, ezLiveStreaming does not support programmatic S3 authentication methods. You may configure AWS access key and secret key as environment variables on the worker VM, so that worker_transcoder has access to upload to the bucket.
+Currently, ezLiveStreaming does not support programmatic S3 authentication methods. You need to find a way to grant S3 upload access to the worker.
 
 # Code structure
 
@@ -585,11 +590,7 @@ Currently, ezLiveStreaming does not support programmatic S3 authentication metho
 
 [specs/sample_live_job_av1.json](specs/sample_live_job_without_drm.json) provides a sample live job request with AV1 video codec. <br>
 
-Note that any modification to the sample jobs under *spec/* will be loaded automatically to the demo UI job template dropdown list. <br>
-
-There are five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
-
-On each live worker VM, there runs one instance of worker_app which manages all the live jobs running on the VM. Each live job is executed by one instance of worker_transcoder which coordinates the live transcoder and the live packager to ingest, transcode and package the HLS/DASH live output stream. worker_app is a long-standing daemon while worker_transcoder only lives when a live job is still alive.
+Note that any modification to the sample jobs under *spec/* will be loaded automatically to the demo UI job template dropdown list when you rebuild the worker docker image. <br>
 
 # Build and run individual services
 This section provides instructions for building and running individual services when you don't want to use docker-compose to manage the services.
