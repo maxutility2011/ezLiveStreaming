@@ -674,7 +674,7 @@ This table stores all the DRM keys. <br>
 
 # Limitation
 ## AV1
-The current implementation uses [libsvtav1](https://gitlab.com/AOMediaCodec/SVT-AV1) for live AV1 transcoding. In order to transcode at real-time speed, the encoder preset has to be set to 12. Further testing has to be done to assess the impact on video quality.
+The current implementation uses [libsvtav1](https://gitlab.com/AOMediaCodec/SVT-AV1) for live AV1 transcoding. 
 
 ## About the demo UI
 The simple demo UI is designed to only serve a single live job. Each time a new job is to be created, the demo UI page needs to be refreshed. The page refresh will automatically send out a *stop_job* request to api_server to clean up the old job.
