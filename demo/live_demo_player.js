@@ -37,6 +37,8 @@ $.getJSON(url3, function(json) {
 var isLivefeeding = false
 
 async function initPlayer() {
+    console.log("url = " + api_server_url);
+
     // Create a Player instance.
     const video = document.getElementById('video');
   
