@@ -12,8 +12,9 @@ RUN mkdir /home/streamer/src \
 RUN cd /home/streamer/src/ezLiveStreaming/drm_key_server \
     && /usr/local/go/bin/go build ezKey_server.go \
     && cp /home/streamer/src/ezLiveStreaming/drm_key_server/ezKey_server /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/drm_key_server/config.json /home/streamer/conf/drm_key_server_config.json \
     && cd ..
+
+COPY ../drm_key_server/config.json /home/streamer/conf/drm_key_server_config.json
 
 ENV PATH="${PATH}:/home/streamer/bins"
 

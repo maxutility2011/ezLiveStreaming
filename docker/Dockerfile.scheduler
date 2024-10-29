@@ -12,8 +12,9 @@ RUN mkdir /home/streamer/src \
 RUN cd /home/streamer/src/ezLiveStreaming/scheduler \
     && /usr/local/go/bin/go build scheduler.go \
     && cp /home/streamer/src/ezLiveStreaming/scheduler/scheduler /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/scheduler/config.json /home/streamer/conf/scheduler_config.json \
     && cd ..
+
+COPY ../scheduler/config.json /home/streamer/conf/scheduler_config.json
 
 ENV PATH="${PATH}:/home/streamer/bins"
 

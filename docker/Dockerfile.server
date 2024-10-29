@@ -13,8 +13,9 @@ RUN mkdir /home/streamer/bins \
 RUN cd /home/streamer/src/ezLiveStreaming/api_server \
     && /usr/local/go/bin/go build api_server_main.go \
     && cp /home/streamer/src/ezLiveStreaming/api_server/api_server_main /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/api_server/config.json /home/streamer/conf/apt_server_config.json \
     && cd ..
+
+COPY ../api_server/config.json /home/streamer/conf/apt_server_config.json
 
 RUN cp /home/streamer/src/ezLiveStreaming/api_server/start_server.sh /home/streamer/bins/ \
     && chmod +x /home/streamer/bins/start_server.sh \
