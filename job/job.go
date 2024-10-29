@@ -31,6 +31,13 @@ type DrmConfig struct {
 	Protection_scheme string
 }
 
+type ObjectDetectionConfig struct {
+	Ingest_frame_rate float64
+	Encode_codec string
+	Encode_preset string
+	Encode_crf int
+}
+
 type s3OutputConfig struct {
 	Bucket string
 }
@@ -43,9 +50,11 @@ type LiveJobOutputSpec struct {
 	Low_latency_mode        int
 	Time_shift_buffer_depth int
 	Drm                     DrmConfig
+	Detection				ObjectDetectionConfig
 	S3_output               s3OutputConfig
 	Video_outputs           []LiveVideoOutputSpec
 	Audio_outputs           []LiveAudioOutputSpec
+	 
 }
 
 type LiveJobInputSpec struct {
@@ -53,6 +62,7 @@ type LiveJobInputSpec struct {
 	JobUdpPortBase int
 }
 
+// LiveJobSpec: specifies a live job request
 type LiveJobSpec struct {
 	Input  LiveJobInputSpec
 	Output LiveJobOutputSpec
@@ -63,6 +73,7 @@ const JOB_STATE_RUNNING = "running"     // worker_transcoder running but not ing
 const JOB_STATE_STREAMING = "streaming" // Ingesting and transcoding
 const JOB_STATE_STOPPED = "stopped"     // Stopped
 
+// LiveJob: includes the job spec, job states and stats.
 type LiveJob struct {
 	Id    string
 	State string

@@ -8,6 +8,7 @@ import (
 var valid_stream_type_values = []string{"hls", "dash"}
 var valid_segment_format_values = []string{"fmp4"}
 var valid_video_codec_values = []string{"h264", "h265", "av1"}
+var valid_detection_codec_values = []string{"h264", "h265"}
 var valid_audio_codec_values = []string{"aac", "mp3"}
 var valid_bitrate_units = []string{"k", "K"}
 var valid_h26x_presets = []string{"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
@@ -20,6 +21,7 @@ const max_video_outputs = 10
 const max_audio_outputs = 5
 const max_video_framerate = 60                    // fps
 const min_video_framerate = 0                     // fps
+const default_detection_frame_rate = 25			  // fps
 const max_video_resolution_height = 1080          // pixel
 const max_video_resolution_width = 1920           // pixel
 const max_video_output_bitrate = 5000             // kbps
@@ -28,9 +30,11 @@ const max_peak_to_average_bitrate_ratio = 2       // X 2
 const max_buffersize_to_average_bitrate_ratio = 2 // X 2
 const min_libsvtav1_preset = 12
 const min_h26x_preset = 5 // "fast"
-const min_h26x_crf = 0
+const min_h26x_crf = 0 // ffmpeg allows crf = 0 (lossless compression). However, this is practically impossible for live encoding.
+const practical_min_h26x_crf = 23 // Return a warning when crf is lower than this value.
 const max_h26x_crf = 51
 const min_av1_crf = 0
+const practical_min_av1_crf = 23 // Return a warning when crf is lower than this value.
 const max_av1_crf = 63
 const min_h26x_threads = 2
 const min_av1_threads = 4
@@ -154,6 +158,48 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
+		// Validate object detection params
+		detection_frame_rate := 0.0
+		if (*j).Output.Detection != (ObjectDetectionConfig{}) {
+			detection_frame_rate = (*j).Output.Detection.Ingest_frame_rate
+		}
+
+		if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
+			w := "- Object detection ingest frame rate cannot be greater than output video frame rate."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection != (ObjectDetectionConfig{}) {
+			if (*j).Output.Detection.Ingest_frame_rate == 0 {
+				if vo.Framerate > 0 {
+					(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
+				} else {
+					(*j).Output.Detection.Ingest_frame_rate = default_detection_frame_rate
+				}
+			}
+
+			if (*j).Output.Detection.Encode_codec == "" {
+				(*j).Output.Detection.Encode_codec = "h264"
+			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
+				return errors.New("bad_detection_codec"), warnings
+			}
+
+			if (*j).Output.Detection.Encode_preset == "" {
+				(*j).Output.Detection.Encode_preset = "veryfast"
+			} else if !contains_string(valid_h26x_presets, (*j).Output.Detection.Encode_preset) {
+				return errors.New("bad_detection_preset"), warnings
+			}
+
+			if (*j).Output.Detection.Encode_crf == 0 {
+				(*j).Output.Detection.Encode_crf = 27
+			} else if (*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf {
+				return errors.New("bad_detection_crf"), warnings
+			} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
+				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
+				warnings = append(warnings, w)
+			}
+		}
+
 		// Video resolution valiation
 		if vo.Width <= 0 || vo.Width > max_video_resolution_width {
 			return errors.New("bad_video_resolution_width"), warnings
@@ -230,6 +276,11 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				warnings = append(warnings, w)
 			}
 
+			if vo.Crf < practical_min_av1_crf {
+				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_av1_crf)
+				warnings = append(warnings, w)
+			}
+
 			if vo.Crf < min_av1_crf || vo.Crf > max_av1_crf {
 				return errors.New("libsvtav1_crf_out_of_range"), warnings
 			}
@@ -251,6 +302,11 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				return errors.New("invalid_h264_encoder_preset"), warnings
 			} else if preset_index < min_h26x_preset {
 				w := "- libx264/libx265 presets lower than " + valid_h26x_presets[min_h26x_preset] + " will not be fast enough for real-time (live) encoding. "
+				warnings = append(warnings, w)
+			}
+
+			if vo.Crf < practical_min_h26x_crf {
+				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf)
 				warnings = append(warnings, w)
 			}
 
