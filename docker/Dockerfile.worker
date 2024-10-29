@@ -11,8 +11,9 @@ RUN mkdir /home/streamer/bins \
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
     && /usr/local/go/bin/go build worker_app.go \
-    && cp /home/streamer/src/ezLiveStreaming/worker/app/worker_app /home/streamer/bins/ \
-    && cp /home/streamer/src/ezLiveStreaming/worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
+    && cp /home/streamer/src/ezLiveStreaming/worker/app/worker_app /home/streamer/bins/
+
+COPY ../worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && /usr/local/go/bin/go build worker_transcoder.go \
