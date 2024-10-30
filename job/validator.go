@@ -146,7 +146,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 	}
 
 	// Find the bitrate of the lowest rendition. This will be used when validating object detection params
-	var min_rendition_bitrate float64 = max_video_output_bitrate
+	var min_rendition_bitrate float64 = max_video_output_bitrate * 1000
 	for i := range (*j).Output.Video_outputs {
 		vo := (*j).Output.Video_outputs[i]
 		err, b := utils.BitrateString2Float64(vo.Bitrate)
