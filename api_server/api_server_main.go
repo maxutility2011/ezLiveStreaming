@@ -393,7 +393,13 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if jspec.Api_test == 1 {
-				w.WriteHeader(http.StatusCreated)
+				warning_message := "\nWarnings: \n"
+				for _, e := range warnings {
+					warning_message += e
+				}
+
+				w.Header().Set("Content-Type", "text/plain")
+				fmt.Fprintln(w, warning_message)
 				return
 			}
 
