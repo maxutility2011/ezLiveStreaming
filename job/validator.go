@@ -173,8 +173,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
-		//err, b := utils.BitrateString2Float64(vo.Bitrate)
-		err, _ := utils.BitrateString2Float64(vo.Bitrate)
+		err, b := utils.BitrateString2Float64(vo.Bitrate)
 		if err != nil {
 			return errors.New("bad_video_output_bitrate"), warnings
 		}
@@ -200,7 +199,9 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			if (*j).Output.Detection.Encode_codec == "" {
 				(*j).Output.Detection.Encode_codec = "h264"
 			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
-				return errors.New("bad_detection_codec"), warnings
+				codec_err := "bad_detection_codec_" + strconv.FormatFloat(min_rendition_bitrate, 'f', 6, 64) + "_" + strconv.FormatFloat(b, 'f', 6, 64) 
+				return errors.New(codec_err), warnings
+				//return errors.New("bad_detection_codec"), warnings
 			}
 
 			if (*j).Output.Detection.Encode_preset == "" {
