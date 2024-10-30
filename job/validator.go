@@ -165,6 +165,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
+			(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
 			w := "- Object detection ingest frame rate cannot be greater than output video frame rate."
 			warnings = append(warnings, w)
 		}
@@ -178,6 +179,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				}
 			}
 
+			// Post-detection video re-encoding only uses h264 or h265, not av1
 			if (*j).Output.Detection.Encode_codec == "" {
 				(*j).Output.Detection.Encode_codec = "h264"
 			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
@@ -195,6 +197,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			} else if (*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf {
 				return errors.New("bad_detection_crf"), warnings
 			} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
+				(*j).Output.Detection.Encode_crf = practical_min_h26x_crf
 				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
 				warnings = append(warnings, w)
 			}
