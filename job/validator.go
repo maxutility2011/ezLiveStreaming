@@ -3,6 +3,7 @@ package job
 import (
 	"strconv"
 	"errors"
+	"ezliveStreaming/utils"
 )
 
 var valid_stream_type_values = []string{"hls", "dash"}
@@ -24,8 +25,8 @@ const min_video_framerate = 0                     // fps
 const default_detection_frame_rate = 25			  // fps
 const max_video_resolution_height = 1080          // pixel
 const max_video_resolution_width = 1920           // pixel
-const max_video_output_bitrate = 5000             // kbps
-const max_audio_output_bitrate = 256              // kbps
+const max_video_output_bitrate = 5000.0           // kbps
+const max_audio_output_bitrate = 256.0              // kbps
 const max_peak_to_average_bitrate_ratio = 2       // X 2
 const max_buffersize_to_average_bitrate_ratio = 2 // X 2
 const min_libsvtav1_preset = 12
@@ -144,6 +145,20 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		return errors.New("too_many_video_outputs"), warnings
 	}
 
+	// Find the bitrate of the lowest rendition. This will be used when validating object detection params
+	var min_rendition_bitrate float64 = max_video_output_bitrate
+	for i := range (*j).Output.Video_outputs {
+		vo := (*j).Output.Video_outputs[i]
+		err, b := utils.BitrateString2Float64(vo.Bitrate)
+		if err != nil {
+			return errors.New("bad_video_output_bitrate"), warnings
+		}
+
+		if b < min_rendition_bitrate {
+			min_rendition_bitrate = b
+		}
+	}
+
 	for i := range (*j).Output.Video_outputs {
 		vo := (*j).Output.Video_outputs[i]
 		// Fatal error. Video codec is required
@@ -158,19 +173,20 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
-		// Validate object detection params
-		detection_frame_rate := 0.0
-		if (*j).Output.Detection != (ObjectDetectionConfig{}) {
-			detection_frame_rate = (*j).Output.Detection.Ingest_frame_rate
+		err, b := utils.BitrateString2Float64(vo.Bitrate)
+		if err != nil {
+			return errors.New("bad_video_output_bitrate"), warnings
 		}
 
-		if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
-			(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
-			w := "- Object detection ingest frame rate cannot be greater than output video frame rate."
-			warnings = append(warnings, w)
-		}
+		// Validate object detection params. Object detection is ONLY performed on the lowest bitrate rendition.
+		if (*j).Output.Detection != (ObjectDetectionConfig{}) && b == min_rendition_bitrate {
+			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
+			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
+				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
+				w := "- Object detection ingest frame rate cannot be greater than output video frame rate."
+				warnings = append(warnings, w)
+			}
 
-		if (*j).Output.Detection != (ObjectDetectionConfig{}) {
 			if (*j).Output.Detection.Ingest_frame_rate == 0 {
 				if vo.Framerate > 0 {
 					(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
@@ -214,7 +230,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video (average) bitrate validation
 		bs := vo.Bitrate[:len(vo.Bitrate)-1]
-		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
+		bi, err_bitrate := strconv.ParseFloat(bs, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_video_bitrate"), warnings
 		}
@@ -229,7 +245,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video max bitrate validation
 		mbs := vo.Max_bitrate[:len(vo.Max_bitrate)-1]
-		mbi, err_maxbitrate := strconv.ParseInt(mbs, 10, 64)
+		mbi, err_maxbitrate := strconv.ParseFloat(mbs, 64)
 		if err_maxbitrate != nil {
 			return errors.New("bad_video_max_bitrate"), warnings
 		}
@@ -249,7 +265,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video buffer size validation
 		buf_s := vo.Buf_size[:len(vo.Buf_size)-1]
-		buf_i, err_bufsize := strconv.ParseInt(buf_s, 10, 64)
+		buf_i, err_bufsize := strconv.ParseFloat(buf_s, 64)
 		if err_bufsize != nil {
 			return errors.New("bad_video_buffer_size"), warnings
 		}
@@ -345,7 +361,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Audio bitrate validation
 		bs := ao.Bitrate[:len(ao.Bitrate)-1]
-		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
+		bi, err_bitrate := strconv.ParseFloat(bs, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_audio_bitrate"), warnings
 		}

@@ -129,7 +129,7 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 	lj.Delete = false // Set to true when the client wants to delete this job
 	lj.State = job.JOB_STATE_CREATED
 
-	warning_message := "\nWarnings: \n"
+	warning_message := "Warnings: "
 	for _, e := range warnings {
 		warning_message += e
 	}
@@ -393,7 +393,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if jspec.Api_test == 1 {
-				warning_message := "\nWarnings: \n"
+				warning_message := "Warnings: "
 				for _, e := range warnings {
 					warning_message += e
 				}
