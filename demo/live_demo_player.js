@@ -69,15 +69,18 @@ function changeJob() {
  	var job_list = document.getElementById("liveJobList");
 	var job_request = document.getElementById("job_request");
 	if (job_list.options[job_list.selectedIndex].text == "hls live with clear-key drm") {
-		j = JSON.parse(sample_live_job)
-		job_request.innerHTML = JSON.stringify(j, null, 2)
+		  j = JSON.parse(sample_live_job)
+		  job_request.innerHTML = JSON.stringify(j, null, 2)
 	} else if (job_list.options[job_list.selectedIndex].text == "hls live without drm") {
-		j = JSON.parse(sample_live_job_without_drm)
-                job_request.innerHTML = JSON.stringify(j, null, 2)
+		  j = JSON.parse(sample_live_job_without_drm)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
 	} else if (job_list.options[job_list.selectedIndex].text == "hls live with av1 codec") {
-                j = JSON.parse(sample_live_job_av1)
-                job_request.innerHTML = JSON.stringify(j, null, 2)
-        }
+      j = JSON.parse(sample_live_job_av1)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
+  } else if (job_list.options[job_list.selectedIndex].text == "hls live with Yolo object detection") {
+      j = JSON.parse(sample_live_job_object_detection)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
+  }
 }
 
 function onError(e) {
