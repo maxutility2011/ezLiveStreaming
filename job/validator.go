@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"errors"
 	"ezliveStreaming/utils"
-	"fmt"
 )
 
 var valid_stream_type_values = []string{"hls", "dash"}
@@ -174,15 +173,14 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
-		err, b := utils.BitrateString2Float64(vo.Bitrate)
+		//err, b := utils.BitrateString2Float64(vo.Bitrate)
+		err, _ := utils.BitrateString2Float64(vo.Bitrate)
 		if err != nil {
 			return errors.New("bad_video_output_bitrate"), warnings
 		}
 
-		fmt.Printf("b = %4f", b)
-		fmt.Printf("min_rendition_bitrate = %4f", min_rendition_bitrate)
 		// Validate object detection params. Object detection is ONLY performed on the lowest bitrate rendition.
-		if (*j).Output.Detection != (ObjectDetectionConfig{}) && b == min_rendition_bitrate {
+		if (*j).Output.Detection != (ObjectDetectionConfig{}) { //&& b == min_rendition_bitrate {
 			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
 			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
 				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
