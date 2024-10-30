@@ -392,6 +392,11 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if jspec.Api_test == 1 {
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+
 			e1, j := createJob(jspec, warnings)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -489,7 +494,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					}
 
 					w.WriteHeader(http.StatusAccepted)
-					e1 := stopJob(j) // Update Redis
+					e1 := stopJob(j) // This function only updates Redis records
 					j.Stop = true // Set Stop flag to true for the local variable
 
 					if e1 != nil {
