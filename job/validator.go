@@ -179,7 +179,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 
 		// Validate object detection params. Object detection is ONLY performed on the lowest bitrate rendition.
-		if (*j).Output.Detection != (ObjectDetectionConfig{}) { //&& b == min_rendition_bitrate {
+		if (*j).Output.Detection != (ObjectDetectionConfig{}) && b == min_rendition_bitrate {
 			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
 			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
 				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
@@ -199,9 +199,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			if (*j).Output.Detection.Encode_codec == "" {
 				(*j).Output.Detection.Encode_codec = "h264"
 			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
-				codec_err := "bad_detection_codec_" + strconv.FormatFloat(min_rendition_bitrate, 'f', 6, 64) + "_" + strconv.FormatFloat(b, 'f', 6, 64) 
-				return errors.New(codec_err), warnings
-				//return errors.New("bad_detection_codec"), warnings
+				return errors.New("bad_detection_codec"), warnings
 			}
 
 			if (*j).Output.Detection.Encode_preset == "" {
