@@ -35,7 +35,7 @@ $.getJSON(url3, function(json) {
 });
 
 var sample_live_job_object_detection = '';
-var url4 = "http://" + location.host + "/specs/sample_live_object_detection.json";
+var url4 = "http://" + location.host + "/specs/sample_live_job_object_detection.json";
 $.getJSON(url4, function(json) {
   sample_live_job_object_detection = JSON.stringify(json, null, 2);
 });
