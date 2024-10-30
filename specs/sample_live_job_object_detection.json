@@ -6,11 +6,11 @@
         "Segment_duration": 4,
         "Low_latency_mode": 0,
         "Time_shift_buffer_depth": 120,
-        "ObjectDetectionConfig": {
-            "Ingest_frame_rate": "25",
-            "Encoder": "h264",
-            "Encoder_preset": "veryfast",
-            "Encoder_crf": "25"
+        "Detection": {
+            "Ingest_frame_rate": 25,
+            "Encode_codec": "h264",
+            "Encode_preset": "veryfast",
+            "Encode_crf": 25
         },
         "S3_output": {
             "Bucket": "bzhang-test-bucket-public"
