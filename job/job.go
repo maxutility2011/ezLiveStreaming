@@ -64,8 +64,9 @@ type LiveJobInputSpec struct {
 
 // LiveJobSpec: specifies a live job request
 type LiveJobSpec struct {
-	Input  LiveJobInputSpec
-	Output LiveJobOutputSpec
+	Input  		LiveJobInputSpec
+	Output 		LiveJobOutputSpec
+	Api_test 	int
 }
 
 const JOB_STATE_CREATED = "created"     // Created
