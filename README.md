@@ -447,7 +447,7 @@ ezLiveStreaming supports display of live transcoding/streaming stats. To receive
 ## Stop a job
 Stop a job given by its ID. Upon request, the associated worker_transcoder instance will be stopped but the job info and states will remain in Redis. When the job is resumed in the future, the job ID, stream key and all the transcoding and packaging parameters remain the same. <br>
 
-**PUT /jobs/[job_id]** <br>
+**PUT /jobs/[job_id]/stop** <br>
 **Request body**: None <br>
 **Response code** <br>
 - on success: 202 Accepted <br>
@@ -461,7 +461,7 @@ Stop a job given by its ID. Upon request, the associated worker_transcoder insta
 ## Resume a job
 Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
 
-**PUT /jobs/[job_id]** <br>
+**PUT /jobs/[job_id]/resume** <br>
 **Request body**: None <br>
 **Response code** <br>
 - on success: 202 Accepted <br>

@@ -28,6 +28,8 @@ type WorkerAppConfig struct {
 	GetPublicIpUrl    string
 	WorkerPort        string
 	WorkerUdpPortBase int
+	CpuCapacity 	  int
+	BandwidthCapacity int
 }
 
 type RunningJob struct {
