@@ -272,12 +272,12 @@ var worker_app_config WorkerAppConfig
 
 const cpu_utilization_threshold = 5.0
 
-func getCpuCapacity() string {
-	return "5000"
+func getCpuCapacity() int {
+	return worker_app_config.CpuCapacity
 }
 
-func getBandwidthCapacity() string {
-	return "100m"
+func getBandwidthCapacity() int { 
+	return worker_app_config.BandwidthCapacity // kbps
 }
 
 func allocateRtmpIngestPort() int {

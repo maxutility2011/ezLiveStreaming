@@ -2,5 +2,7 @@
     "SchedulerUrl": "http://SchedulerUrl:3080",
     "GetPublicIpUrl" : "https://api.ipify.org?format=json",
     "WorkerPort": "2080",
-    "WorkerUdpPortBase": 10001
+    "WorkerUdpPortBase": 10001,
+    "CpuCapacity": 0,
+    "BandwidthCapacity": 0
 }
