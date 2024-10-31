@@ -178,8 +178,9 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("bad_video_output_bitrate"), warnings
 		}
 
-		// Validate object detection params. Object detection is ONLY performed on the lowest bitrate rendition.
-		if (*j).Output.Detection != (ObjectDetectionConfig{}) && b == min_rendition_bitrate {
+		// Validate object detection params. 
+		// Object detection is ONLY performed on the lowest bitrate rendition.
+		if NeedObjectDetection(*j) && b == min_rendition_bitrate {
 			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
 			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
 				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
