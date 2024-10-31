@@ -184,7 +184,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
 			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
 				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
-				w := "- Object detection ingest frame rate cannot be greater than output video frame rate."
+				w := "- Object detection ingest frame rate " + strconv.FormatFloat(detection_frame_rate, 'f', 4, 64) + " cannot be greater than output video frame rate " + strconv.FormatFloat(vo.Framerate, 'f', 4, 64)
 				warnings = append(warnings, w)
 			}
 
@@ -200,7 +200,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			if (*j).Output.Detection.Encode_codec == "" {
 				(*j).Output.Detection.Encode_codec = "h264"
 			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
-				return errors.New("bad_detection_codec"), warnings
+				return errors.New("bad_detection_codec_" + strconv.FormatFloat(detection_frame_rate, 'f', 4, 64) + "_" + strconv.FormatFloat(vo.Framerate, 'f', 4, 64)), warnings
 			}
 
 			if (*j).Output.Detection.Encode_preset == "" {
