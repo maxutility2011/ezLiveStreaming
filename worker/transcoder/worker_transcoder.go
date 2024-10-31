@@ -9,6 +9,7 @@ import (
 	"ezliveStreaming/job"
 	"ezliveStreaming/models"
 	"ezliveStreaming/s3"
+	"ezliveStreaming/utils"
 	"flag"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -364,6 +365,18 @@ func isHlsmasterPlaylist(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
+func isDetectionTargetTypeMediaDataSegment(file_name string, min_rendition_bitrate string) bool {
+	return strings.Contains(file_name, min_rendition_bitrate) && isMediaDataSegment(file_name)
+}
+
+func isDetectionTargetTypeMediaInitSegment(file_name string, min_rendition_bitrate string) bool {
+	return strings.Contains(file_name, min_rendition_bitrate) && isFmp4InitSegment(file_name)
+}
+
+func isDetectionTargetTypeHlsVariantPlaylist(file_name string, min_rendition_bitrate string) bool {
+	return strings.Contains(file_name, min_rendition_bitrate) && isHlsVariantPlaylist(file_name)
+}
+
 func getRenditionNameFromPath(path string) string {
 	s := ""
 	posLastSingleSlash := strings.LastIndex(path, "/")
@@ -413,7 +426,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 }
 
 // https://github.com/fsnotify/fsnotify
-func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool) error {
+func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, min_rendition_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
 	upload_list = list.New()
 
@@ -443,6 +456,18 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 						addToUploadList(event.Name, remote_media_output_path)
 					} else {
 						Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
+					}
+
+					if isDetectionTargetTypeMediaDataSegment(event.Name, min_rendition_bitrate) {
+						Log.Printf("Media data segment to detect: %s", event.Name)
+					}
+
+					if isDetectionTargetTypeMediaInitSegment(event.Name, min_rendition_bitrate) {
+						Log.Printf("Media init segment to detect: %s", event.Name)
+					}
+
+					if isDetectionTargetTypeHlsVariantPlaylist(event.Name, min_rendition_bitrate) {
+						Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 					}
 				}
 			case _, ok := <-watcher.Errors:
@@ -649,6 +674,20 @@ func main() {
 	//    Also, FFprobe exits and does not cause FFmpeg to crash.
 	// 5. It takes FFprobe ~5 seconds to analyze the input stream, so be patient if you don't see input_info.json.
 
+	// Create a subdirectory for video detection output.
+	// The Yolo script (object detector) will be launched on the fly when new video segments 
+	// in the lowest bitrate rendition are written to its output subdir and be found by the
+	// file watcher. The Yolo model will be used to 
+	// 1. Split video segments into frames, 
+	// 2. Detect and mark objects in video frames, 
+	// 3. Encode the marked frames into a single video segment,
+	// 4. Output the marked video segments to the video detection output subdir,
+	// The file watcher keeps watching the video detection output subdir, and upload the marked segments.
+	if job.NeedObjectDetection(j) {
+		detection_output_subdir := "video_detection"
+		local_media_output_path_subdirs = append(local_media_output_path_subdirs, detection_output_subdir)
+	}
+
 	// Create local output paths. Shaka packager may have already created the paths.
 	for _, sd := range local_media_output_path_subdirs {
 		sd = local_media_output_path + sd
@@ -663,6 +702,18 @@ func main() {
 		}
 	}
 
+	var min_rendition_bitrate float64 = 500000 * 1000 // 500000 (500mbps) = infinity
+	var min_rendition_bitrate_str string = ""
+	for i := range j.Output.Video_outputs {
+		vo := j.Output.Video_outputs[i]
+		_, b := utils.BitrateString2Float64(vo.Bitrate) // Output bitrate was already validated, no need to check for errors again.
+
+		if b < min_rendition_bitrate {
+			min_rendition_bitrate = b
+			min_rendition_bitrate_str = vo.Bitrate
+		}
+	}
+
 	// Start a file watcher to check for new stream output from the packager and upload to remote origin server.
 	var errWatchFiles error
 	go func() {
@@ -672,7 +723,7 @@ func main() {
 			watch_dirs = append(watch_dirs, local_media_output_path+subdir+"/")
 		}
 
-		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone)
+		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone, min_rendition_bitrate_str)
 	}()
 
 	if errWatchFiles != nil {
