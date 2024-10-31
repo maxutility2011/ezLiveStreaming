@@ -652,6 +652,10 @@ Jobs that are pulled from the SQS job queue by job scheduler, but yet to be sche
 **Data structure**: list <br>
 **value**: string of "type LiveJob struct" (job/job.go) <br>
 
+To view all queued jobs in redis-cli, run "lrange queued_jobs [start_index] [end_index]"
+
+To pop the queue, run "rpop queued_jobs".
+
 ## "workers":
 The set of live workers currently being managed by the job scheduler. <br>
 **Data structure**: hash table <br>
