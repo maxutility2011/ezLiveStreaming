@@ -1,4 +1,4 @@
-FROM maxutility2011/ezlivestreaming_baseimage:v5.2
+FROM maxutility2011/ezlivestreaming_baseimage:v5.4
 
 USER streamer
 
@@ -7,7 +7,8 @@ RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/conf \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src/ \
-    && git clone -b yolo https://github.com/maxutility2011/ezLiveStreaming.git 
+    && git clone -b yolo https://github.com/maxutility2011/ezLiveStreaming.git \
+    && git clone -b main https://github.com/maxutility2011/od_yolov8.git
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
     && /usr/local/go/bin/go build worker_app.go \
@@ -23,9 +24,14 @@ RUN cd /home/streamer/src/ezLiveStreaming/worker/transcoder \
     && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_cpuutil_reader.sh /home/streamer/bins/ \
     && cp /home/streamer/src/ezLiveStreaming/worker/utils/start_ffprobe.sh /home/streamer/bins/ 
 
+RUN cp /home/streamer/src/od_yolov8/yolo.py /home/streamer/bins/ \
+    && cp /home/streamer/src/od_yolov8/od.sh /home/streamer/bins/ \
+    && curl https://file-examples.com/storage/fe00d37cde6728af4966ebc/2017/04/file_example_MP4_480_1_5MG.mp4 -o /home/streamer/src/od_yolov8/sample.mp4
+
 ENV PATH="${PATH}:/home/streamer/bins"
 
 EXPOSE 1080
 EXPOSE 4080
 
+CMD /home/streamer/bins/od.sh /home/streamer/src/od_yolov8/sample.mp4 20
 CMD /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.json
