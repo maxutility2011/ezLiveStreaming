@@ -30,6 +30,13 @@ const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
 const drm_label_allmedia = "allmedia"
 const Input_json_file_name = "input_info.json"
+const Yolo_input_resolution_height = 180
+const Yolo_input_resolution_width = 320
+const Yolo_input_bitrate = "150k"
+const Yolo_input_max_bitrate ="250k"
+const Yolo_input_bufsize = Yolo_input_max_bitrate
+const Yolo_input_preset = "veryfast"
+const Yolo_input_crf = 25
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -94,6 +101,21 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	// - audio rendition 2: udp://127.0.0.1:10005
 
 	// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
+	// If object detection is configured, add an extra output rendition for Yolo input
+	var yolo_video_output LiveVideoOutputSpec
+	if NeedObjectDetection(j) {
+		yolo_video_output.Codec = H264_CODEC
+		yolo_video_output.Framerate = j.Output.Detection.Ingest_frame_rate
+		yolo_video_output.Height = Yolo_input_resolution_height
+		yolo_video_output.Width = Yolo_input_resolution_width
+		yolo_video_output.Bitrate = Yolo_input_bitrate
+		yolo_video_output.Max_bitrate = Yolo_input_max_bitrate
+		yolo_video_output.Buf_size = Yolo_input_bufsize
+		yolo_video_output.Preset = Yolo_input_preset
+		yolo_video_output.Crf = Yolo_input_crf
+
+		j.Output.Video_outputs = append(j.Output.Video_outputs, yolo_video_output)
+	}
 
 	// Video renditions
 	var i int
