@@ -565,6 +565,11 @@ func main() {
 	ffmpegCmd = nil
 	remote_media_output_path_base := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
 
+	// If object detection is configured, add an extra output rendition for object detection
+	if job.NeedObjectDetection(j) {
+		job.AddDetectionVideoOutput(j)
+	}
+
 	if !ffmpegAlone {
 		// Start Shaka packager first
 		packagerArgs, local_media_output_path_subdirs = job.JobSpecToShakaPackagerArgs(*jobIdPtr, j, local_media_output_path, *drmPtr)
@@ -683,10 +688,10 @@ func main() {
 	// 3. Encode the marked frames into a single video segment,
 	// 4. Output the marked video segments to the video detection output subdir,
 	// The file watcher keeps watching the video detection output subdir, and upload the marked segments.
-	if job.NeedObjectDetection(j) {
+	/*if job.NeedObjectDetection(j) {
 		detection_output_subdir := "video_detection"
 		local_media_output_path_subdirs = append(local_media_output_path_subdirs, detection_output_subdir)
-	}
+	}*/
 
 	// Create local output paths. Shaka packager may have already created the paths.
 	for _, sd := range local_media_output_path_subdirs {

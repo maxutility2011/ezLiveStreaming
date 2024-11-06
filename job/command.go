@@ -63,6 +63,68 @@ func NeedObjectDetection(j LiveJobSpec) bool {
 	return j.Output.Detection != (ObjectDetectionConfig{})
 }
 
+func AddDetectionVideoOutput(j LiveJobSpec) {
+	video_outputs_contain_detection_output := false
+	var i int
+	for i = range j.Output.Video_outputs {
+		vo := j.Output.Video_outputs[i]
+		// Detection video output already exists in job video output configuration. No need to add detection output.
+		if vo.Bitrate == j.Output.Detection.Input_video_bitrate {
+			video_outputs_contain_detection_output = true
+		}
+	}
+
+	if !video_outputs_contain_detection_output {
+		var detection_video_output LiveVideoOutputSpec
+		detection_video_output.Framerate = j.Output.Detection.Input_video_frame_rate
+		if detection_video_output.Framerate == 0.0 {
+			detection_video_output.Framerate = default_detection_frame_rate
+		}
+
+		detection_video_output.Height = j.Output.Detection.Input_video_resolution_height 
+		if detection_video_output.Height == 0 {
+			detection_video_output.Height = default_detection_input_video_resolution_height
+		}
+	
+		detection_video_output.Width = j.Output.Detection.Input_video_resolution_width
+		if detection_video_output.Width == 0 {
+			detection_video_output.Width = default_detection_input_video_resolution_width
+		}
+
+		detection_video_output.Bitrate = j.Output.Detection.Input_video_bitrate
+		if detection_video_output.Bitrate == "" {
+			detection_video_output.Bitrate = default_detection_input_video_bitrate
+		}
+		
+		detection_video_output.Max_bitrate = j.Output.Detection.Input_video_max_bitrate
+		if detection_video_output.Max_bitrate == "" {
+			detection_video_output.Max_bitrate = default_detection_input_video_max_bitrate
+		}
+		
+		detection_video_output.Buf_size = j.Output.Detection.Input_video_buf_size
+		if detection_video_output.Buf_size == "" {
+			detection_video_output.Buf_size = default_detection_input_video_buf_size
+		}
+		
+		detection_video_output.Codec = j.Output.Detection.Encode_codec
+		if detection_video_output.Codec == "" {
+			detection_video_output.Codec = default_detection_encode_codec
+		}
+
+		detection_video_output.Preset = j.Output.Detection.Encode_preset
+		if detection_video_output.Preset == "" {
+			detection_video_output.Preset = default_detection_encode_preset
+		}
+		
+		detection_video_output.Crf = j.Output.Detection.Encode_crf
+		if detection_video_output.Crf == 0 {
+			detection_video_output.Crf = default_detection_encode_crf
+		}
+
+		j.Output.Video_outputs = append(j.Output.Video_outputs, detection_video_output)
+	}
+}
+
 // This function is for ffmpeg video transcoding ONLY. 
 // It is Shaka packager's job to perform media packaging.
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
@@ -103,67 +165,6 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	// - audio rendition 2: udp://127.0.0.1:10005
 
 	// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
-	
-	// If object detection is configured, add an extra output rendition for object detection
-	video_outputs_contain_detection_output := false
-	var i int
-	for i = range j.Output.Video_outputs {
-		vo := j.Output.Video_outputs[i]
-		// Detection video output always exists in job video output configuration. No need to add detection output.
-		if vo.Bitrate == j.Output.Detection.Input_video_bitrate {
-			video_outputs_contain_detection_output = true
-		}
-	}
-	
-	if NeedObjectDetection(j) && !video_outputs_contain_detection_output {
-		var detection_video_output LiveVideoOutputSpec
-		detection_video_output.Framerate = j.Output.Detection.Input_video_frame_rate
-		if detection_video_output.Framerate == 0.0 {
-			detection_video_output.Framerate = default_detection_frame_rate
-		}
-
-		detection_video_output.Height = j.Output.Detection.Input_video_resolution_height 
-		if detection_video_output.Height == 0 {
-			detection_video_output.Height = default_detection_input_video_resolution_height
-		}
-		
-		detection_video_output.Width = j.Output.Detection.Input_video_resolution_width
-		if detection_video_output.Width == 0 {
-			detection_video_output.Width = default_detection_input_video_resolution_width
-		}
-
-		detection_video_output.Bitrate = j.Output.Detection.Input_video_bitrate
-		if detection_video_output.Bitrate == "" {
-			detection_video_output.Bitrate = default_detection_input_video_bitrate
-		}
-		
-		detection_video_output.Max_bitrate = j.Output.Detection.Input_video_max_bitrate
-		if detection_video_output.Max_bitrate == "" {
-			detection_video_output.Max_bitrate = default_detection_input_video_max_bitrate
-		}
-		
-		detection_video_output.Buf_size = j.Output.Detection.Input_video_buf_size
-		if detection_video_output.Buf_size == "" {
-			detection_video_output.Buf_size = default_detection_input_video_buf_size
-		}
-		
-		detection_video_output.Codec = j.Output.Detection.Encode_codec
-		if detection_video_output.Codec == "" {
-			detection_video_output.Codec = default_detection_encode_codec
-		}
-
-		detection_video_output.Preset = j.Output.Detection.Encode_preset
-		if detection_video_output.Preset == "" {
-			detection_video_output.Preset = default_detection_encode_preset
-		}
-		
-		detection_video_output.Crf = j.Output.Detection.Encode_crf
-		if detection_video_output.Crf == 0 {
-			detection_video_output.Crf = default_detection_encode_crf
-		}
-
-		j.Output.Video_outputs = append(j.Output.Video_outputs, detection_video_output)
-	}
 
 	// Video renditions
 	var i int
