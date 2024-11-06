@@ -3,6 +3,9 @@ package utils
 import (
 	"errors"
 	"strconv"
+	"io/ioutil"
+	"os"
+	"path"
 )
 
 var valid_bitrate_units = []string{"k", "K"}
@@ -20,4 +23,25 @@ func BitrateString2Float64(bs string) (error, float64) {
 
 	r = b * 1000
 	return nil, r
+}
+
+func Read_file(path string) ([]byte, error) {
+	var data []byte
+	f, err := os.Open(path)
+	if err != nil {
+		return data, err
+	}
+
+	defer f.Close()
+	data, _ = ioutil.ReadAll(f)
+	return data, nil
+}
+
+func Write_file(data []byte, file_name string) error {
+	err := os.WriteFile(file_name, data, 0644)
+    return err
+}
+
+func Get_path_dir(p string) string {
+	return path.Dir(p)
 }

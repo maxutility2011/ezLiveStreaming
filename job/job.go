@@ -59,7 +59,6 @@ type LiveJobOutputSpec struct {
 	S3_output               s3OutputConfig
 	Video_outputs           []LiveVideoOutputSpec
 	Audio_outputs           []LiveAudioOutputSpec
-	 
 }
 
 type LiveJobInputSpec struct {
@@ -91,18 +90,18 @@ type LiveJob struct {
 	Total_up_seconds            int64  // elapsed time since the job was launched/resumed.
 	Total_active_seconds        int64  // elapsed time since the job becomes active (ingesting).
 	// End job stats
-	Playback_url               string
-	RtmpIngestUrl              string
-	RtmpIngestPort             int
-	Input_info_url             string
-	Spec                       LiveJobSpec
-	Job_validation_warnings    string
-	StreamKey                  string
-	Time_created               time.Time
-	Time_received_by_scheduler time.Time
-	Time_received_by_worker    time.Time
-	Assigned_worker_id         string
-	DrmEncryptionKeyInfo       models.KeyInfo
-	Stop                       bool // A flag indicating the job is to be stopped
-	Delete                     bool // A flag indicating the job is to be deleted
+	Playback_url               	string
+	RtmpIngestUrl              	string
+	RtmpIngestPort             	int
+	Input_info_url             	string
+	Spec                       	LiveJobSpec
+	Job_validation_warnings    	string
+	StreamKey                  	string
+	Time_created               	time.Time
+	Time_received_by_scheduler 	time.Time
+	Time_received_by_worker    	time.Time
+	Assigned_worker_id         	string
+	DrmEncryptionKeyInfo       	models.KeyInfo
+	Stop                       	bool // A flag indicating the job is to be stopped
+	Delete                     	bool // A flag indicating the job is to be deleted
 }

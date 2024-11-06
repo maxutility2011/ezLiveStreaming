@@ -40,6 +40,7 @@ const stream_file_upload_interval = "0.1s"
 const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
+var Detection_output_init_segment_path_local string
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
@@ -365,16 +366,41 @@ func isHlsmasterPlaylist(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
-func isDetectionTargetTypeMediaDataSegment(file_name string, min_rendition_bitrate string) bool {
-	return strings.Contains(file_name, min_rendition_bitrate) && isMediaDataSegment(file_name)
+func isDetectionTargetTypeMediaDataSegment(file_name string, detection_output_bitrate string) bool {
+	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name)
 }
 
-func isDetectionTargetTypeMediaInitSegment(file_name string, min_rendition_bitrate string) bool {
-	return strings.Contains(file_name, min_rendition_bitrate) && isFmp4InitSegment(file_name)
+func isDetectionTargetTypeMediaInitSegment(file_name string, detection_output_bitrate string) bool {
+	return strings.Contains(file_name, detection_output_bitrate) && isFmp4InitSegment(file_name)
 }
 
-func isDetectionTargetTypeHlsVariantPlaylist(file_name string, min_rendition_bitrate string) bool {
-	return strings.Contains(file_name, min_rendition_bitrate) && isHlsVariantPlaylist(file_name)
+func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_bitrate string) bool {
+	return strings.Contains(file_name, detection_output_bitrate) && isHlsVariantPlaylist(file_name)
+}
+
+func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
+	var merge_segment_path string = utils.Get_path_dir(init_segment_path) // merged_segments go to the same folder as init and data segments
+	var merged_segment_buffer []byte
+	var err error
+	var bytes_init []byte
+	var bytes_data []byte
+	bytes_init, err = utils.Read_file(init_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detection output init segment: %s. Error: %v", init_segment_path, err)
+		return merge_segment_path, err
+	}
+
+	bytes_data, err = utils.Read_file(data_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detection output data segment: %s. Error: %v", init_segment_path, err)
+		return merge_segment_path, err
+	}
+
+	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
+	merged_segment_buffer = append(merged_segment_buffer, bytes_data...)
+	utils.Write_file(merged_segment_buffer, merge_segment_path)
+
+	return merge_segment_path, nil
 }
 
 func getRenditionNameFromPath(path string) string {
@@ -425,8 +451,14 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 	}
 }
 
+func run_detection(input_segment_path string) (string, error) {
+	var output_segment_path string = input_segment_path + ".od" // "od" standas for object detection
+	Log.Printf("Run detection on input segment: %s\n", input_segment_path)
+	return output_segment_path, nil
+}
+
 // https://github.com/fsnotify/fsnotify
-func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, min_rendition_bitrate string) error {
+func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_output_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
 	upload_list = list.New()
 
@@ -458,15 +490,22 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 						Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
 					}
 
-					if isDetectionTargetTypeMediaDataSegment(event.Name, min_rendition_bitrate) {
-						Log.Printf("Media data segment to detect: %s", event.Name)
+					if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
+						Log.Printf("Media data segment to detect: %s\n", event.Name)
+						merged_segment_path, err := merge_init_and_data_segments(Detection_output_init_segment_path_local, event.Name)
+						if err != nil {
+							Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
+						}
+
+						run_detection(merged_segment_path)
 					}
 
-					if isDetectionTargetTypeMediaInitSegment(event.Name, min_rendition_bitrate) {
+					if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) {
 						Log.Printf("Media init segment to detect: %s", event.Name)
+						Detection_output_init_segment_path_local = event.Name
 					}
 
-					if isDetectionTargetTypeHlsVariantPlaylist(event.Name, min_rendition_bitrate) {
+					if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) {
 						Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 					}
 				}
@@ -707,17 +746,8 @@ func main() {
 		}
 	}
 
-	var min_rendition_bitrate float64 = 500000 * 1000 // 500000 (500mbps) = infinity
-	var min_rendition_bitrate_str string = ""
-	for i := range j.Output.Video_outputs {
-		vo := j.Output.Video_outputs[i]
-		_, b := utils.BitrateString2Float64(vo.Bitrate) // Output bitrate was already validated, no need to check for errors again.
-
-		if b < min_rendition_bitrate {
-			min_rendition_bitrate = b
-			min_rendition_bitrate_str = vo.Bitrate
-		}
-	}
+	// Tell file watch also watches for detection output files
+	detection_output_bitrate := j.Output.Detection.Input_video_bitrate
 
 	// Start a file watcher to check for new stream output from the packager and upload to remote origin server.
 	var errWatchFiles error
@@ -728,7 +758,7 @@ func main() {
 			watch_dirs = append(watch_dirs, local_media_output_path+subdir+"/")
 		}
 
-		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone, min_rendition_bitrate_str)
+		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_output_bitrate)
 	}()
 
 	if errWatchFiles != nil {
