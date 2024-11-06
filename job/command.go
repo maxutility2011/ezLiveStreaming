@@ -105,8 +105,18 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
 	
 	// If object detection is configured, add an extra output rendition for object detection
-	var detection_video_output LiveVideoOutputSpec
-	if NeedObjectDetection(j) {
+	video_outputs_contain_detection_output := false
+	var i int
+	for i = range j.Output.Video_outputs {
+		vo := j.Output.Video_outputs[i]
+		// Detection video output always exists in job video output configuration. No need to add detection output.
+		if vo.Bitrate == j.Output.Detection.Input_video_bitrate {
+			video_outputs_contain_detection_output = true
+		}
+	}
+	
+	if NeedObjectDetection(j) && !video_outputs_contain_detection_output {
+		var detection_video_output LiveVideoOutputSpec
 		detection_video_output.Framerate = j.Output.Detection.Input_video_frame_rate
 		if detection_video_output.Framerate == 0.0 {
 			detection_video_output.Framerate = default_detection_frame_rate

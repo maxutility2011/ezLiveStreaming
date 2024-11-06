@@ -148,7 +148,7 @@ On the worker server, build the live transcoding worker service,
 ```
 docker compose build worker --no-cache
 ```
-The build process will take several minutes on its initial run, but following build should be much faster. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+Building worker will take several minutes on its initial run, but following build should be much faster. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
 On fresh installation, you probably need to start docker as a service after installing it, e.g., *sudo service start docker*. And on some OSes, you may need to change the permission of */var/run/docker.sock*, e.g., *sudo chmod 666 /var/run/docker.sock*.
