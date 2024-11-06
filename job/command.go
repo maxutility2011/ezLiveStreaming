@@ -30,13 +30,15 @@ const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
 const drm_label_allmedia = "allmedia"
 const Input_json_file_name = "input_info.json"
-const Yolo_input_resolution_height = 180
-const Yolo_input_resolution_width = 320
-const Yolo_input_bitrate = "150k"
-const Yolo_input_max_bitrate ="250k"
-const Yolo_input_bufsize = Yolo_input_max_bitrate
-const Yolo_input_preset = "veryfast"
-const Yolo_input_crf = 25
+const default_detection_frame_rate = 25	// fps
+const default_detection_input_video_resolution_height = 320 // pixels
+const default_detection_input_video_resolution_width = 180 // pixels
+const default_detection_input_video_bitrate = "150k"
+const default_detection_input_video_max_bitrate = "250k"
+const default_detection_input_video_buf_size = "250k"
+const default_detection_encode_codec = H264_CODEC
+const default_detection_encode_preset = "veryfast"
+const default_detection_encode_crf = 25
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -101,20 +103,56 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	// - audio rendition 2: udp://127.0.0.1:10005
 
 	// ffmpeg and shaka packager must run on the same VM so that we can use localhost (127.0.0.1) address for udp streaming.
-	// If object detection is configured, add an extra output rendition for Yolo input
-	var yolo_video_output LiveVideoOutputSpec
+	
+	// If object detection is configured, add an extra output rendition for object detection
+	var detection_video_output LiveVideoOutputSpec
 	if NeedObjectDetection(j) {
-		yolo_video_output.Codec = H264_CODEC
-		yolo_video_output.Framerate = j.Output.Detection.Ingest_frame_rate
-		yolo_video_output.Height = Yolo_input_resolution_height
-		yolo_video_output.Width = Yolo_input_resolution_width
-		yolo_video_output.Bitrate = Yolo_input_bitrate
-		yolo_video_output.Max_bitrate = Yolo_input_max_bitrate
-		yolo_video_output.Buf_size = Yolo_input_bufsize
-		yolo_video_output.Preset = Yolo_input_preset
-		yolo_video_output.Crf = Yolo_input_crf
+		detection_video_output.Framerate = j.Output.Detection.Input_video_frame_rate
+		if detection_video_output.Framerate == 0.0 {
+			detection_video_output.Framerate = default_detection_frame_rate
+		}
 
-		j.Output.Video_outputs = append(j.Output.Video_outputs, yolo_video_output)
+		detection_video_output.Height = j.Output.Detection.Input_video_resolution_height 
+		if detection_video_output.Height == 0 {
+			detection_video_output.Height = default_detection_input_video_resolution_height
+		}
+		
+		detection_video_output.Width = j.Output.Detection.Input_video_resolution_width
+		if detection_video_output.Width == 0 {
+			detection_video_output.Width = default_detection_input_video_resolution_width
+		}
+
+		detection_video_output.Bitrate = j.Output.Detection.Input_video_bitrate
+		if detection_video_output.Bitrate == "" {
+			detection_video_output.Bitrate = default_detection_input_video_bitrate
+		}
+		
+		detection_video_output.Max_bitrate = j.Output.Detection.Input_video_max_bitrate
+		if detection_video_output.Max_bitrate == "" {
+			detection_video_output.Max_bitrate = default_detection_input_video_max_bitrate
+		}
+		
+		detection_video_output.Buf_size = j.Output.Detection.Input_video_buf_size
+		if detection_video_output.Buf_size == "" {
+			detection_video_output.Buf_size = default_detection_input_video_buf_size
+		}
+		
+		detection_video_output.Codec = j.Output.Detection.Encode_codec
+		if detection_video_output.Codec == "" {
+			detection_video_output.Codec = default_detection_encode_codec
+		}
+
+		detection_video_output.Preset = j.Output.Detection.Encode_preset
+		if detection_video_output.Preset == "" {
+			detection_video_output.Preset = default_detection_encode_preset
+		}
+		
+		detection_video_output.Crf = j.Output.Detection.Encode_crf
+		if detection_video_output.Crf == 0 {
+			detection_video_output.Crf = default_detection_encode_crf
+		}
+
+		j.Output.Video_outputs = append(j.Output.Video_outputs, detection_video_output)
 	}
 
 	// Video renditions

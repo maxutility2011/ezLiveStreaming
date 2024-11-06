@@ -32,7 +32,12 @@ type DrmConfig struct {
 }
 
 type ObjectDetectionConfig struct {
-	Ingest_frame_rate float64
+	Input_video_frame_rate float64
+	Input_video_resolution_height int
+	Input_video_resolution_width int
+	Input_video_bitrate string
+	Input_video_max_bitrate string
+	Input_video_buf_size string
 	Encode_codec string
 	Encode_preset string
 	Encode_crf int

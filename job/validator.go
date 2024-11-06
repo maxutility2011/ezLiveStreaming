@@ -14,28 +14,27 @@ var valid_audio_codec_values = []string{"aac", "mp3"}
 var valid_bitrate_units = []string{"k", "K"}
 var valid_h26x_presets = []string{"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
 
-const max_fragment_duration = 10            // second
-const max_segment_duration = 10             // second
-const default_time_shift_buffer_depth = 120 // second
-const max_time_shift_buffer_depth = 14400   // second
+const max_fragment_duration = 10            		// second
+const max_segment_duration = 10             		// second
+const default_time_shift_buffer_depth = 120 		// second
+const max_time_shift_buffer_depth = 14400   		// second
 const max_video_outputs = 10
 const max_audio_outputs = 5
-const max_video_framerate = 60                    // fps
-const min_video_framerate = 0                     // fps
-const default_detection_frame_rate = 25			  // fps
-const max_video_resolution_height = 1080          // pixel
-const max_video_resolution_width = 1920           // pixel
-const max_video_output_bitrate = 10000.0           // kbps
+const max_video_framerate = 60                    	// fps
+const min_video_framerate = 0                     	// fps
+const max_video_resolution_height = 1080          	// pixel
+const max_video_resolution_width = 1920           	// pixel
+const max_video_output_bitrate = 10000.0           	// kbps
 const max_audio_output_bitrate = 256.0              // kbps
-const max_peak_to_average_bitrate_ratio = 2       // X 2
-const max_buffersize_to_average_bitrate_ratio = 2 // X 2
+const max_peak_to_average_bitrate_ratio = 2       	// X 2
+const max_buffersize_to_average_bitrate_ratio = 2 	// X 2
 const min_libsvtav1_preset = 12
-const min_h26x_preset = 5 // "fast"
-const min_h26x_crf = 0 // ffmpeg allows crf = 0 (lossless compression). However, this is practically impossible for live encoding.
-const practical_min_h26x_crf = 23 // Return a warning when crf is lower than this value.
+const min_h26x_preset = 5 							// "fast"
+const min_h26x_crf = 0 								// ffmpeg allows crf = 0 (lossless compression). However, this is practically impossible for live encoding.
+const practical_min_h26x_crf = 23 					// Return a warning when crf is lower than this value.
 const max_h26x_crf = 51
 const min_av1_crf = 0
-const practical_min_av1_crf = 23 // Return a warning when crf is lower than this value.
+const practical_min_av1_crf = 23 					// Return a warning when crf is lower than this value.
 const max_av1_crf = 63
 const min_h26x_threads = 2
 const min_av1_threads = 4
@@ -129,6 +128,73 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 	}
 
+	// Validate object detection params. 
+	if NeedObjectDetection(*j) {
+		// Validate detection frame rate
+		detection_frame_rate := (*j).Output.Detection.Input_video_frame_rate
+		// Frame rate is not required, so this is a warning
+		if detection_frame_rate == 0 {
+			w := "Missing object detection input frame rate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// Frame rate cannot be out of range, so this is an error
+		if detection_frame_rate < min_video_framerate ||
+			detection_frame_rate > max_video_framerate {
+			return errors.New("detection_framerate_out_of_range"), warnings
+		}
+
+		// If video resolution height is missing, the default value will be used and a warning will be added.
+		if (*j).Output.Detection.Input_video_resolution_height == 0 {
+			w := "Missing object detection input video resolution height. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// If video resolution height is missing, the default value will be used and a warning will be added.
+		if (*j).Output.Detection.Input_video_resolution_width == 0 {
+			w := "Missing object detection input video resolution width. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_bitrate == "" {
+			w := "Missing object detection input video bitrate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_max_bitrate == "" {
+			w := "Missing object detection input video max_bitrate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_buf_size == "" {
+			w := "Missing object detection input video buf_size. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// Post-detection video re-encoding only uses h264 or h265, not av1
+		if (*j).Output.Detection.Encode_codec == "" || 
+			!contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
+			w := "Missing or invalid object detection Encode_codec. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Encode_preset == "" ||
+			!contains_string(valid_h26x_presets, (*j).Output.Detection.Encode_preset) {
+			w := "Missing or invalid object detection Encode_preset. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Encode_crf == 0 ||
+			((*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf) {
+			w := "Missing or out-of-range object detection Encode_crf. Default value will be used."
+			warnings = append(warnings, w)
+		} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
+			(*j).Output.Detection.Encode_crf = practical_min_h26x_crf
+			w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
+			warnings = append(warnings, w)
+		}
+	}
+
 	// Fatal error. Output bucket is required
 	// TODO: Need to verify output bucket (e.g., upload a small file to verify)
 	if (*j).Output.S3_output.Bucket == "" {
@@ -145,20 +211,6 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		return errors.New("too_many_video_outputs"), warnings
 	}
 
-	// Find the bitrate of the lowest rendition. This will be used when validating object detection params
-	var min_rendition_bitrate float64 = max_video_output_bitrate * 1000
-	for i := range (*j).Output.Video_outputs {
-		vo := (*j).Output.Video_outputs[i]
-		err, b := utils.BitrateString2Float64(vo.Bitrate)
-		if err != nil {
-			return errors.New("bad_video_output_bitrate"), warnings
-		}
-
-		if b < min_rendition_bitrate {
-			min_rendition_bitrate = b
-		}
-	}
-
 	for i := range (*j).Output.Video_outputs {
 		vo := (*j).Output.Video_outputs[i]
 		// Fatal error. Video codec is required
@@ -173,51 +225,9 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
-		err, b := utils.BitrateString2Float64(vo.Bitrate)
+		err, _ := utils.BitrateString2Float64(vo.Bitrate)
 		if err != nil {
 			return errors.New("bad_video_output_bitrate"), warnings
-		}
-
-		// Validate object detection params. 
-		// Object detection is ONLY performed on the lowest bitrate rendition.
-		if NeedObjectDetection(*j) && b == min_rendition_bitrate {
-			detection_frame_rate := (*j).Output.Detection.Ingest_frame_rate
-			if vo.Framerate > 0 && detection_frame_rate > vo.Framerate {
-				(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
-				w := "- Object detection ingest frame rate (" + strconv.FormatFloat(detection_frame_rate, 'f', 4, 64) + "fps) cannot be greater than output video frame rate (" + strconv.FormatFloat(vo.Framerate, 'f', 4, 64) + ")"
-				warnings = append(warnings, w)
-			}
-
-			if (*j).Output.Detection.Ingest_frame_rate == 0 {
-				if vo.Framerate > 0 {
-					(*j).Output.Detection.Ingest_frame_rate = vo.Framerate
-				} else {
-					(*j).Output.Detection.Ingest_frame_rate = default_detection_frame_rate
-				}
-			}
-
-			// Post-detection video re-encoding only uses h264 or h265, not av1
-			if (*j).Output.Detection.Encode_codec == "" {
-				(*j).Output.Detection.Encode_codec = "h264"
-			} else if !contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
-				return errors.New("bad_detection_codec_"), warnings
-			}
-
-			if (*j).Output.Detection.Encode_preset == "" {
-				(*j).Output.Detection.Encode_preset = "veryfast"
-			} else if !contains_string(valid_h26x_presets, (*j).Output.Detection.Encode_preset) {
-				return errors.New("bad_detection_preset"), warnings
-			}
-
-			if (*j).Output.Detection.Encode_crf == 0 {
-				(*j).Output.Detection.Encode_crf = 27
-			} else if (*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf {
-				return errors.New("bad_detection_crf"), warnings
-			} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
-				(*j).Output.Detection.Encode_crf = practical_min_h26x_crf
-				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
-				warnings = append(warnings, w)
-			}
 		}
 
 		// Video resolution valiation
