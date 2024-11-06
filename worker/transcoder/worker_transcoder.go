@@ -567,7 +567,7 @@ func main() {
 
 	// If object detection is configured, add an extra output rendition for object detection
 	if job.NeedObjectDetection(j) {
-		job.AddDetectionVideoOutput(j)
+		job.AddDetectionVideoOutput(&j)
 	}
 
 	if !ffmpegAlone {
