@@ -69,7 +69,7 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 
 ## Prerequisites:
 
-- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. 
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. The worker server should have at least 100GB of disk space.
 
 - You need to install **docker**, **docker-compose**, **git**, **aws-cli** and optionally **redis-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker. If you choose to use Amazon Linux, **aws-cli** is pre-installed in the AMI image.
 
@@ -148,7 +148,7 @@ On the worker server, build the live transcoding worker service,
 ```
 docker compose build worker --no-cache
 ```
-The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+The build process will take several minutes on its initial run, but following build should be much faster. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
 On fresh installation, you probably need to start docker as a service after installing it, e.g., *sudo service start docker*. And on some OSes, you may need to change the permission of */var/run/docker.sock*, e.g., *sudo chmod 666 /var/run/docker.sock*.

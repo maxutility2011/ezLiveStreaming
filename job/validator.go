@@ -174,20 +174,17 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		// Post-detection video re-encoding only uses h264 or h265, not av1
 		if (*j).Output.Detection.Encode_codec == "" || 
 			!contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
-			w := "Missing or invalid object detection Encode_codec. Default value will be used."
-			warnings = append(warnings, w)
+			return errors.New("bad_detection_video_codec"), warnings
 		}
 
 		if (*j).Output.Detection.Encode_preset == "" ||
 			!contains_string(valid_h26x_presets, (*j).Output.Detection.Encode_preset) {
-			w := "Missing or invalid object detection Encode_preset. Default value will be used."
-			warnings = append(warnings, w)
+			return errors.New("bad_detection_video_preset"), warnings
 		}
 
 		if (*j).Output.Detection.Encode_crf == 0 ||
 			((*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf) {
-			w := "Missing or out-of-range object detection Encode_crf. Default value will be used."
-			warnings = append(warnings, w)
+				return errors.New("bad_detection_video_crf"), warnings
 		} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
 			(*j).Output.Detection.Encode_crf = practical_min_h26x_crf
 			w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
