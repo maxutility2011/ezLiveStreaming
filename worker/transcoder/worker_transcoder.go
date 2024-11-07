@@ -382,7 +382,7 @@ func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_
 }
 
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
-	var merge_segment_path string = utils.Get_path_dir(init_segment_path) // merged_segments go to the same folder as init and data segments
+	var segment_path string = utils.Get_path_dir(init_segment_path) // merged_segments go to the same folder as init and data segments
 	var merged_segment_buffer []byte
 	var err error
 	var bytes_init []byte
@@ -390,20 +390,25 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 	bytes_init, err = utils.Read_file(init_segment_path)
 	if err != nil {
 		Log.Printf("Failed to read detection output init segment: %s. Error: %v", init_segment_path, err)
-		return merge_segment_path, err
+		return segment_path, err
 	}
 
 	bytes_data, err = utils.Read_file(data_segment_path)
 	if err != nil {
 		Log.Printf("Failed to read detection output data segment: %s. Error: %v", init_segment_path, err)
-		return merge_segment_path, err
+		return segment_path, err
 	}
 
 	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
 	merged_segment_buffer = append(merged_segment_buffer, bytes_data...)
-	utils.Write_file(merged_segment_buffer, merge_segment_path)
 
-	return merge_segment_path, nil
+	pos_dot := strings.LastIndex(data_segment_path, ".")
+	// Change file extension from ".m4s" to ".merged" so that the merged segment 
+	// would not be uploaded 
+	merged_segment_path := data_segment_path[:pos_dot] + ".merged"
+	utils.Write_file(merged_segment_buffer, merged_segment_path)
+
+	return merged_segment_path, nil
 }
 
 func getRenditionNameFromPath(path string) string {
