@@ -45,3 +45,8 @@ func Write_file(data []byte, file_name string) error {
 func Get_path_dir(p string) string {
 	return path.Dir(p)
 }
+
+func Get_path_filename(p string) string {
+	_, filename := path.Split(p)
+	return filename
+}

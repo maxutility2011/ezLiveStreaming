@@ -366,6 +366,10 @@ func isHlsmasterPlaylist(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
+func isDetectionTarget(file_name string, detection_output_bitrate string) bool {
+	return strings.Contains(file_name, detection_output_bitrate)
+}
+
 func isDetectionTargetTypeMediaDataSegment(file_name string, detection_output_bitrate string) bool {
 	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name)
 }
@@ -452,8 +456,11 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 }
 
 func run_detection(input_segment_path string) (string, error) {
-	var output_segment_path string = input_segment_path + ".od" // "od" standas for object detection
-	Log.Printf("Run detection on input segment: %s\n", input_segment_path)
+	filename := utils.Get_path_filename(input_segment_path)
+	filename = "od_" + filename // "od" stands for object detection
+	output_segment_path := utils.Get_path_dir(input_segment_path) + filename
+
+	Log.Printf("Run detection on input segment: %s. Output path: %s\n", input_segment_path, output_segment_path)
 	return output_segment_path, nil
 }
 
@@ -474,46 +481,69 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 	go func() {
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					Log.Println("Failed to receive a file system event (watchStreamFiles)")
-					continue
-				}
-
-				// After a stream file (e.g., media segments, playlists) is created on disk, add the file to
-				// the upload list to make it ready for upload. The file will be uploaded in the next file
-				// upload opportunity
-				if event.Op == fsnotify.Create {
-					if isStreamFile(event.Name) {
-						addToUploadList(event.Name, remote_media_output_path)
-					} else {
-						Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
+				case event, ok := <-watcher.Events:
+					if !ok {
+						Log.Println("Failed to receive a file system event (watchStreamFiles)")
+						continue
 					}
 
-					if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
-						Log.Printf("Media data segment to detect: %s\n", event.Name)
-						merged_segment_path, err := merge_init_and_data_segments(Detection_output_init_segment_path_local, event.Name)
-						if err != nil {
-							Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
+					// After a stream file (e.g., media segments, playlists) is created on disk, add the file to
+					// the upload list to make it ready for upload. The file will be uploaded in the next file
+					// upload opportunity
+					if event.Op == fsnotify.Create {
+						if isStreamFile(event.Name) { 
+							// The file is a stream file but a not detection target, upload it right away
+							if !isDetectionTarget(event.Name, detection_output_bitrate) {
+								addToUploadList(event.Name, remote_media_output_path)
+								continue
+							}
+						} else { // The file is not a stream file, do nothing
+							Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
+							continue
 						}
 
-						run_detection(merged_segment_path)
-					}
+						// The file is a stream file and is a detection target media data segment, do the following,
+						// - Merge it with the init segment,
+						// - Save the merged file to disk,
+						// - Run Yolo inference (detection) on the merged file,
+						// - Upload it.
+						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
+							Log.Printf("Media data segment to detect: %s\n", event.Name)
+							if Detection_output_init_segment_path_local == "" {
+								Log.Printf("Error: data segment %s found, but init segment is missing\n", event.Name)
+								continue
+							}
 
-					if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) {
-						Log.Printf("Media init segment to detect: %s", event.Name)
-						Detection_output_init_segment_path_local = event.Name
-					}
+							merged_segment_path, err := merge_init_and_data_segments(Detection_output_init_segment_path_local, event.Name)
+							if err != nil {
+								Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
+								continue
+							}
 
-					if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) {
-						Log.Printf("Hls variant playerlist to detect: %s", event.Name)
+							// Run detection in a separate thread
+							go func() {
+								detection_output_segment_path, err := run_detection(merged_segment_path)
+								if err != nil {
+									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
+									// Replace with a slate segment?
+									return
+								}
+
+								Log.Printf("Uploading detection output segment: %s\n", detection_output_segment_path)
+								//addToUploadList(detection_output_segment_path, remote_media_output_path)
+							}()
+						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the detection output, save the file path.
+							Log.Printf("Media init segment to detect: %s", event.Name)
+							Detection_output_init_segment_path_local = event.Name
+						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
+							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
+						}
 					}
-				}
-			case _, ok := <-watcher.Errors:
-				if !ok {
-					Log.Println("Error while receiving an file system event (watchStreamFiles)")
-					continue
-				}
+				case _, ok := <-watcher.Errors:
+					if !ok {
+						Log.Println("Error while receiving an file system event (watchStreamFiles)")
+						continue
+					}
 			}
 		}
 	}()
