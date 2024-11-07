@@ -382,7 +382,7 @@ func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_
 }
 
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
-	var segment_path string = utils.Get_path_dir(init_segment_path) // merged_segments go to the same folder as init and data segments
+	var merged_segment_path string = ""
 	var merged_segment_buffer []byte
 	var err error
 	var bytes_init []byte
@@ -390,13 +390,13 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 	bytes_init, err = utils.Read_file(init_segment_path)
 	if err != nil {
 		Log.Printf("Failed to read detection output init segment: %s. Error: %v", init_segment_path, err)
-		return segment_path, err
+		return merged_segment_path, err
 	}
 
 	bytes_data, err = utils.Read_file(data_segment_path)
 	if err != nil {
 		Log.Printf("Failed to read detection output data segment: %s. Error: %v", init_segment_path, err)
-		return segment_path, err
+		return merged_segment_path, err
 	}
 
 	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
@@ -405,7 +405,7 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 	pos_dot := strings.LastIndex(data_segment_path, ".")
 	// Change file extension from ".m4s" to ".merged" so that the merged segment 
 	// would not be uploaded 
-	merged_segment_path := data_segment_path[:pos_dot] + ".merged"
+	merged_segment_path = data_segment_path[:pos_dot] + ".merged"
 	utils.Write_file(merged_segment_buffer, merged_segment_path)
 
 	return merged_segment_path, nil
@@ -462,7 +462,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 func run_detection(input_segment_path string) (string, error) {
 	filename := utils.Get_path_filename(input_segment_path)
 	filename = "od_" + filename // "od" stands for object detection
-	output_segment_path := utils.Get_path_dir(input_segment_path) + filename
+	output_segment_path := utils.Get_path_dir(input_segment_path) + "/" + filename
 
 	Log.Printf("Run detection on input segment: %s. Output path: %s\n", input_segment_path, output_segment_path)
 	return output_segment_path, nil
