@@ -125,6 +125,12 @@ func AddDetectionVideoOutput(j *LiveJobSpec) {
 	}
 }
 
+// Generate object detection command
+func GenerateDetectionCommand(j LiveJobSpec) []string {
+	var detectorArgs []string
+	return detectorArgs
+}
+
 // This function is for ffmpeg video transcoding ONLY. 
 // It is Shaka packager's job to perform media packaging.
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002

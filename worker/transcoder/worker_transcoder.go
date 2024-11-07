@@ -40,7 +40,8 @@ const stream_file_upload_interval = "0.1s"
 const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
-var Detection_output_init_segment_path_local string
+var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
+var upload_detection_output_init_segment_path_local string // The new init segment output by Yolo detector which is ready to upload
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
@@ -458,17 +459,45 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 	}
 }
 
-// run detection on ".merged" segment file (containing both fmp4 initialization 
+// Run detection on ".merged" segment file (containing both fmp4 initialization 
 // section and media data section), and output a ".detected" segment file
-func run_detection(input_segment_path string) (string, error) {
+func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error) {
 	// Use file extension ".detected" so that it would not be uploaded
+	// ".detected" files contain both an fmp4 initialization section and media
+	// data section, and are NOT immediately uploadable. We need to 
+	// 1. Extract the initialization section from the ".detected" file 
+	// and output a new initialization segment. This needs to be done only once.
+	// 2. Strip off the initialization section from every ".detected" file.
 	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
-	Log.Printf("Run detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
+	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
+
+	detectorArgs := job.GenerateDetectionCommand(j)
+	Log.Println("Detector arguments: ")
+	Log.Println(job.ArgumentArrayToString(detectorArgs))
+
+	detectorCmd := exec.Command("od.sh", detectorArgs...)
+	var errDetector error = nil
+	var out []byte
+	go func() {
+		out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
+		if errDetector != nil {
+			Log.Println("Errors starting detector: ", errDetector, " detector output: ", string(out))
+		}
+	}()
+
+	// Wait 100ms before detector fully starts
+	/*time.Sleep(100 * time.Millisecond)
+	if errDetector != nil {
+		Log.Println("Errors starting Shaka packager: ", errDetector, " packager output: ", string(out))
+		//os.Exit(1)
+	}*/
+
+	// When detection finishes, the output 
 	return detected_segment_path, nil
 }
 
 // https://github.com/fsnotify/fsnotify
-func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_output_bitrate string) error {
+func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_output_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
 	upload_list = list.New()
 
@@ -512,12 +541,12 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 						// - Upload it.
 						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
 							Log.Printf("Media data segment to detect: %s\n", event.Name)
-							if Detection_output_init_segment_path_local == "" {
+							if original_detection_output_init_segment_path_local == "" {
 								Log.Printf("Cannot merge data segment %s due to missing init segment\n", event.Name)
 								continue
 							}
 
-							merged_segment_path, err := merge_init_and_data_segments(Detection_output_init_segment_path_local, event.Name)
+							merged_segment_path, err := merge_init_and_data_segments(original_detection_output_init_segment_path_local, event.Name)
 							if err != nil {
 								Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
 								continue
@@ -525,21 +554,37 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 
 							// Run detection in a separate thread
 							go func() {
-								detection_output_segment_path, err := run_detection(merged_segment_path)
+								detection_output_segment_path, err := run_detection(j, merged_segment_path)
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
-									// Replace with a slate segment?
+									// TODO: When detection fails for any reason,
+									// show a slate segment instead?
 									return
 								}
 
+								// Strip init section
+								new_init_segment_bytes, upload_media_data_segment_path, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
+								if err_init != nil {
+									Log.Printf("Failed to strip off init section of detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
+									return
+								}
 
-								Log.Printf("Uploading detection output segment: %s\n", detection_output_segment_path)
-								
-								//addToUploadList(detection_output_segment_path, remote_media_output_path)
+								if upload_detection_output_init_segment_path_local == "" {
+									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + "/init.mp4" 
+									// Output init section to local init segment file
+									utils.Write_file(new_init_segment_bytes, upload_detection_output_init_segment_path_local)
+									Log.Printf("Uploading detection output init segment: %s\n", upload_detection_output_init_segment_path_local)
+									// Upload local init segment file only once
+									addToUploadList(upload_detection_output_init_segment_path_local, remote_media_output_path)
+								}
+
+								Log.Printf("Uploading detection output media data segment: %s\n", upload_media_data_segment_path)
+								// Upload local media data segment file
+								addToUploadList(upload_media_data_segment_path, remote_media_output_path)
 							}()
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the detection output, save the file path.
 							Log.Printf("Media init segment to detect: %s", event.Name)
-							Detection_output_init_segment_path_local = event.Name
+							original_detection_output_init_segment_path_local = event.Name
 							// Do not upload detection output init segment
 						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
 							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
@@ -794,7 +839,7 @@ func main() {
 			watch_dirs = append(watch_dirs, local_media_output_path+subdir+"/")
 		}
 
-		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_output_bitrate)
+		errWatchFiles = watchStreamFiles(j, watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_output_bitrate)
 	}()
 
 	if errWatchFiles != nil {
