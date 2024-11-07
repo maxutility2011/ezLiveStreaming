@@ -402,10 +402,9 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
 	merged_segment_buffer = append(merged_segment_buffer, bytes_data...)
 
-	pos_dot := strings.LastIndex(data_segment_path, ".")
 	// Change file extension from ".m4s" to ".merged" so that the merged segment 
-	// would not be uploaded 
-	merged_segment_path = data_segment_path[:pos_dot] + ".merged"
+	// would not be uploaded
+	merged_segment_path = utils.Change_file_extension(data_segment_path, ".merged")
 	utils.Write_file(merged_segment_buffer, merged_segment_path)
 
 	return merged_segment_path, nil
@@ -459,13 +458,13 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 	}
 }
 
+// run detection on ".merged" segment file (containing both fmp4 initialization 
+// section and media data section), and output a ".detected" segment file
 func run_detection(input_segment_path string) (string, error) {
-	filename := utils.Get_path_filename(input_segment_path)
-	filename = "od_" + filename // "od" stands for object detection
-	output_segment_path := utils.Get_path_dir(input_segment_path) + "/" + filename
-
-	Log.Printf("Run detection on input segment: %s. Output path: %s\n", input_segment_path, output_segment_path)
-	return output_segment_path, nil
+	// Use file extension ".detected" so that it would not be uploaded
+	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
+	Log.Printf("Run detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
+	return detected_segment_path, nil
 }
 
 // https://github.com/fsnotify/fsnotify
@@ -533,12 +532,15 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 									return
 								}
 
+
 								Log.Printf("Uploading detection output segment: %s\n", detection_output_segment_path)
+								
 								//addToUploadList(detection_output_segment_path, remote_media_output_path)
 							}()
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the detection output, save the file path.
 							Log.Printf("Media init segment to detect: %s", event.Name)
 							Detection_output_init_segment_path_local = event.Name
+							// Do not upload detection output init segment
 						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
 							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 						}

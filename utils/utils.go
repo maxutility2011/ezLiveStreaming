@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 )
 
 var valid_bitrate_units = []string{"k", "K"}
@@ -49,4 +50,11 @@ func Get_path_dir(p string) string {
 func Get_path_filename(p string) string {
 	_, filename := path.Split(p)
 	return filename
+}
+
+// new_extension: any random string representing the new file extension, 
+// e.g., ".merged", ".detected"
+func Change_file_extension(p string, new_extension string) string {
+	pos_dot := strings.LastIndex(p, ".") 
+	return (p[:pos_dot] + new_extension)
 }
