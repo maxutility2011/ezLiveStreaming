@@ -475,7 +475,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	Log.Println("Detector arguments: ")
 	Log.Println(job.ArgumentArrayToString(detectorArgs))
 
-	detectorCmd := exec.Command("od.sh", detectorArgs...)
+	detectorCmd := exec.Command("sh", detectorArgs...)
 	var errDetector error = nil
 	var out []byte
 	go func() {
