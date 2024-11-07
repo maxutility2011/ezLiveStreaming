@@ -345,8 +345,7 @@ func isStreamFile(file_name string) bool {
 }
 
 func isMediaDataSegment(file_name string) bool {
-	return (strings.Contains(file_name, ".mp4") ||
-		strings.Contains(file_name, ".ts") ||
+	return (strings.Contains(file_name, ".ts") ||
 		strings.Contains(file_name, ".m4s")) &&
 		!strings.Contains(file_name, ".tmp")
 }
@@ -510,7 +509,7 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
 							Log.Printf("Media data segment to detect: %s\n", event.Name)
 							if Detection_output_init_segment_path_local == "" {
-								Log.Printf("Error: data segment %s found, but init segment is missing\n", event.Name)
+								Log.Printf("Cannot merge data segment %s due to missing init segment\n", event.Name)
 								continue
 							}
 
