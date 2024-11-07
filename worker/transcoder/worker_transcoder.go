@@ -551,19 +551,23 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
 								continue
 							}
+							
+							os.Remove(event.Name)
+							os.Remove(original_detection_output_init_segment_path_local)
 
 							// Run detection in a separate thread
 							go func() {
 								detection_output_segment_path, err := run_detection(j, merged_segment_path)
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
-									// TODO: When detection fails for any reason,
-									// show a slate segment instead?
+									// TODO: When detection fails for some reason,
+									// can we show a slate segment instead?
 									return
 								}
 
 								// Strip init section
-								new_init_segment_bytes, upload_media_data_segment_path, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
+								new_init_segment_bytes, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
+								upload_media_data_segment_path := event.Name // The original media data segment is already deleted. The same file name can be reused.
 								if err_init != nil {
 									Log.Printf("Failed to strip off init section of detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
 									return

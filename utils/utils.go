@@ -63,8 +63,7 @@ func Change_file_extension(p string, new_extension string) string {
 // []byte: the byte array containing the fmp4 init section
 // string: the media data segment (path) only (with init section stripped)
 // error
-func Strip_fmp4_init_section(p string) ([]byte, string, error) {
-	var init_data []byte
-	var media_data_segment_path string 
-	return init_data, media_data_segment_path, nil
+func Strip_fmp4_init_section(p string) ([]byte,  error) {
+	init_data := []byte("test_data")
+	return init_data, nil
 }
