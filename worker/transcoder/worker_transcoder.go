@@ -383,6 +383,8 @@ func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_
 }
 
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
+	time.Sleep(200 * time.Millisecond)
+	
 	var merged_segment_path string = ""
 	var merged_segment_buffer []byte
 	var err error
@@ -396,8 +398,13 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 
 	bytes_data, err = utils.Read_file(data_segment_path)
 	if err != nil {
-		Log.Printf("Failed to read detection output data segment: %s. Error: %v", init_segment_path, err)
+		Log.Printf("Failed to read detection output data segment: %s. Error: %v", data_segment_path, err)
 		return merged_segment_path, err
+	}
+
+	if len(bytes_data) == 0 {
+		Log.Printf("Empty detection output data segment: %s", data_segment_path)
+		return merged_segment_path, errors.New("empty_detection_media_data")
 	}
 
 	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
@@ -537,17 +544,17 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								continue
 							}
 
-							merged_segment_path, err := merge_init_and_data_segments(original_detection_output_init_segment_path_local, event.Name)
-							if err != nil {
-								Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
-								continue
-							}
-							
-							//os.Remove(event.Name)
-							//os.Remove(original_detection_output_init_segment_path_local)
-
 							// Run detection in a separate thread
 							go func() {
+								merged_segment_path, err := merge_init_and_data_segments(original_detection_output_init_segment_path_local, event.Name)
+								if err != nil {
+									Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
+									return
+								}
+							
+								os.Remove(event.Name)
+								os.Remove(original_detection_output_init_segment_path_local)
+
 								detection_output_segment_path, err := run_detection(j, merged_segment_path)
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
