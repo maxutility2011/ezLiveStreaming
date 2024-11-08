@@ -543,8 +543,8 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								continue
 							}
 							
-							os.Remove(event.Name)
-							os.Remove(original_detection_output_init_segment_path_local)
+							//os.Remove(event.Name)
+							//os.Remove(original_detection_output_init_segment_path_local)
 
 							// Run detection in a separate thread
 							go func() {
@@ -558,14 +558,14 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 
 								// Strip init section
 								new_init_segment_bytes, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
-								upload_media_data_segment_path := event.Name // The original media data segment is already deleted. The same file name can be reused.
+								upload_media_data_segment_path := event.Name + ".od" // The original media data segment is already deleted. The same file name can be reused.
 								if err_init != nil {
 									Log.Printf("Failed to strip off init section of detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
 									return
 								}
 
 								if upload_detection_output_init_segment_path_local == "" {
-									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + "/init.mp4" 
+									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + "/init.mp4.od" 
 									// Output init section to local init segment file
 									utils.Write_file(new_init_segment_bytes, upload_detection_output_init_segment_path_local)
 									Log.Printf("Uploading detection output init segment: %s\n", upload_detection_output_init_segment_path_local)
