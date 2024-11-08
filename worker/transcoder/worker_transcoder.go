@@ -471,7 +471,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
 	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
 
-	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, detected_segment_path)
+	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path)
 	Log.Println("Detector arguments: ")
 	Log.Println(job.ArgumentArrayToString(detectorArgs))
 
