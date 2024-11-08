@@ -478,19 +478,10 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	detectorCmd := exec.Command("sh", detectorArgs...)
 	var errDetector error = nil
 	var out []byte
-	go func() {
-		out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
-		if errDetector != nil {
-			Log.Println("Errors starting detector: ", errDetector, " detector output: ", string(out))
-		}
-	}()
-
-	// Wait 100ms before detector fully starts
-	/*time.Sleep(100 * time.Millisecond)
+	out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
 	if errDetector != nil {
-		Log.Println("Errors starting Shaka packager: ", errDetector, " packager output: ", string(out))
-		//os.Exit(1)
-	}*/
+		Log.Println("Errors starting detector: ", errDetector, " detector output: ", string(out))
+	}
 
 	// When detection finishes, the output 
 	return detected_segment_path, nil
