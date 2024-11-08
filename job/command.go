@@ -126,7 +126,7 @@ func AddDetectionVideoOutput(j *LiveJobSpec) {
 }
 
 // Generate object detection command
-func GenerateDetectionCommand(input_video_frame_rate float64, input_file string) []string {
+func GenerateDetectionCommand(input_video_frame_rate float64, input_file string, output_file string) []string {
 	var detectorArgs []string
 	detectorArgs = append(detectorArgs, "/home/streamer/bins/od.sh")
 	detectorArgs = append(detectorArgs, input_file)
@@ -136,6 +136,7 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string)
 		detectorArgs = append(detectorArgs, strconv.FormatFloat(input_video_frame_rate, 'e', 2, 64))
 	}
 
+	detectorArgs = append(detectorArgs, output_file)
 	return detectorArgs
 }
 

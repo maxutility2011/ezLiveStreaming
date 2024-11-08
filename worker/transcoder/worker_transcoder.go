@@ -42,6 +42,7 @@ const max_upload_retries = 3
 const num_concurrent_uploads = 5
 var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_detection_output_init_segment_path_local string // The new init segment output by Yolo detector which is ready to upload
+const detection_init_segment_local_filename = "init_detection.mp4"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
@@ -383,7 +384,9 @@ func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_
 }
 
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
+	// Wait 200ms before data segment becomes fully written
 	time.Sleep(200 * time.Millisecond)
+	Log.Printf("Merging init segment %s and data segment %s\n", init_segment_path, data_segment_path)
 	
 	var merged_segment_path string = ""
 	var merged_segment_buffer []byte
@@ -478,7 +481,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
 	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
 
-	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path)
+	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path, detected_segment_path)
 	Log.Println("Detector arguments: ")
 	Log.Println(job.ArgumentArrayToString(detectorArgs))
 
@@ -537,6 +540,16 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 						// - Save the merged file to disk,
 						// - Run Yolo inference (detection) on the merged file,
 						// - Upload it.
+
+						// The following diagram shows the object detection workflow
+						// filename in parenthesis are intermediate files that will be replaced or removed
+						// seg.mp4 and init_detection.mp4 are annotated by Yolo and uploaded
+						// "init.mp4" is also an intermediate file, but it is always needed for detection.
+						
+						//          merge             detect               split
+						// init.mp4 -----> (seg.merged) --> (seg.detected) -----> seg.m4s 
+						//            |                                    |
+						// (seg.m4s)---                                    --> init_detection.mp4
 						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
 							Log.Printf("Media data segment to detect: %s\n", event.Name)
 							if original_detection_output_init_segment_path_local == "" {
@@ -552,9 +565,10 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									return
 								}
 							
+								// Delete the media data segment as it is already merged with the init segment
 								os.Remove(event.Name)
-								os.Remove(original_detection_output_init_segment_path_local)
 
+								// Run Yolo object detection on the merged segment
 								detection_output_segment_path, err := run_detection(j, merged_segment_path)
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
@@ -562,6 +576,9 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									// can we show a slate segment instead?
 									return
 								}
+
+								// Delete the merged segment as it is no longer needed
+								os.Remove(merged_segment_path)
 
 								// Strip init section
 								new_init_segment_bytes, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
@@ -572,7 +589,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								}
 
 								if upload_detection_output_init_segment_path_local == "" {
-									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + "/init.mp4" 
+									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + detection_init_segment_local_filename 
 									// Output init section to local init segment file
 									utils.Write_file(new_init_segment_bytes, upload_detection_output_init_segment_path_local)
 									Log.Printf("Uploading detection output init segment: %s\n", upload_detection_output_init_segment_path_local)
