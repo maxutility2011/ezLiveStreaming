@@ -149,7 +149,7 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string,
 	// Parameter #4 - segment file name (without file extension)
 	media_data_segment_filename := utils.Get_path_filename(input_file)
 	pos_dot := strings.LastIndex(media_data_segment_filename, ".")
-	seg_name := media_data_segment_filename[:pos_dot-1]
+	seg_name := media_data_segment_filename[:pos_dot]
 	detectorArgs = append(detectorArgs, seg_name)
 
 	// Parameter #5 - Output file from Yolo script, i.e., ".detected" files
