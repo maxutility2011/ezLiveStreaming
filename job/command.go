@@ -143,7 +143,7 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string,
 	}
 
 	// Parameter #3 - detection output subdir, e.g., "/tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k"
-	detection_output_subdir := utils.Get_path_dir(input_file) + "/" 
+	detection_output_subdir := utils.Get_path_dir(input_file) 
 	detectorArgs = append(detectorArgs, detection_output_subdir)
 
 	// Parameter #4 - Output file from Yolo script, i.e., ".detected" files
