@@ -41,7 +41,7 @@ const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
 var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
-var upload_detection_output_init_segment_path_local string // The new init segment output by Yolo detector which is ready to upload
+var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const detection_init_segment_local_filename = "init_detection.mp4"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
@@ -566,6 +566,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								}
 							
 								// Delete the media data segment as it is already merged with the init segment
+								Log.Printf("Deleting original media segment: %s\n", event.Name)
 								os.Remove(event.Name)
 
 								// Run Yolo object detection on the merged segment
@@ -577,34 +578,39 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									return
 								}
 
+								Log.Printf("Object detection completes. Detected media segment output: %s\n", detection_output_segment_path)
+
 								// Delete the merged segment as it is no longer needed
+								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
 								os.Remove(merged_segment_path)
 
 								// Strip init section
+								Log.Printf("Stripping init section from detected segment: %s\n", detection_output_segment_path)
 								new_init_segment_bytes, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
-								upload_media_data_segment_path := event.Name // The original media data segment is already deleted. The same file name can be reused.
+								upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.
 								if err_init != nil {
-									Log.Printf("Failed to strip off init section of detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
+									Log.Printf("Failed to strip off init section from detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
 									return
 								}
 
-								if upload_detection_output_init_segment_path_local == "" {
-									upload_detection_output_init_segment_path_local = utils.Get_path_dir(detection_output_segment_path) + detection_init_segment_local_filename 
-									// Output init section to local init segment file
-									utils.Write_file(new_init_segment_bytes, upload_detection_output_init_segment_path_local)
-									Log.Printf("Uploading detection output init segment: %s\n", upload_detection_output_init_segment_path_local)
-									// Upload local init segment file only once
-									addToUploadList(upload_detection_output_init_segment_path_local, remote_media_output_path)
+								if upload_candidate_detection_init_segment == "" {
+									upload_candidate_detection_init_segment = utils.Get_path_dir(detection_output_segment_path) + detection_init_segment_local_filename 
+									// Write init section to local init segment file
+									utils.Write_file(new_init_segment_bytes, upload_candidate_detection_init_segment)
+									Log.Printf("Uploading detection output init segment: %s\n", upload_candidate_detection_init_segment)
+									// Upload the new detected init segment only once
+									addToUploadList(upload_candidate_detection_init_segment, remote_media_output_path)
 								}
 
-								Log.Printf("Uploading detection output media data segment: %s\n", upload_media_data_segment_path)
+								Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
 								// Upload local media data segment file
-								addToUploadList(upload_media_data_segment_path, remote_media_output_path)
+								addToUploadList(upload_candidate_detection_media_data_segment, remote_media_output_path)
 							}()
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the detection output, save the file path.
 							Log.Printf("Media init segment to detect: %s", event.Name)
 							original_detection_output_init_segment_path_local = event.Name
-							// Do not upload detection output init segment
+							// Do not upload original detection init segment. 
+							// We only upload the new detected init segment.
 						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
 							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 						}
