@@ -3,6 +3,7 @@ package job
 import (
 	"encoding/json"
 	"ezliveStreaming/models"
+	"ezliveStreaming/utils"
 	"strconv"
 	"strings"
 )
@@ -126,16 +127,26 @@ func AddDetectionVideoOutput(j *LiveJobSpec) {
 }
 
 // Generate object detection command
+// sh /home/streamer/bins/od.sh /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.merged 25 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.detected
 func GenerateDetectionCommand(input_video_frame_rate float64, input_file string, output_file string) []string {
 	var detectorArgs []string
 	detectorArgs = append(detectorArgs, "/home/streamer/bins/od.sh")
+	// Parameter #1 - Input file to Yolo script, i.e., ".merged" files
 	detectorArgs = append(detectorArgs, input_file)
+
+	// Parameter #2 - Yolo re-encoder's output frame rate. 
+	// This is also the number of Yolo input images per second. 
 	if input_video_frame_rate == 0.0 {
 		detectorArgs = append(detectorArgs, strconv.FormatFloat(default_detection_frame_rate, 'e', 2, 64))
 	} else {
 		detectorArgs = append(detectorArgs, strconv.FormatFloat(input_video_frame_rate, 'e', 2, 64))
 	}
 
+	// Parameter #3 - detection output subdir, e.g., "/tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k"
+	detection_output_subdir := utils.Get_path_dir(input_file) + "/" 
+	detectorArgs = append(detectorArgs, detection_output_subdir)
+
+	// Parameter #4 - Output file from Yolo script, i.e., ".detected" files
 	detectorArgs = append(detectorArgs, output_file)
 	return detectorArgs
 }

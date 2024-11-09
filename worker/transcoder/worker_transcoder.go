@@ -491,6 +491,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
 	if errDetector != nil {
 		Log.Println("Errors starting detector: ", errDetector, " detector output: ", string(out))
+		return detected_segment_path, errors.New("error_starting_detector")
 	}
 
 	// When detection finishes, the output 
@@ -594,7 +595,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								}
 
 								if upload_candidate_detection_init_segment == "" {
-									upload_candidate_detection_init_segment = utils.Get_path_dir(detection_output_segment_path) + detection_init_segment_local_filename 
+									upload_candidate_detection_init_segment = utils.Get_path_dir(detection_output_segment_path) + "/" + detection_init_segment_local_filename 
 									// Write init section to local init segment file
 									utils.Write_file(new_init_segment_bytes, upload_candidate_detection_init_segment)
 									Log.Printf("Uploading detection output init segment: %s\n", upload_candidate_detection_init_segment)
