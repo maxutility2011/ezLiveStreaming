@@ -127,7 +127,7 @@ func AddDetectionVideoOutput(j *LiveJobSpec) {
 }
 
 // Generate object detection command
-// sh /home/streamer/bins/od.sh /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.merged 25 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.detected
+// sh /home/streamer/bins/od.sh /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.merged 25 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k seg_1 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.detected
 func GenerateDetectionCommand(input_video_frame_rate float64, input_file string, output_file string) []string {
 	var detectorArgs []string
 	detectorArgs = append(detectorArgs, "/home/streamer/bins/od.sh")
@@ -146,7 +146,13 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string,
 	detection_output_subdir := utils.Get_path_dir(input_file) 
 	detectorArgs = append(detectorArgs, detection_output_subdir)
 
-	// Parameter #4 - Output file from Yolo script, i.e., ".detected" files
+	// Parameter #4 - segment file name (without file extension)
+	media_data_segment_filename := utils.Get_path_filename(input_file)
+	pos_dot := strings.LastIndex(media_data_segment_filename, ".")
+	seg_name := media_data_segment_filename[:pos_dot-1]
+	detectorArgs = append(detectorArgs, seg_name)
+
+	// Parameter #5 - Output file from Yolo script, i.e., ".detected" files
 	detectorArgs = append(detectorArgs, output_file)
 	return detectorArgs
 }
