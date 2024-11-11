@@ -571,7 +571,9 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								os.Remove(event.Name)
 
 								// Run Yolo object detection on the merged segment
+								detection_start_time_ms := time.Now().UnixMilli()
 								detection_output_segment_path, err := run_detection(j, merged_segment_path)
+								detection_end_time_ms := time.Now().UnixMilli()
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
 									// TODO: When detection fails for some reason,
@@ -579,7 +581,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									return
 								}
 
-								Log.Printf("Object detection completes. Detected media segment output: %s\n", detection_output_segment_path)
+								Log.Printf("Object detection completed in %d milliseconds. Detected media segment output: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
 
 								// Delete the merged segment as it is no longer needed
 								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
