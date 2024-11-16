@@ -43,6 +43,7 @@ const num_concurrent_uploads = 5
 var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const detection_init_segment_local_filename = "init_detection.mp4"
+const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
@@ -855,8 +856,11 @@ func main() {
 		}
 	}
 
-	// Tell file watch also watches for detection output files
-	detection_output_bitrate := j.Output.Detection.Input_video_bitrate
+	// Tell file watcher to also watches for detection output files
+	var detection_output_bitrate string = undefined_bitrate
+	if job.NeedObjectDetection(j) {
+		detection_output_bitrate = j.Output.Detection.Input_video_bitrate
+	}
 
 	// Start a file watcher to check for new stream output from the packager and upload to remote origin server.
 	var errWatchFiles error
