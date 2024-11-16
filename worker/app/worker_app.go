@@ -26,7 +26,6 @@ import (
 type WorkerAppConfig struct {
 	SchedulerUrl      string
 	GetPublicIpUrl    string
-	MyPublicIP		  string
 	WorkerPort        string
 	WorkerUdpPortBase int
 }
@@ -677,12 +676,7 @@ func registerWorker(conf WorkerAppConfig) error {
 		return err
 	}
 
-	if worker_app_config.MyPublicIP != "" {
-		new_worker_request.ServerIp = worker_app_config.MyPublicIP // local testing uses configured IP address
-	} else {
-		new_worker_request.ServerIp = public_ip
-	}
-
+	new_worker_request.ServerIp = public_ip
 	new_worker_request.ServerPort = conf.WorkerPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()
