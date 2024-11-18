@@ -216,9 +216,9 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		ffmpegArgs = append(ffmpegArgs, resolution)
 		*/
 
-		resolution := "-vf 'scale=w=" 
+		resolution := "-vf \"scale=w=" 
 		resolution += strconv.Itoa(vo.Width)
-		resolution += ":" + "h=" + strconv.Itoa(vo.Height) + "'"
+		resolution += ":" + "h=" + strconv.Itoa(vo.Height) + "\""
 		ffmpegArgs = append(ffmpegArgs, resolution)
 
 		ffmpegArgs = append(ffmpegArgs, "-c:v")
