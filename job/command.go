@@ -40,6 +40,7 @@ const default_detection_input_video_buf_size = "250k"
 const default_detection_encode_codec = H264_CODEC
 const default_detection_encode_preset = "veryfast"
 const default_detection_encode_crf = 25
+const mp4box_segment_template = "segment_$Number$"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -157,6 +158,28 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string,
 	return detectorArgs
 }
 
+// MP4Box -dash 4000 -segment-name 'segment_$Number$' -out 1.m3u8 /tmp/1.mp4
+func GenerateFmp4ConversionCommand(input string, seg_duration int) []string {
+	var detectorArgs []string
+
+	// segment duration
+	detectorArgs = append(detectorArgs, "-dash") // MP4 fmp4 segmenter always use option "-dash" regardless of dash or hls output
+	detectorArgs = append(detectorArgs, strconv.Itoa(seg_duration))
+
+	// segment template
+	detectorArgs = append(detectorArgs, "-segment-name")
+	detectorArgs = append(detectorArgs, mp4box_segment_template)
+
+	// output m3u8 path
+	// All we need is the fmp4 init and data segment. We don't upload the m3u8 playlist.
+	detectorArgs = append(detectorArgs, "-out")
+	detectorArgs = append(detectorArgs, utils.Get_path_dir(input) + "/dummy.m3u8") 
+
+	// Input path
+	detectorArgs = append(detectorArgs, input)
+	return detectorArgs
+}
+
 // This function is for ffmpeg video transcoding ONLY. 
 // It is Shaka packager's job to perform media packaging.
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
@@ -202,19 +225,6 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	var i int
 	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
-
-		/*ffmpegArgs = append(ffmpegArgs, "-map")
-		ffmpegArgs = append(ffmpegArgs, "v:0")
-
-		s := "-s:"
-		s += strconv.Itoa(i)
-		ffmpegArgs = append(ffmpegArgs, s)
-
-		resolution := strconv.Itoa(vo.Width)
-		resolution += "x"
-		resolution += strconv.Itoa(vo.Height)
-		ffmpegArgs = append(ffmpegArgs, resolution)
-		*/
 
 		video_filter := "-vf" 
 		ffmpegArgs = append(ffmpegArgs, video_filter)

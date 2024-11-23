@@ -58,12 +58,3 @@ func Change_file_extension(p string, new_extension string) string {
 	pos_dot := strings.LastIndex(p, ".") 
 	return (p[:pos_dot] + new_extension)
 }
-
-// return values:
-// []byte: the byte array containing the fmp4 init section
-// string: the media data segment (path) only (with init section stripped)
-// error
-func Strip_fmp4_init_section(p string) ([]byte,  error) {
-	init_data := []byte("test_data")
-	return init_data, nil
-}

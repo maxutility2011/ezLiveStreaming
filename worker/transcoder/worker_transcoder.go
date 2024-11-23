@@ -42,7 +42,8 @@ const max_upload_retries = 3
 const num_concurrent_uploads = 5
 var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
-const detection_init_segment_local_filename = "init_detection.mp4"
+const init_segment_local_filename = "init.mp4"
+const detection_init_segment_local_filename = "segment_init.mp4" // This must match MP4Box init segment filename
 const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
@@ -321,8 +322,8 @@ func uploadOneFile(local_file string, remote_path_base string) error {
 	}
 
 	// This is the first media data segment. Let's also upload the init segment of this rendition.
-	// FFmpeg media data segment template: "stream_%v/seg_%05d". The first segment looks like e.g., seg_00000.m4s.
-	// Shaka packager template: "stream_%v/seg_$Number$.m4s". The first segment looks like e.g., seg_1.m4s.
+	// FFmpeg media data segment template: "stream_%v/seg_%05d". The first segment is seg_00000.m4s.
+	// Shaka packager template: "stream_%v/seg_$Number$.m4s". The first segment is seg_1.m4s.
 	// TODO: remove dependency on data segment template.
 	if isMediaDataSegment(local_file) && (strings.Contains(local_file, "seg_00000") || strings.Contains(local_file, "seg_1")) {
 		item, ok := init_segments_to_upload[rendition_name[:len(rendition_name)-1]]
@@ -368,18 +369,22 @@ func isHlsmasterPlaylist(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
+// The detection target rendition is an encoder output rendition that is used for object detection
 func isDetectionTarget(file_name string, detection_output_bitrate string) bool {
 	return strings.Contains(file_name, detection_output_bitrate)
 }
 
+// A media data segment of the detection target rendition
 func isDetectionTargetTypeMediaDataSegment(file_name string, detection_output_bitrate string) bool {
 	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name)
 }
 
+// A media init segment of the detection target rendition
 func isDetectionTargetTypeMediaInitSegment(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && isFmp4InitSegment(file_name)
+	return strings.Contains(file_name, detection_output_bitrate) && strings.Contains(file_name, init_segment_local_filename)
 }
 
+// A variant playlist of the detection target rendition
 func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_bitrate string) bool {
 	return strings.Contains(file_name, detection_output_bitrate) && isHlsVariantPlaylist(file_name)
 }
@@ -422,6 +427,33 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 	return merged_segment_path, nil
 }
 
+// This function calls MP4Box to convert a single MP4 segment to a fMP4 stream consisting exactly one init segment and one fMP4 segment.
+// MP4Box command: MP4Box -dash 4000 -segment-name 'segment_$Number$' -out 1.m3u8 /tmp/1.mp4
+// Output: "1.mpd  segment_1.m4s  segment_2.m4s  segment_3.m4s  segment_4.m4s  segment_5.m4s  segment_6.m4s  segment_7.m4s  segment_8.m4s  segment_init.mp4"
+func mp4_to_fmp4(input string, seg_duration int) (string, string, error) {
+	mp4box_init_segment_filename := utils.Get_path_dir(input) + "/" + detection_init_segment_local_filename
+
+	// The MP4Box command guarantees the output segment name would always be "segment_1.m4s"
+	// The input MP4 file consists of only one media data segment. The MP4Box output will consist of only one segment as well, hence the segment number will always be "1".
+	mp4box_media_data_segment_filename := utils.Get_path_dir(input) + "/segment_1.m4s"
+	var err error
+
+	converterArgs := job.GenerateFmp4ConversionCommand(input, seg_duration)
+	Log.Println("Fmp4Converter arguments: ")
+	Log.Println(job.ArgumentArrayToString(converterArgs))
+
+	converterCmd := exec.Command("MP4Box", converterArgs...)
+	var errConverter error = nil
+	var out []byte
+	out, errConverter = converterCmd.CombinedOutput() // This line blocks when converterCmd launch succeeds
+	if errConverter != nil {
+		Log.Println("Errors starting converter: ", errConverter, " converter output: ", string(out))
+		return mp4box_init_segment_filename, mp4box_media_data_segment_filename, errors.New("error_starting_converter")
+	}
+
+	return mp4box_init_segment_filename, mp4box_media_data_segment_filename, err
+}
+
 func getRenditionNameFromPath(path string) string {
 	s := ""
 	posLastSingleSlash := strings.LastIndex(path, "/")
@@ -462,7 +494,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 			Log.Printf("Add %s to init segment table under rendition name = %s\n", file_path, rendition_name)
 			init_segments_to_upload[rendition_name] = it
 		} else {
-			Log.Printf("Failed to add %s to init segment tabele. Invalid rendition name: %s\n", file_path, rendition_name)
+			Log.Printf("Failed to add %s to init segment table. Invalid rendition name: %s\n", file_path, rendition_name)
 		}
 	} else { // Add media data segments to upload_list
 		Log.Printf("Add %s to UploadList\n", file_path)
@@ -527,7 +559,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 					// upload opportunity
 					if event.Op == fsnotify.Create {
 						if isStreamFile(event.Name) { 
-							// The file is a stream file but a not detection target, upload it right away
+							// The file is a stream file but not a detection target, upload it right away
 							if !isDetectionTarget(event.Name, detection_output_bitrate) {
 								addToUploadList(event.Name, remote_media_output_path)
 								continue
@@ -551,11 +583,12 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 						//          merge             detect               split
 						// init.mp4 -----> (seg.merged) --> (seg.detected) -----> seg.m4s 
 						//            |                                    |
-						// (seg.m4s)---                                    --> init_detection.mp4
+						// (seg.m4s)---                                    --> init.detected.mp4
 						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
 							Log.Printf("Media data segment to detect: %s\n", event.Name)
 							if original_detection_output_init_segment_path_local == "" {
-								Log.Printf("Cannot merge data segment %s due to missing init segment\n", event.Name)
+								Log.Printf("Not ready to merge data segment %s due to missing init segment\n", event.Name)
+								// TODO: When merge fails, shall we show a slate segment instead?
 								continue
 							}
 
@@ -567,7 +600,8 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									return
 								}
 							
-								// Delete the media data segment as it is already merged with the init segment
+								// Delete the original media data segment as it is already merged.
+								// The same file name (i.e., event.Name) can be reused for the detected media segment
 								Log.Printf("Deleting original media segment: %s\n", event.Name)
 								os.Remove(event.Name)
 
@@ -577,44 +611,44 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								detection_end_time_ms := time.Now().UnixMilli()
 								if err != nil {
 									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
-									// TODO: When detection fails for some reason,
-									// can we show a slate segment instead?
+									// TODO: When detection fails, shall we show a slate segment instead?
 									return
 								}
 
 								Log.Printf("Object detection completed in %d milliseconds. Detected media segment output: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
 
-								// Delete the merged segment as it is no longer needed
+								// Delete the merged segment to save space as it is no longer needed
 								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
 								os.Remove(merged_segment_path)
 
-								// Strip init section
-								Log.Printf("Stripping init section from detected segment: %s\n", detection_output_segment_path)
-								new_init_segment_bytes, err_init := utils.Strip_fmp4_init_section(detection_output_segment_path)
+								// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
+								Log.Printf("Converting detected mp4 segment to fmp4 segment: %s\n", detection_output_segment_path)
+								new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, j.Output.Segment_duration)
+								
 								upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.
-								if err_init != nil {
-									Log.Printf("Failed to strip off init section from detected segment: %s. Error: %v\n", detection_output_segment_path, err_init)
+								if err_conversion != nil {
+									Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
 									return
 								}
 
+								// Upload the new init segment only once
 								if upload_candidate_detection_init_segment == "" {
-									upload_candidate_detection_init_segment = utils.Get_path_dir(detection_output_segment_path) + "/" + detection_init_segment_local_filename 
-									// Write init section to local init segment file
-									utils.Write_file(new_init_segment_bytes, upload_candidate_detection_init_segment)
-									Log.Printf("Uploading detection output init segment: %s\n", upload_candidate_detection_init_segment)
-									// Upload the new detected init segment only once
+									upload_candidate_detection_init_segment = new_init_segment_path
 									addToUploadList(upload_candidate_detection_init_segment, remote_media_output_path)
-								}
+								} 
 
 								Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
+								// Reuse the filename of the original media data segment
+								os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
+
 								// Upload local media data segment file
 								addToUploadList(upload_candidate_detection_media_data_segment, remote_media_output_path)
 							}()
-						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the detection output, save the file path.
+						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
 							Log.Printf("Media init segment to detect: %s", event.Name)
 							original_detection_output_init_segment_path_local = event.Name
-							// Do not upload original detection init segment. 
-							// We only upload the new detected init segment.
+							// Do not upload original detection init segment, e.g., init.mp4. 
+							// We only upload the new detected init segment, e.g., init.detected.mp4.
 						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
 							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 						}
