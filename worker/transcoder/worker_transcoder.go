@@ -620,7 +620,6 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								// Delete the merged segment to save space as it is no longer needed
 								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
 								os.Remove(merged_segment_path)
-								return
 
 								// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
 								Log.Printf("Converting detected mp4 segment to fmp4 segment: %s\n", detection_output_segment_path)
