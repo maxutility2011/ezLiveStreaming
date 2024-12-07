@@ -479,7 +479,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		mpd_output_path := media_output_path + DASH_MPD_FILE_NAME
 		packagerArgs = append(packagerArgs, mpd_output_path)
 	} else if j.Output.Stream_type == HLS {
-		frag_duration_option := "--fragment_duration"
+		/*frag_duration_option := "--fragment_duration"
 		packagerArgs = append(packagerArgs, frag_duration_option)
 		frag_duration_value := strconv.Itoa(j.Output.Fragment_duration)
 		packagerArgs = append(packagerArgs, frag_duration_value)
@@ -487,8 +487,8 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		seg_duration_option := "--segment_duration"
 		packagerArgs = append(packagerArgs, seg_duration_option)
 		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
-		packagerArgs = append(packagerArgs, seg_duration_value)
-		
+		packagerArgs = append(packagerArgs, seg_duration_value)*/
+
 		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
 		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
