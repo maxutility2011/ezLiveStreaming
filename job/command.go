@@ -226,6 +226,13 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
 
+		kf := "expr:gte(t,n_forced*"
+		kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
+		kf += ")"
+
+		ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+		ffmpegArgs = append(ffmpegArgs, kf)
+
 		video_filter := "-vf" 
 		ffmpegArgs = append(ffmpegArgs, video_filter)
 		
@@ -479,7 +486,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		mpd_output_path := media_output_path + DASH_MPD_FILE_NAME
 		packagerArgs = append(packagerArgs, mpd_output_path)
 	} else if j.Output.Stream_type == HLS {
-		/*frag_duration_option := "--fragment_duration"
+		frag_duration_option := "--fragment_duration"
 		packagerArgs = append(packagerArgs, frag_duration_option)
 		frag_duration_value := strconv.Itoa(j.Output.Fragment_duration)
 		packagerArgs = append(packagerArgs, frag_duration_value)
@@ -487,7 +494,7 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		seg_duration_option := "--segment_duration"
 		packagerArgs = append(packagerArgs, seg_duration_option)
 		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
-		packagerArgs = append(packagerArgs, seg_duration_value)*/
+		packagerArgs = append(packagerArgs, seg_duration_value)
 
 		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
 		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
@@ -578,13 +585,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	ffmpegArgs = append(ffmpegArgs, "-i")
 	ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
-	kf := "expr:gte(t,n_forced*"
-	kf += strconv.Itoa(j.Output.Segment_duration)
-	kf += ")"
-
-	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
-	ffmpegArgs = append(ffmpegArgs, kf)
-
 	var local_media_output_path_subdirs []string
 	i := 0
 	// Video encoding params
@@ -603,6 +603,13 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		resolution += "x"
 		resolution += strconv.Itoa(vo.Height)
 		ffmpegArgs = append(ffmpegArgs, resolution)
+
+		kf := "expr:gte(t,n_forced*"
+		kf += strconv.Itoa(j.Output.Segment_duration)
+		kf += ")"
+
+		ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+		ffmpegArgs = append(ffmpegArgs, kf)
 
 		ffmpegArgs = append(ffmpegArgs, "-c:v")
 		if vo.Codec == AV1_CODEC {
