@@ -43,7 +43,7 @@ const num_concurrent_uploads = 5
 var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const init_segment_local_filename = "init.mp4"
-const detection_init_segment_local_filename = "segment_init.mp4" // This must match MP4Box init segment filename
+const detection_init_segment_local_filename = job.Mp4box_segment_template_prefix + "init.mp4" // This must match MP4Box init segment filename
 const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
@@ -376,12 +376,12 @@ func isDetectionTarget(file_name string, detection_output_bitrate string) bool {
 
 // A media data segment of the detection target rendition
 func isDetectionTargetTypeMediaDataSegment(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name)
+	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name) && !strings.Contains(file_name, job.Mp4box_segment_template_prefix)
 }
 
-// A media init segment of the detection target rendition
+// A media init segment of the detection target rendition. 
 func isDetectionTargetTypeMediaInitSegment(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && strings.Contains(file_name, init_segment_local_filename)
+	return strings.Contains(file_name, detection_output_bitrate) && strings.Contains(file_name, init_segment_local_filename) && !strings.Contains(file_name, detection_init_segment_local_filename)
 }
 
 // A variant playlist of the detection target rendition
@@ -622,7 +622,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								os.Remove(merged_segment_path)
 
 								// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
-								Log.Printf("Converting detected mp4 segment to fmp4 segment: %s\n", detection_output_segment_path)
+								Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
 								new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, j.Output.Segment_duration)
 								
 								upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.

@@ -40,7 +40,8 @@ const default_detection_input_video_buf_size = "250k"
 const default_detection_encode_codec = H264_CODEC
 const default_detection_encode_preset = "veryfast"
 const default_detection_encode_crf = 25
-const mp4box_segment_template = "segment_$Number$"
+const Mp4box_segment_template_prefix = "segment_"
+const mp4box_segment_template = Mp4box_segment_template_prefix + "$Number$"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
