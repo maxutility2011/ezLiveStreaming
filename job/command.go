@@ -605,7 +605,7 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		ffmpegArgs = append(ffmpegArgs, resolution)
 
 		kf := "expr:gte(t,n_forced*"
-		kf += strconv.Itoa(j.Output.Segment_duration)
+		kf += strconv.Itoa(j.Output.Fragment_duration)
 		kf += ")"
 
 		ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
