@@ -164,6 +164,7 @@ func GenerateFmp4ConversionCommand(input string, seg_duration int) []string {
 
 	// segment duration
 	detectorArgs = append(detectorArgs, "-dash") // MP4 fmp4 segmenter always use option "-dash" regardless of dash or hls output
+	seg_duration = seg_duration * 1000 // convert to ms
 	detectorArgs = append(detectorArgs, strconv.Itoa(seg_duration))
 
 	// segment template
