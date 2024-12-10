@@ -601,7 +601,6 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								}
 							
 								// Delete the original media data segment as it is already merged.
-								// The same file name (i.e., event.Name) can be reused for the detected media segment
 								Log.Printf("Deleting original media segment: %s\n", event.Name)
 								os.Remove(event.Name)
 
@@ -624,11 +623,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
 								Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
 								new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, j.Output.Segment_duration)
-								
-								pos_underscore := strings.LastIndex(event.Name, "_") 
-								upload_candidate_detection_media_data_segment := "segment_" + event.Name[pos_underscore+1 :]
 
-								//upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.
 								if err_conversion != nil {
 									Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
 									return
@@ -640,11 +635,14 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									addToUploadList(upload_candidate_detection_init_segment, remote_media_output_path)
 								} 
 
-								Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
-								// Reuse the filename of the original media data segment
+								// Rename detection output media segment to follow "segment_%d.m4s" template
+								// "segment_%d.m4s" will be found by function watchStreamFiles. However, function isDetectionTargetTypeMediaDataSegment will filter them out.
+								pos_underscore := strings.LastIndex(event.Name, "_") 
+								upload_candidate_detection_media_data_segment := "segment_" + event.Name[pos_underscore+1 :]
 								os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
 
 								// Upload local media data segment file
+								Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
 								addToUploadList(upload_candidate_detection_media_data_segment, remote_media_output_path)
 							}()
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
