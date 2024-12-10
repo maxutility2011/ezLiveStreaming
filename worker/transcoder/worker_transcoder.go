@@ -637,8 +637,9 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 
 								// Rename detection output media segment to follow "segment_%d.m4s" template
 								// "segment_%d.m4s" will be found by function watchStreamFiles. However, function isDetectionTargetTypeMediaDataSegment will filter them out.
+								pos_seg := strings.LastIndex(event.Name, "seg_") 
 								pos_underscore := strings.LastIndex(event.Name, "_") 
-								upload_candidate_detection_media_data_segment := "segment_" + event.Name[pos_underscore+1 :]
+								upload_candidate_detection_media_data_segment := event.Name[:pos_seg] + "segment_" + event.Name[pos_underscore+1 :]
 								os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
 
 								// Upload local media data segment file
