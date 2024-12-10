@@ -333,7 +333,7 @@ func uploadOneFile(local_file string, remote_path_base string) error {
 			return nil // This is NOT a fatal error, let's return nil.
 		}
 
-		Log.Printf("Add %s to UploadList\n", local_file)
+		Log.Printf("Add %s to UploadList\n", item.File_path)
 		upload_list.PushBack(item)
 	}
 
