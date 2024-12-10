@@ -625,7 +625,10 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
 								new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, j.Output.Segment_duration)
 								
-								upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.
+								pos_underscore := strings.LastIndex(event.Name, "_") 
+								upload_candidate_detection_media_data_segment := "segment_" + event.Name[pos_underscore+1 :]
+
+								//upload_candidate_detection_media_data_segment := event.Name // The original media data segment is already deleted. The same file name can be reused.
 								if err_conversion != nil {
 									Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
 									return
