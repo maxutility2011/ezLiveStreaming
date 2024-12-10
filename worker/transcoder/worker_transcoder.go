@@ -40,10 +40,10 @@ const stream_file_upload_interval = "0.1s"
 const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
 const num_concurrent_uploads = 5
-var original_detection_output_init_segment_path_local string // The original detection init segment output by Shaka packager
+var original_detection_target_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const init_segment_local_filename = "init.mp4"
-const detection_init_segment_local_filename = job.Mp4box_segment_template_prefix + "init.mp4" // This must match MP4Box init segment filename
+const detection_output_init_segment_local_filename = job.Mp4box_segment_template_prefix + "init.mp4" // This must match MP4Box init segment filename
 const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
@@ -370,23 +370,23 @@ func isHlsmasterPlaylist(file_name string) bool {
 }
 
 // The detection target rendition is an encoder output rendition that is used for object detection
-func isDetectionTarget(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate)
+func isDetectionTarget(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate)
 }
 
 // A media data segment of the detection target rendition
-func isDetectionTargetTypeMediaDataSegment(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && isMediaDataSegment(file_name) && !strings.Contains(file_name, job.Mp4box_segment_template_prefix)
+func isDetectionTargetTypeMediaDataSegment(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && isMediaDataSegment(file_name) && strings.Contains(file_name, "seg_")
 }
 
 // A media init segment of the detection target rendition. 
-func isDetectionTargetTypeMediaInitSegment(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && strings.Contains(file_name, init_segment_local_filename) && !strings.Contains(file_name, detection_init_segment_local_filename)
+func isDetectionTargetTypeMediaInitSegment(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && strings.Contains(file_name, init_segment_local_filename) && !strings.Contains(file_name, detection_output_init_segment_local_filename)
 }
 
 // A variant playlist of the detection target rendition
-func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_output_bitrate string) bool {
-	return strings.Contains(file_name, detection_output_bitrate) && isHlsVariantPlaylist(file_name)
+func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && isHlsVariantPlaylist(file_name)
 }
 
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
@@ -431,7 +431,7 @@ func merge_init_and_data_segments(init_segment_path string, data_segment_path st
 // MP4Box command: MP4Box -dash 4000 -segment-name 'segment_$Number$' -out 1.m3u8 /tmp/1.mp4
 // Output: "1.mpd  segment_1.m4s  segment_2.m4s  segment_3.m4s  segment_4.m4s  segment_5.m4s  segment_6.m4s  segment_7.m4s  segment_8.m4s  segment_init.mp4"
 func mp4_to_fmp4(input string, seg_duration int) (string, string, error) {
-	mp4box_init_segment_filename := utils.Get_path_dir(input) + "/" + detection_init_segment_local_filename
+	mp4box_init_segment_filename := utils.Get_path_dir(input) + "/" + detection_output_init_segment_local_filename
 
 	// The MP4Box command guarantees the output segment name would always be "segment_1.m4s"
 	// The input MP4 file consists of only one media data segment. The MP4Box output will consist of only one segment as well, hence the segment number will always be "1".
@@ -532,7 +532,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 }
 
 // https://github.com/fsnotify/fsnotify
-func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_output_bitrate string) error {
+func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_target_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
 	upload_list = list.New()
 
@@ -560,7 +560,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 					if event.Op == fsnotify.Create {
 						if isStreamFile(event.Name) { 
 							// The file is a stream file but not a detection target, upload it right away
-							if !isDetectionTarget(event.Name, detection_output_bitrate) {
+							if !isDetectionTarget(event.Name, detection_target_bitrate) {
 								addToUploadList(event.Name, remote_media_output_path)
 								continue
 							}
@@ -584,9 +584,9 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 						// init.mp4 -----> (seg.merged) --> (seg.detected) -----> seg.m4s 
 						//            |                                    |
 						// (seg.m4s)---                                    --> init.detected.mp4
-						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_output_bitrate) {
+						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_target_bitrate) {
 							Log.Printf("Media data segment to detect: %s\n", event.Name)
-							if original_detection_output_init_segment_path_local == "" {
+							if original_detection_target_init_segment_path_local == "" {
 								Log.Printf("Not ready to merge data segment %s due to missing init segment\n", event.Name)
 								// TODO: When merge fails, shall we show a slate segment instead?
 								continue
@@ -594,9 +594,9 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 
 							// Run detection in a separate thread
 							go func() {
-								merged_segment_path, err := merge_init_and_data_segments(original_detection_output_init_segment_path_local, event.Name)
+								merged_segment_path, err := merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
 								if err != nil {
-									Log.Printf("Failed to merge detection output init and data segments. Error: %v\n", err)
+									Log.Printf("Failed to merge detection target init and data segments. Error: %v\n", err)
 									return
 								}
 							
@@ -615,7 +615,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 									return
 								}
 
-								Log.Printf("Object detection completed in %d milliseconds. Detected media segment output: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
+								Log.Printf("Object detection completed in %d milliseconds. Detection output media segment: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
 
 								// Delete the merged segment to save space as it is no longer needed
 								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
@@ -644,12 +644,12 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								// Upload local media data segment file
 								addToUploadList(upload_candidate_detection_media_data_segment, remote_media_output_path)
 							}()
-						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_output_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
+						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
 							Log.Printf("Media init segment to detect: %s", event.Name)
-							original_detection_output_init_segment_path_local = event.Name
+							original_detection_target_init_segment_path_local = event.Name
 							// Do not upload original detection init segment, e.g., init.mp4. 
 							// We only upload the new detected init segment, e.g., init.detected.mp4.
-						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_output_bitrate) { // The file is the variant playlist of the detection output, update it.
+						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_target_bitrate) { // The file is the variant playlist of the detection output, update it.
 							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
 						}
 					}
@@ -891,9 +891,9 @@ func main() {
 	}
 
 	// Tell file watcher to also watches for detection output files
-	var detection_output_bitrate string = undefined_bitrate
+	var detection_target_bitrate string = undefined_bitrate
 	if job.NeedObjectDetection(j) {
-		detection_output_bitrate = j.Output.Detection.Input_video_bitrate
+		detection_target_bitrate = j.Output.Detection.Input_video_bitrate
 	}
 
 	// Start a file watcher to check for new stream output from the packager and upload to remote origin server.
@@ -905,7 +905,7 @@ func main() {
 			watch_dirs = append(watch_dirs, local_media_output_path+subdir+"/")
 		}
 
-		errWatchFiles = watchStreamFiles(j, watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_output_bitrate)
+		errWatchFiles = watchStreamFiles(j, watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_target_bitrate)
 	}()
 
 	if errWatchFiles != nil {
