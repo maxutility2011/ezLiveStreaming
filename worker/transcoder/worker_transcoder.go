@@ -583,6 +583,7 @@ func executeDetectionJob(dj detectionJob) {
 		return
 	}
 
+	num_concurrent_detection_jobs = num_concurrent_detection_jobs - 1
 	Log.Printf("Object detection completed in %d milliseconds. Detection output media segment: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
 
 	// Delete the merged segment to save space as it is no longer needed
