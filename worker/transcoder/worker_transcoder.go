@@ -30,6 +30,13 @@ type Upload_item struct {
 	Remote_media_output_path string
 }
 
+type detectionJob struct {
+	Merged_segment_path string
+	LiveJob job.LiveJobSpec
+	Original_media_data_segment_path string
+	Remote_media_output_path string
+}
+
 var Log *log.Logger
 var upload_list *list.List
 var init_segments_to_upload = make(map[string]Upload_item) // map key (string): rendition name; map value: Upload_item representing the init segments
@@ -37,9 +44,12 @@ var local_media_output_path string
 
 const transcoder_status_check_interval = "2s"
 const stream_file_upload_interval = "0.1s"
+const process_detection_job_interval = "0.2s"
 const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
-const num_concurrent_uploads = 5
+const max_concurrent_uploads = 5
+const max_concurrent_detection_jobs = 1
+var num_concurrent_detection_jobs = 0
 var original_detection_target_init_segment_path_local string // The original detection init segment output by Shaka packager
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const init_segment_local_filename = "init.mp4"
@@ -48,6 +58,8 @@ const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
+
+var queued_detection_jobs []detectionJob
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
 	// According to https://pkg.go.dev/os#FindProcess,
@@ -217,7 +229,7 @@ func uploadInputInfoFile(local_media_output_path string, remote_media_output_pat
 // A stream file is qualified for upload if all of the following conditions are met,
 // - it is created more than "stream_file_write_delay_ms (200ms)" ago,
 // - its upload retry count does not exceed "max_upload_retries (3)",
-// - it is within the first "num_concurrent_uploads (3)" items in upload_list.
+// - it is within the first "max_concurrent_uploads" items in upload_list.
 func uploadFiles() {
 	i := 1
 	var f Upload_item
@@ -240,11 +252,11 @@ func uploadFiles() {
 		Log.Printf("%d - Upload item: \n file: %s (size: %d bytes)\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, fs.Size(), time_created, now-time_created, f.Num_retried, f.Remote_media_output_path)
 
 		if now-time_created > stream_file_write_delay_ms {
-			if i > num_concurrent_uploads {
-				Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, num_concurrent_uploads)
+			if i > max_concurrent_uploads {
+				Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, max_concurrent_uploads)
 				break
 			} else {
-				Log.Printf("Current upload: %d < Max. uploads: %d. Proceed to upload.\n", i, num_concurrent_uploads)
+				Log.Printf("Current upload: %d < Max. uploads: %d. Proceed to upload.\n", i, max_concurrent_uploads)
 			}
 
 			// Do not call s3 upload SDK in a go routine because it does not seem to be thread-safe.
@@ -534,6 +546,82 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	return detected_segment_path, nil
 }
 
+// Pop a detection job from the queue and execute it
+func executeNextDetectionJob() {
+	if len(queued_detection_jobs) == 0 {
+		return
+	}
+
+	var frontJob detectionJob
+	frontJob = queued_detection_jobs[0]
+
+	Log.Printf("New detection job found. Input path: %s.\n", frontJob.Merged_segment_path)
+	if num_concurrent_detection_jobs >= max_concurrent_detection_jobs {
+		Log.Printf("Job not executed!! Cannot process more than %d jobs (but %d jobs running currently) at same time. Wait until current jobs finish.\n", max_concurrent_detection_jobs, num_concurrent_detection_jobs)
+		return
+	}
+
+	num_concurrent_detection_jobs = num_concurrent_detection_jobs + 1
+	// Pop out the front job from queue
+	queued_detection_jobs = queued_detection_jobs[1:]
+
+	// Run detection in a separate thread
+	go func() {
+		executeDetectionJob(frontJob) 
+	}()
+}
+
+func executeDetectionJob(dj detectionJob) {
+	// Run Yolo object detection on the merged segment (dj.Merged_segment_path) using the given detection configuration (dj.LiveJob)
+	// For each input file (dj.Merged_segment_path), the detector outputs a detected segment file (detection_output_segment_path)
+	detection_start_time_ms := time.Now().UnixMilli()
+	detection_output_segment_path, err := run_detection(dj.LiveJob, dj.Merged_segment_path)
+	detection_end_time_ms := time.Now().UnixMilli()
+	if err != nil {
+		Log.Printf("Failed to run detection on input = %s. Error: %v\n", dj.Merged_segment_path, err)
+		// TODO: When detection fails, shall we show a slate segment instead?
+		return
+	}
+
+	Log.Printf("Object detection completed in %d milliseconds. Detection output media segment: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
+
+	// Delete the merged segment to save space as it is no longer needed
+	Log.Printf("Deleting merged segment: %s\n", dj.Merged_segment_path)
+	os.Remove(dj.Merged_segment_path)
+
+	// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
+	Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
+	new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, dj.LiveJob.Output.Segment_duration)
+
+	// Delete detected mp4 segment which is an intermediate file
+	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
+	os.Remove(detection_output_segment_path)
+
+	if err_conversion != nil {
+		Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
+		return
+	}
+
+	// Upload the new init segment only once
+	if upload_candidate_detection_init_segment == "" {
+		upload_candidate_detection_init_segment = new_init_segment_path
+		addToUploadList(upload_candidate_detection_init_segment, dj.Remote_media_output_path)
+	} 
+
+	// Rename detection output media segment to follow "segment_%d.m4s" template. 
+	// For example, "/tmp/output_b11b6b55-9306-4212-a15a-3d4aa79d3fb1/video_150k/seg_6.m4s" is renamed to "/tmp/output_b11b6b55-9306-4212-a15a-3d4aa79d3fb1/video_150k/segment_6.m4s"
+	// "segment_%d.m4s" will be found by function watchStreamFiles. However, function isDetectionTargetTypeMediaDataSegment will filter them out.
+	pos_seg := strings.LastIndex(dj.Original_media_data_segment_path, "seg_") 
+	pos_underscore := strings.LastIndex(dj.Original_media_data_segment_path, "_") 
+	// Rename segment while still keeps the segment number.
+	upload_candidate_detection_media_data_segment := dj.Original_media_data_segment_path[:pos_seg] + "segment_" + dj.Original_media_data_segment_path[pos_underscore+1 :]
+	os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
+
+	// Upload local media data segment file
+	Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
+	addToUploadList(upload_candidate_detection_media_data_segment, dj.Remote_media_output_path)
+}
+
 // https://github.com/fsnotify/fsnotify
 func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_target_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
@@ -595,64 +683,26 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								continue
 							}
 
-							// Run detection in a separate thread
-							go func() {
-								merged_segment_path, err := merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
-								if err != nil {
-									Log.Printf("Failed to merge detection target init and data segments. Error: %v\n", err)
-									return
-								}
+							// Merge init and media data segments to a single inited media data segment.
+							merged_segment_path, err := merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
+							if err != nil {
+								Log.Printf("Failed to merge detection target init and data segments. Error: %v\n", err)
+								return
+							}
 							
-								// Delete the original media data segment as it is already merged.
-								Log.Printf("Deleting original media segment: %s\n", event.Name)
-								os.Remove(event.Name)
+							// Delete the original media data segment as it is already merged.
+							// Do not delete the original init segment.
+							Log.Printf("Deleting original media segment: %s\n", event.Name)
+							os.Remove(event.Name)
 
-								// Run Yolo object detection on the merged segment
-								detection_start_time_ms := time.Now().UnixMilli()
-								detection_output_segment_path, err := run_detection(j, merged_segment_path)
-								detection_end_time_ms := time.Now().UnixMilli()
-								if err != nil {
-									Log.Printf("Failed to run detection on input = %s. Error: %v\n", merged_segment_path, err)
-									// TODO: When detection fails, shall we show a slate segment instead?
-									return
-								}
+							// Create a new detection job then enqueue
+							var dj detectionJob
+							dj.Merged_segment_path = merged_segment_path // Merged segment: this is the input file to the detector
+							dj.LiveJob = j // Live job spec: this includes detection configuration
+							dj.Original_media_data_segment_path = event.Name // The path to the original media data segment. Although this file was already deleted, the path name contains segment sequence number which is necessary for naming the detected data segment.
+							dj.Remote_media_output_path = remote_media_output_path // The S3 media output path: the detected segment will be uploaded right after detection
 
-								Log.Printf("Object detection completed in %d milliseconds. Detection output media segment: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
-
-								// Delete the merged segment to save space as it is no longer needed
-								Log.Printf("Deleting merged segment: %s\n", merged_segment_path)
-								os.Remove(merged_segment_path)
-
-								// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
-								Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
-								new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, j.Output.Segment_duration)
-
-								// Delete detected mp4 segment which is an intermediate file
-								Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
-								os.Remove(detection_output_segment_path)
-
-								if err_conversion != nil {
-									Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
-									return
-								}
-
-								// Upload the new init segment only once
-								if upload_candidate_detection_init_segment == "" {
-									upload_candidate_detection_init_segment = new_init_segment_path
-									addToUploadList(upload_candidate_detection_init_segment, remote_media_output_path)
-								} 
-
-								// Rename detection output media segment to follow "segment_%d.m4s" template
-								// "segment_%d.m4s" will be found by function watchStreamFiles. However, function isDetectionTargetTypeMediaDataSegment will filter them out.
-								pos_seg := strings.LastIndex(event.Name, "seg_") 
-								pos_underscore := strings.LastIndex(event.Name, "_") 
-								upload_candidate_detection_media_data_segment := event.Name[:pos_seg] + "segment_" + event.Name[pos_underscore+1 :]
-								os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
-
-								// Upload local media data segment file
-								Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
-								addToUploadList(upload_candidate_detection_media_data_segment, remote_media_output_path)
-							}()
+							queued_detection_jobs = append(queued_detection_jobs, dj)
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
 							Log.Printf("Media init segment to detect: %s", event.Name)
 							original_detection_target_init_segment_path_local = event.Name
@@ -987,8 +1037,21 @@ func main() {
 			select {
 			case <-ticker.C:
 				{
-					// Periodically call function uploadFiles every "stream_file_upload_interval" time units
 					uploadFiles()
+				}
+			}
+		}
+	}(ticker)
+
+	// Periodically handle queued object detection jobs
+	d3, _ := time.ParseDuration(process_detection_job_interval)
+	ticker = time.NewTicker(d3)
+	go func(ticker *time.Ticker) {
+		for {
+			select {
+			case <-ticker.C:
+				{
+					executeNextDetectionJob()
 				}
 			}
 		}
