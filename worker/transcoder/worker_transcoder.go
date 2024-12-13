@@ -538,8 +538,19 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	var out []byte
 	out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
 	if errDetector != nil {
-		Log.Println("Errors starting detector: ", errDetector, " detector output: ", string(out))
-		return detected_segment_path, errors.New("error_starting_detector")
+		errMessage := string(out)
+		Log.Println("Errors starting detector: ", errDetector, " detector output: ", errMessage)
+		
+		ignoreError := false
+		// The following error can be ignored as it does not stop detector from running successfully.
+		// "[W1213 11:31:21.107731264 NNPACK.cpp:61] Could not initialize NNPACK! Reason: Unsupported hardware."
+		if strings.Contains(errMessage, "NNPACK") {
+			ignoreError = true
+		}
+
+		if !ignoreError {
+			return detected_segment_path, errors.New("error_starting_detector")
+		}
 	}
 
 	// When detection finishes, the output 
@@ -555,7 +566,6 @@ func executeNextDetectionJob() {
 	var frontJob detectionJob
 	frontJob = queued_detection_jobs[0]
 
-	Log.Printf("New detection job found. Input path: %s.\n", frontJob.Merged_segment_path)
 	if num_concurrent_detection_jobs >= max_concurrent_detection_jobs {
 		Log.Printf("Job not executed!! Cannot process more than %d jobs (but %d jobs running currently) at same time. Wait until current jobs finish.\n", max_concurrent_detection_jobs, num_concurrent_detection_jobs)
 		return
@@ -567,6 +577,7 @@ func executeNextDetectionJob() {
 
 	// Run detection in a separate thread
 	go func() {
+		Log.Printf("Exexuting new detection job. Input path: %s.\n", frontJob.Merged_segment_path)
 		executeDetectionJob(frontJob) 
 	}()
 }
