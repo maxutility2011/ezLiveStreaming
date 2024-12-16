@@ -21,6 +21,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"bufio"
 )
 
 type Upload_item struct {
@@ -50,7 +51,8 @@ const max_upload_retries = 3
 const max_concurrent_uploads = 5
 const max_concurrent_detection_jobs = 1
 var num_concurrent_detection_jobs = 0
-var original_detection_target_init_segment_path_local string // The original detection init segment output by Shaka packager
+var original_detection_target_init_segment_path_local string // The original detection target init segment output by Shaka packager (before detection)
+var original_detection_target_hls_playlist_path_local string // The original detection target HLS playlist output by Shaka packager (before detection)
 var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
 const init_segment_local_filename = "init.mp4"
 const detection_output_init_segment_local_filename = job.Mp4box_segment_template_prefix + "init.mp4" // This must match MP4Box init segment filename
@@ -590,7 +592,9 @@ func executeDetectionJob(dj detectionJob) {
 	detection_end_time_ms := time.Now().UnixMilli()
 	if err != nil {
 		Log.Printf("Failed to run detection on input = %s. Error: %v\n", dj.Merged_segment_path, err)
-		// TODO: When detection fails, shall we show a slate segment instead?
+		// TODO: When detection fails, we shall just show the original non-detected segment.
+		//       1. Rename seg_xxxxx.m4s to segment_xxxxx.m4s and upload
+		//       2. Update playlist accordingly and upload
 		return
 	}
 
@@ -611,6 +615,9 @@ func executeDetectionJob(dj detectionJob) {
 
 	if err_conversion != nil {
 		Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
+		// TODO: When detection fails, we shall just show the original non-detected segment.
+		//       1. Rename seg_xxxxx.m4s to segment_xxxxx.m4s and upload
+		//       2. Update playlist accordingly and upload
 		return
 	}
 
@@ -632,6 +639,73 @@ func executeDetectionJob(dj detectionJob) {
 	// Upload local media data segment file
 	Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
 	addToUploadList(upload_candidate_detection_media_data_segment, dj.Remote_media_output_path)
+
+	// Add the detected segment to the end (live playhead) of the detection target playlist
+	// TODO: Ideally, a segment should be added to the playlist ONLY after it is successfully uploaded.
+	err, upload_candidate_detection_playlist := updatePlaylistNewDetectedSegment(original_detection_target_hls_playlist_path_local, dj.Original_media_data_segment_path, upload_candidate_detection_media_data_segment)
+	if err != nil {
+		Log.Printf("Failed to update playlist to add newly detected segment %d\n", upload_candidate_detection_playlist)
+		return
+	}
+
+	Log.Printf("Uploading detection HLS playlist: %s\n", upload_candidate_detection_playlist)
+	addToUploadList(upload_candidate_detection_playlist, dj.Remote_media_output_path)
+}
+
+func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path string, detected_segment_path string) (error, string) {
+	pos_dot := strings.LastIndex(playlistFile, ".")
+	updated_playlist_path := playlistFile[: pos_dot] + "_detected" + playlistFile[pos_dot :]
+
+	// Load input playlist
+	playlist, err := os.Open(playlistFile)
+	if err != nil {
+		Log.Printf("Failed to read HLS variant playerlist: %s. Error: %v", playlistFile, err)
+		return errors.New("error_reading_playlist"), updated_playlist_path
+	}
+
+	defer playlist.Close()
+	scanner := bufio.NewScanner(playlist)
+
+	// Load output playlist
+	newPlaylist, err := os.OpenFile(updated_playlist_path, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		Log.Printf("Failed to create new HLS variant playerlist: %s. Error: %v", updated_playlist_path, err)
+        return err, updated_playlist_path
+    }
+
+	defer newPlaylist.Close()
+	writer := bufio.NewWriter(newPlaylist)
+
+	segment_found_in_playlist := false
+	// Scan every line until we reach the line containing URI of the latest detected media data segment
+	// Write every line before the target line (include the target line) to the output playlist.
+	// Then, skip all following lines which essentially skip all the following media segments.
+	// Any segments before the latest one are not ready to stream yet.
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		pos_lastslash := strings.LastIndex(original_segment_path, "/")
+		original_segment_name := original_segment_path[pos_lastslash+1 :]
+		if strings.Contains(line, original_segment_name) {
+			segment_found_in_playlist = true
+			writer.WriteString(line + "\n")
+			break
+		}
+
+		writer.WriteString(line + "\n")
+	}
+
+	if !segment_found_in_playlist {
+		Log.Printf("Failed to update detection target variant playlist %s. Segment %s not found\n", playlistFile, original_segment_path)
+		return errors.New("segment_not_found_in_playlist"), updated_playlist_path
+	}
+
+	writer.Flush()
+	return nil, updated_playlist_path
+	
+	/*if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}*/
 }
 
 // https://github.com/fsnotify/fsnotify
@@ -721,7 +795,8 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 							// Do not upload original detection init segment, e.g., init.mp4. 
 							// We only upload the new detected init segment, e.g., init.detected.mp4.
 						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_target_bitrate) { // The file is the variant playlist of the detection output, update it.
-							Log.Printf("Hls variant playerlist to detect: %s", event.Name)
+							Log.Printf("HLS variant playerlist to detect: %s", event.Name)
+							original_detection_target_hls_playlist_path_local = event.Name
 						}
 					}
 				case _, ok := <-watcher.Errors:
