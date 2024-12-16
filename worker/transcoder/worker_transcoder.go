@@ -377,7 +377,7 @@ func isFmp4InitSegment(file_name string) bool {
 }
 
 func isHlsVariantPlaylist(file_name string) bool {
-	return strings.Contains(file_name, "playlist.m3u8") &&
+	return (strings.Contains(file_name, "playlist.m3u8") || strings.Contains(file_name, "playlist_detected.m3u8")) &&
 		!strings.Contains(file_name, ".tmp")
 }
 
