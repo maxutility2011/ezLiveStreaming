@@ -684,6 +684,13 @@ func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		if strings.Contains(line, "init.mp4") {
+			pos_init := strings.LastIndex(original_segment_path, "init.mp4")
+			newLine := original_segment_path[: pos_init] + "segment_init.mp4\""
+			writer.WriteString(newLine + "\n")
+			continue
+		}
+
 		pos_lastslash := strings.LastIndex(original_segment_path, "/")
 		original_segment_name := original_segment_path[pos_lastslash+1 :]
 		if strings.Contains(line, original_segment_name) {
