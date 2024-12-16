@@ -642,7 +642,7 @@ func executeDetectionJob(dj detectionJob) {
 
 	// Add the detected segment to the end (live playhead) of the detection target playlist
 	// TODO: Ideally, a segment should be added to the playlist ONLY after it is successfully uploaded.
-	err, upload_candidate_detection_playlist := updatePlaylistNewDetectedSegment(original_detection_target_hls_playlist_path_local, dj.Original_media_data_segment_path, upload_candidate_detection_media_data_segment)
+	err, upload_candidate_detection_playlist := updatePlaylistNewDetectedSegment(original_detection_target_hls_playlist_path_local, dj.Original_media_data_segment_path)
 	if err != nil {
 		Log.Printf("Failed to update playlist to add newly detected segment %d\n", upload_candidate_detection_playlist)
 		return
@@ -652,7 +652,7 @@ func executeDetectionJob(dj detectionJob) {
 	addToUploadList(upload_candidate_detection_playlist, dj.Remote_media_output_path)
 }
 
-func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path string, detected_segment_path string) (error, string) {
+func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path string) (error, string) {
 	pos_dot := strings.LastIndex(playlistFile, ".")
 	updated_playlist_path := playlistFile[: pos_dot] + "_detected" + playlistFile[pos_dot :]
 
@@ -667,7 +667,7 @@ func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path
 	scanner := bufio.NewScanner(playlist)
 
 	// Load output playlist
-	newPlaylist, err := os.OpenFile(updated_playlist_path, os.O_WRONLY|os.O_CREATE, 0644)
+	newPlaylist, err := os.Create(updated_playlist_path)
 	if err != nil {
 		Log.Printf("Failed to create new HLS variant playerlist: %s. Error: %v", updated_playlist_path, err)
         return err, updated_playlist_path
@@ -677,6 +677,8 @@ func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path
 	writer := bufio.NewWriter(newPlaylist)
 
 	segment_found_in_playlist := false
+	pos_lastslash := strings.LastIndex(original_segment_path, "/")
+	original_segment_name := original_segment_path[pos_lastslash+1 :]
 	// Scan every line until we reach the line containing URI of the latest detected media data segment
 	// Write every line before the target line (include the target line) to the output playlist.
 	// Then, skip all following lines which essentially skip all the following media segments.
@@ -691,15 +693,21 @@ func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path
 			continue
 		}
 
-		pos_lastslash := strings.LastIndex(original_segment_path, "/")
-		original_segment_name := original_segment_path[pos_lastslash+1 :]
 		if strings.Contains(line, original_segment_name) {
 			segment_found_in_playlist = true
-			writer.WriteString(line + "\n")
+			pos_seg := strings.LastIndex(line, "seg_")
+			newLine := line[: pos_seg] + "segment_" + line[pos_seg+4 :]
+			writer.WriteString(newLine + "\n")
 			break
 		}
 
-		writer.WriteString(line + "\n")
+		if strings.Contains(line, "seg_") {
+			pos_seg := strings.LastIndex(line, "seg_")
+			newLine := line[: pos_seg] + "segment_" + line[pos_seg+4 :]
+			writer.WriteString(newLine + "\n")
+		} else {
+			writer.WriteString(line + "\n")
+		}
 	}
 
 	if !segment_found_in_playlist {
