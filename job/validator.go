@@ -15,7 +15,7 @@ var valid_bitrate_units = []string{"k", "K"}
 var valid_h26x_presets = []string{"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
 
 const max_fragment_duration = 10            		// second
-const max_segment_duration = 10             		// second
+const max_segment_duration = 30             		// second
 const default_time_shift_buffer_depth = 120 		// second
 const max_time_shift_buffer_depth = 14400   		// second
 const max_video_outputs = 10
