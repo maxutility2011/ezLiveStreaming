@@ -498,10 +498,12 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
 		packagerArgs = append(packagerArgs, seg_duration_value)
 
-		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
-		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
-		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
-		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+		if j.Output.Time_shift_buffer_depth > 0 { 
+			time_shift_buffer_depth_option := "--time_shift_buffer_depth"
+			packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
+			time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
+			packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+		}
 
 		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
 		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_option)
