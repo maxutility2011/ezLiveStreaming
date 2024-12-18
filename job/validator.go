@@ -94,11 +94,6 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 	// Low_latency_mode defaults to 0. No need to validate.
 
-	// Default to 120 seconds
-	if (*j).Output.Time_shift_buffer_depth <= 0 {
-		(*j).Output.Time_shift_buffer_depth = default_time_shift_buffer_depth
-	}
-
 	// Time_shift_buffer_depth NOT to be higher than 4 hours
 	if (*j).Output.Time_shift_buffer_depth > max_time_shift_buffer_depth {
 		(*j).Output.Time_shift_buffer_depth = max_time_shift_buffer_depth
