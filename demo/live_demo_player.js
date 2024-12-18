@@ -331,6 +331,7 @@ function createJob() {
     let job_body = ""
     if (job_request.value != "") {
         job_body = job_request.value;
+        window.alert(job_body)
         try {
             j = JSON.parse(job_body)
             j.Output.Video_outputs.forEach((o) => {
