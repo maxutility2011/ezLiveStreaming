@@ -1,6 +1,6 @@
 module ezliveStreaming
 
-go 1.22.1
+go 1.23.3
 
 require (
 	github.com/aws/aws-sdk-go v1.51.9
@@ -13,6 +13,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/maxutility2011/media_utils v0.1.1 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect

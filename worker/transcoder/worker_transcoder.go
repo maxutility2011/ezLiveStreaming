@@ -12,6 +12,7 @@ import (
 	"ezliveStreaming/utils"
 	"flag"
 	"fmt"
+	"github.com/maxutility2011/media_utils"
 	"github.com/fsnotify/fsnotify"
 	"io/ioutil"
 	"log"
@@ -22,6 +23,7 @@ import (
 	"syscall"
 	"time"
 	"bufio"
+	"math"
 )
 
 type Upload_item struct {
@@ -36,6 +38,7 @@ type detectionJob struct {
 	LiveJob job.LiveJobSpec
 	Original_media_data_segment_path string
 	Remote_media_output_path string
+	BaseMediaDecodeTime uint32
 }
 
 var Log *log.Logger
@@ -406,6 +409,21 @@ func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_target_
 	return strings.Contains(file_name, detection_target_bitrate) && isHlsVariantPlaylist(file_name)
 }
 
+func read_baseMediaDecodeTime(segment_path string) (uint32, error) {
+	var err error
+	var seg_data []byte
+	var result uint32 = math.MaxUint32
+	seg_data, err = utils.Read_file(segment_path)
+	if err != nil {
+		Log.Printf("Failed to read media segment: %s. Error: %v", segment_path, err)
+		return result, err
+	}
+
+	var tfdt media_utils.Tfdt_box 
+	tfdt, err = media_utils.GetTfdt(seg_data)
+	return tfdt.BaseMediaDecodeTime_v0, nil
+}
+
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
 	// Wait 200ms before data segment becomes fully written
 	time.Sleep(200 * time.Millisecond)
@@ -609,6 +627,26 @@ func executeDetectionJob(dj detectionJob) {
 	Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
 	new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, dj.LiveJob.Output.Segment_duration)
 
+	// Read the detected fmp4 segment and set TFDT BaseMediaDecodeTime
+	var seg_data []byte
+	seg_data, err = utils.Read_file(new_media_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detected fmp4 segment: %s. Can not set BaseMediaDecodeTime. Error: %v", new_media_segment_path, err)
+		// Failing to set BaseMediaDecodeTime will cause PTS discontinuity and HLS playback issue. Let's see if player can recover from the discontinuity.
+	}
+
+	media_utils.SetTfdtUint32(seg_data, dj.BaseMediaDecodeTime)
+
+	// Verify BaseMediaDecodeTime is set correctly
+	var tfdt media_utils.Tfdt_box 
+	tfdt, err = media_utils.GetTfdt(seg_data)
+	if tfdt.BaseMediaDecodeTime_v0 != dj.BaseMediaDecodeTime {
+		Log.Printf("Failed to set TFDT BaseMediaDecodeTime. Target value: %d, set value: %d\n", dj.BaseMediaDecodeTime, tfdt.BaseMediaDecodeTime_v0)
+		// Failing to set BaseMediaDecodeTime will cause PTS discontinuity and HLS playback issue. Let's see if player can recover from the discontinuity.
+	}
+
+	utils.Write_file(seg_data, new_media_segment_path)
+
 	// Delete detected mp4 segment which is an intermediate file
 	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
 	os.Remove(detection_output_segment_path)
@@ -784,8 +822,19 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								continue
 							}
 
+							var err error
+							var baseMediaDecodeTime uint32
+							baseMediaDecodeTime, err = read_baseMediaDecodeTime(event.Name)
+							if err != nil {
+								Log.Printf("Failed to read baseMediaDecodeTime from media segment. Error: %v\n", err)
+								// Should we give a warning or error on this?
+								// If reading baseMediaDecodeTime fails, this media segment won't have correct timestamp and 
+								// playback could have troubles. 
+							}
+
+							var merged_segment_path string
 							// Merge init and media data segments to a single inited media data segment.
-							merged_segment_path, err := merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
+							merged_segment_path, err = merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
 							if err != nil {
 								Log.Printf("Failed to merge detection target init and data segments. Error: %v\n", err)
 								return
@@ -802,6 +851,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 							dj.LiveJob = j // Live job spec: this includes detection configuration
 							dj.Original_media_data_segment_path = event.Name // The path to the original media data segment. Although this file was already deleted, the path name contains segment sequence number which is necessary for naming the detected data segment.
 							dj.Remote_media_output_path = remote_media_output_path // The S3 media output path: the detected segment will be uploaded right after detection
+							dj.BaseMediaDecodeTime = baseMediaDecodeTime
 
 							queued_detection_jobs = append(queued_detection_jobs, dj)
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
