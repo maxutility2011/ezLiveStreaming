@@ -2,12 +2,12 @@
     "Output": {
         "Stream_type": "hls",
         "Segment_format": "fmp4",
-        "Fragment_duration": 10,
+        "Fragment_duration": 5,
         "Segment_duration": 10,
         "Low_latency_mode": 0,
         "Time_shift_buffer_depth": 120,
         "Detection": {
-            "Input_video_frame_rate": 15,
+            "Input_video_frame_rate": 10,
             "Input_video_resolution_height": 180,
             "Input_video_resolution_width": 320,
             "Input_video_bitrate": "150k",
