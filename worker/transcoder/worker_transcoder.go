@@ -39,6 +39,7 @@ type detectionJob struct {
 	Original_media_data_segment_path string
 	Remote_media_output_path string
 	BaseMediaDecodeTime uint32
+	Sidx_timescale uint32
 }
 
 var Log *log.Logger
@@ -424,6 +425,21 @@ func read_baseMediaDecodeTime(segment_path string) (uint32, error) {
 	return tfdt.BaseMediaDecodeTime_v0, nil
 }
 
+func read_sidx_timescale(segment_path string) (uint32, error) {
+	var err error
+	var seg_data []byte
+	var result uint32 = math.MaxUint32
+	seg_data, err = utils.Read_file(segment_path)
+	if err != nil {
+		Log.Printf("Failed to read media segment: %s. Error: %v", segment_path, err)
+		return result, err
+	}
+
+	var sidx media_utils.Sidx_box 
+	sidx, err = media_utils.GetSidx(seg_data)
+	return sidx.Timescale, nil
+}
+
 func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
 	// Wait 200ms before data segment becomes fully written
 	time.Sleep(200 * time.Millisecond)
@@ -539,7 +555,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 
 // Run detection on ".merged" segment file (containing both fmp4 initialization 
 // section and media data section), and output a ".detected" segment file
-func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error) {
+func run_detection(j job.LiveJobSpec, input_segment_path string, sidx_timescale uint32) (string, error) {
 	// Use file extension ".detected" so that it would not be uploaded
 	// ".detected" files contain both an fmp4 initialization section and media
 	// data section, and are NOT immediately uploadable. We need to 
@@ -549,7 +565,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string) (string, error)
 	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
 	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
 
-	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path, detected_segment_path)
+	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path, detected_segment_path, sidx_timescale)
 	Log.Println("Detector arguments: ")
 	Log.Println(job.ArgumentArrayToString(detectorArgs))
 
@@ -606,7 +622,7 @@ func executeDetectionJob(dj detectionJob) {
 	// Run Yolo object detection on the merged segment (dj.Merged_segment_path) using the given detection configuration (dj.LiveJob)
 	// For each input file (dj.Merged_segment_path), the detector outputs a detected segment file (detection_output_segment_path)
 	detection_start_time_ms := time.Now().UnixMilli()
-	detection_output_segment_path, err := run_detection(dj.LiveJob, dj.Merged_segment_path)
+	detection_output_segment_path, err := run_detection(dj.LiveJob, dj.Merged_segment_path, dj.Sidx_timescale)
 	detection_end_time_ms := time.Now().UnixMilli()
 	if err != nil {
 		Log.Printf("Failed to run detection on input = %s. Error: %v\n", dj.Merged_segment_path, err)
@@ -832,6 +848,24 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 								// playback could have troubles. 
 							}
 
+							// Read video timescale from media data segment's SIDX box.
+							// The timescale is passed to detector's (od.sh) ffmpeg reencoder.
+							// The ffmpeg reencoder uses the same timescale when re-encoding the 
+							// detected images to video segment.
+
+							// We must use the same timescale before and after detection. 
+							// This is because we will set the same TFDT baseMediaDecode time before and after detection.
+							// The timescales for baseMediaDecode must be consistent too.
+							var sidx_timescale uint32
+							sidx_timescale, err = read_sidx_timescale(event.Name)
+							if err != nil {
+								Log.Printf("Failed to read SIDX timescale from media segment. Error: %v\n", err)
+								// Should we give a warning or error on this?
+								// If reading SIDX timescale fails, od.sh's ffmpeg re-encoder will use the default timescale
+								// when re-encoding the annotated images. This won't match the timescale used by baseMediaDecodeTime.
+								// There will be timing issues when playing the converted media segment.
+							}
+
 							var merged_segment_path string
 							// Merge init and media data segments to a single inited media data segment.
 							merged_segment_path, err = merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
@@ -852,6 +886,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 							dj.Original_media_data_segment_path = event.Name // The path to the original media data segment. Although this file was already deleted, the path name contains segment sequence number which is necessary for naming the detected data segment.
 							dj.Remote_media_output_path = remote_media_output_path // The S3 media output path: the detected segment will be uploaded right after detection
 							dj.BaseMediaDecodeTime = baseMediaDecodeTime
+							dj.Sidx_timescale = sidx_timescale
 
 							queued_detection_jobs = append(queued_detection_jobs, dj)
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.

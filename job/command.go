@@ -130,7 +130,7 @@ func AddDetectionVideoOutput(j *LiveJobSpec) {
 
 // Generate object detection command
 // sh /home/streamer/bins/od.sh /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.merged 25 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k seg_1 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.detected
-func GenerateDetectionCommand(input_video_frame_rate float64, input_file string, output_file string) []string {
+func GenerateDetectionCommand(input_video_frame_rate float64, input_file string, output_file string, sidx_timescale uint32) []string {
 	var detectorArgs []string
 	detectorArgs = append(detectorArgs, "/home/streamer/bins/od.sh")
 	// Parameter #1 - Input file to Yolo script, i.e., ".merged" files
@@ -156,6 +156,9 @@ func GenerateDetectionCommand(input_video_frame_rate float64, input_file string,
 
 	// Parameter #5 - Output file from Yolo script, i.e., ".detected" files
 	detectorArgs = append(detectorArgs, output_file)
+
+	// Parameter #6 - SIDX timescale that shall be used by ffmpeg re-encoder
+	detectorArgs = append(detectorArgs, strconv.Itoa(int(sidx_timescale)))
 	return detectorArgs
 }
 
