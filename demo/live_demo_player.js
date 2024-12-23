@@ -1,19 +1,24 @@
-var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
+var init_playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd"
+var playback_url = init_playback_url;
+var detection_playlist_url = "";
 var ingest_url = "";
 var create_button;
 var stop_button;
 var resume_button;
 var show_button;
 var play_button;
-var livefeed_button;
-var stoplivefeed_button;
+//var livefeed_button;
+//var stoplivefeed_button;
 var response_code;
 var response_body;
 var job_request;
 var video;
 var job_id;
 var listJobsTimer = null;
-var listJobsInterval = 2000
+const listJobsInterval = 2000;
+var time_job_created;
+var playback_ready_wait_time = 20000; // 20 secs
+var detection_enabled = false;
 
 // Download sample jobs from the server.
 var sample_live_job = '';
@@ -40,7 +45,7 @@ $.getJSON(url4, function(json) {
   sample_live_job_object_detection = JSON.stringify(json, null, 2);
 });
 
-var isLivefeeding = false
+//var isLivefeeding = false
 
 async function initPlayer() {
     // Create a Player instance.
@@ -145,18 +150,6 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
-	/*
-    livefeed_button = document.getElementById('livefeed');
-    livefeed_button.addEventListener('click', (event) => {
-        liveFeed();
-    });
-
-    stoplivefeed_button = document.getElementById('stoplivefeed');
-    stoplivefeed_button.addEventListener('click', (event) => {
-        stopLiveFeed();
-    });
-	*/
-
     play_button = document.getElementById('play');
     play_button.addEventListener('click', (event) => {
         playVideo();
@@ -195,10 +188,7 @@ function startPlaybackTimer() {
     playbackTimer = setTimeout(playVideo, 16000);
 }
 
-function startLiveFeedTimer() {
-    showJobTimer = setTimeout(liveFeed, 500);
-}
-
+/*
 function liveFeed() {
     let live_feed_url = api_server_url + "feed";
     let live_feed_req = new XMLHttpRequest();
@@ -252,13 +242,48 @@ function stopLiveFeed() {
     
     stop_live_feed_req.send();
 }
+*/
+
+function get_detection_playlist(buf, detection_video_bitrate) {
+  let detection_playlist = "";
+  const lines = buf.split('\n');
+  let prev_key = "";
+  let stream;
+  lines.forEach((line) => {
+      let pos_sharp = line.indexOf("#");
+      let key = "";
+      let val = "";
+      if (pos_sharp >= 0) {
+          let pos_colon = line.indexOf(":");
+          if (pos_colon >= 0) {
+              key = line.substring(pos_sharp+1, pos_colon);
+              val = line.substring(pos_colon+1);
+          } else {
+              key = line.substring(pos_sharp+1);
+          }
+
+          prev_key = key;
+      } else {
+          console.log(line);
+          if (prev_key == "EXT-X-STREAM-INF" && line.includes(detection_video_bitrate)) {
+            detection_playlist = line;
+            console.log("detection_playlist: " + detection_playlist);
+          }
+      }
+  });
+
+  return detection_playlist;
+}
 
 function showJob() {
     showJobTimer = setTimeout(showJob, 5000);
+
+    // Get Job state
     let show_job_url = api_server_url + "jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
     show_job_req.open("GET", show_job_url, true);
+    let detection_video_bitrate = ""
 
     show_job_req.onload = function (e) {
         if (show_job_req.readyState === show_job_req.DONE) {
@@ -268,29 +293,29 @@ function showJob() {
             job_id = j.Id;
 
             playback_url = j.Playback_url;
-            ingest_url = j.RtmpIngestUrl;
-            drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
-            drm_key = j.DrmEncryptionKeyInfo.Key;
-            warnings = j.Job_validation_warnings;
-            jstate = j.State;
-            bw = j.Ingress_bandwidth_kbps;
-            cpu = j.Transcoding_cpu_utilization;
-            input_info = j.Input_info_url;
 
             let je = {};
-            je.playback_url = playback_url;
-            je.rtmp_ingest_url = ingest_url;
-            je.drm_key_id = drm_key_id;
-            je.drm_key = drm_key;
-            je.job_state = jstate;
-            je.validation_warnings = warnings;
-            je.ingress_bandwidth_kbps = bw; 
-            je.transcoding_cpu_utilization = cpu;  
-            je.input_info = input_info;
+            je.playback_url = j.Playback_url;
+            je.detection_playlist_url = detection_playlist_url;
+            je.rtmp_ingest_url = j.RtmpIngestUrl;
+            je.drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
+            je.drm_key = j.DrmEncryptionKeyInfo.Key;
+            je.job_state = j.State;
+            je.validation_warnings = j.Job_validation_warnings;
+            je.ingress_bandwidth_kbps = j.Ingress_bandwidth_kbps; 
+            je.transcoding_cpu_utilization = j.Transcoding_cpu_utilization;  
+            je.input_info = j.Input_info_url;
 
             job_essentials.innerHTML = JSON.stringify(je, null, 2);
             response_code.innerHTML = "status code=" + show_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
+
+            console.log("Before checking for detection config\n");
+            if (j.Output?.Detection) {
+              detection_enabled = true;
+              detection_video_bitrate = j.Output.Detection.Input_video_bitrate;
+              console.log("detection_video_bitrate " + detection_video_bitrate);
+            }
           } else {
             let job_resp = this.response;
             window.alert(job_resp);
@@ -299,6 +324,43 @@ function showJob() {
     }
     
     show_job_req.send();
+
+    // If detection is enabled and job has been created before 20 secs ago (i.e., job is streamable), do the following
+    // - Download the new live stream master playlist,
+    // - Parse the downloaded playlist and get the detection variant playlist pathname,
+    // - Concatenate with the base URL to form the full detection variant playlist,
+    // - Display detection variant playlist in job essential section.
+    curr_time = Date.now()
+    if (detection_enabled && playback_url !== init_playback_url && curr_time - time_job_created >= playback_ready_wait_time) {
+      let download_master_playlist_req = new XMLHttpRequest();
+      download_master_playlist_req.open("GET", playback_url, true);
+
+      download_master_playlist_req.onload = function (e) {
+        console.log("download_master_playlist_req loaded");
+        if (download_master_playlist_req.readyState === download_master_playlist_req.DONE) {
+          console.log("download_master_playlist_req done");
+          if (download_master_playlist_req.status === 200) {
+            console.log("download_master_playlist_req 200");
+            let master_playlist_data = download_master_playlist_req.response;
+            console.log("Master playlist\n");
+            console.log(master_playlist_data);
+            let detection_playlist_pathname = get_detection_playlist(master_playlist_data, detection_video_bitrate);
+            console.log("detection_playlist_pathname: " + detection_playlist_pathname);
+            
+            const url = new URL(playback_url);
+            const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
+            console.log("baseUrlPathname: " + baseUrlPathname);
+            const baseUrl = `${url.origin}${baseUrlPathname}`;
+            console.log("baseUrl: " + baseUrl);
+
+            detection_playlist_url = baseUrl + detection_playlist_pathname;
+            console.log("detection_playlist_url: " + detection_playlist_url);
+          }
+        }
+      }
+    }
+
+    download_master_playlist_req.send();
 }
 
 function createJob() {
@@ -331,7 +393,6 @@ function createJob() {
     let job_body = ""
     if (job_request.value != "") {
         job_body = job_request.value;
-        console.log("test 1: " + job_body)
         try {
             j = JSON.parse(job_body)
             j.Output.Video_outputs.forEach((o) => {
@@ -352,15 +413,16 @@ function createJob() {
         })
 
         job_body = JSON.stringify(j)
-        console.log("test 2: " + job_body)
         job_request.innerHTML = JSON.stringify(j, null, 2)
     }
     
     create_job_req.send(job_body);
+    time_job_created = Date.now()
+
 }
 
 function cleanup() {
-  stopLiveFeed()
+  //stopLiveFeed()
   stopJob()
 }
 
