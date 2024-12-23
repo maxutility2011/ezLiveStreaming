@@ -385,7 +385,7 @@ func isHlsVariantPlaylist(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
-func isHlsmasterPlaylist(file_name string) bool {
+func isHlsMasterPlaylist(file_name string) bool {
 	return strings.Contains(file_name, "master.m3u8") &&
 		!strings.Contains(file_name, ".tmp")
 }
@@ -777,6 +777,68 @@ func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path
 	}*/
 }
 
+// Get detection target rendition from master playlist and return its url. Also, remove detection target rendition from master playlist.
+func removeDetectionTargetRendition(master_playlist_path string, detection_target_bitrate string) (string, error) {
+	var err error
+	var detection_target_var_playlist_url string
+	var output_playlist_data []byte
+	
+	// Load master playlist
+	playlist, err := os.Open(master_playlist_path)
+	if err != nil {
+		Log.Printf("Failed to read HLS master playlist: %s. Error: %v", master_playlist_path, err)
+		return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+	}
+
+	scanner := bufio.NewScanner(playlist)
+
+	var prev_line string
+	for scanner.Scan() {              
+		line := scanner.Text()
+		if strings.Contains(line, "EXT-X-STREAM-INF") {
+			prev_line = line
+			continue
+		}
+
+		if strings.Contains(prev_line, "EXT-X-STREAM-INF") {
+			// Output non-detection target rendition (EXT-X-STREAM-INF)
+			if !strings.Contains(line, detection_target_bitrate) {
+				prev_line = prev_line + "\n"
+                line = line + "\n"
+                output_playlist_data = append(output_playlist_data, []byte(prev_line)...)
+                output_playlist_data = append(output_playlist_data, []byte(line)...)
+			} else { // Return detection target rendition
+				detection_target_var_playlist_url = line
+			}
+
+			continue
+		}
+
+		// Output any playlist lines other than "EXT-X-STREAM-INF" and the rendition URL
+		line = line + string("\n")
+        output_playlist_data = append(output_playlist_data, []byte(line)...)
+		prev_line = line
+	}
+
+	playlist.Close()
+
+	// Rewrite master playlist with detection target rendition removed
+	truncated_playlist, err := os.OpenFile(master_playlist_path, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		Log.Printf("Failed to truncate HLS master playlist: %s. Error: %v", master_playlist_path, err)
+        return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+    }
+
+	defer truncated_playlist.Close()
+	_, err = truncated_playlist.Write(output_playlist_data)
+	if err != nil {
+		Log.Printf("Failed to write new master playlist: %s. Error: %v", master_playlist_path, err)
+		return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+	}
+
+	return detection_target_var_playlist_url, nil
+}
+
 // https://github.com/fsnotify/fsnotify
 func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_target_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
@@ -807,6 +869,24 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 						if isStreamFile(event.Name) { 
 							// The file is a stream file but not a detection target, upload it right away
 							if !isDetectionTarget(event.Name, detection_target_bitrate) {
+								// If object detection is enabled, we need to get the detection target
+								// variant playlist url from the master playlist.
+								// Then, we delete detection target variant playlist from the master.
+								// We can't leave the detection target variant playlist in the master.
+								if isHlsMasterPlaylist(event.Name) {
+									if detection_target_bitrate != undefined_bitrate {
+										//detection_target_var_playlist_url, err := removeDetectionTargetRendition(event.Name, detection_target_bitrate)
+										_, err := removeDetectionTargetRendition(event.Name, detection_target_bitrate)
+										if err != nil {
+											Log.Printf("Failed to update master playlist: %s. Error: %v\n", event.Name, err)
+											// If reading master playlist fails, we will not know the detection target variant playlist url,
+											// we will not remove the detection target variant playlist url from the master playlist.
+											// This is not good, but acceptable. We can still try again later. 
+											// So this is not a fatal error.
+										}
+									}
+								}
+
 								addToUploadList(event.Name, remote_media_output_path)
 								continue
 							}
@@ -1117,11 +1197,7 @@ func main() {
 	// 3. Encode the marked frames into a single video segment,
 	// 4. Output the marked video segments to the video detection output subdir,
 	// The file watcher keeps watching the video detection output subdir, and upload the marked segments.
-	/*if job.NeedObjectDetection(j) {
-		detection_output_subdir := "video_detection"
-		local_media_output_path_subdirs = append(local_media_output_path_subdirs, detection_output_subdir)
-	}*/
-
+	
 	// Create local output paths. Shaka packager may have already created the paths.
 	for _, sd := range local_media_output_path_subdirs {
 		sd = local_media_output_path + sd
@@ -1136,7 +1212,7 @@ func main() {
 		}
 	}
 
-	// Tell file watcher to also watches for detection output files
+	// Tell file watcher to also watch for detection target output files
 	var detection_target_bitrate string = undefined_bitrate
 	if job.NeedObjectDetection(j) {
 		detection_target_bitrate = j.Output.Detection.Input_video_bitrate
