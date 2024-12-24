@@ -7,8 +7,6 @@ var stop_button;
 var resume_button;
 var show_button;
 var play_button;
-//var livefeed_button;
-//var stoplivefeed_button;
 var response_code;
 var response_body;
 var job_request;
@@ -16,8 +14,6 @@ var video;
 var job_id;
 var listJobsTimer = null;
 const listJobsInterval = 2000;
-//var time_job_created;
-//var playback_ready_wait_time = 20000; // 20 secs
 var detection_enabled = false;
 
 // Download sample jobs from the server.
@@ -44,8 +40,6 @@ var url4 = "http://" + location.host + "/specs/sample_live_job_object_detection.
 $.getJSON(url4, function(json) {
   sample_live_job_object_detection = JSON.stringify(json, null, 2);
 });
-
-//var isLivefeeding = false
 
 async function initPlayer() {
     // Create a Player instance.
@@ -188,93 +182,6 @@ function startPlaybackTimer() {
     playbackTimer = setTimeout(playVideo, 16000);
 }
 
-/*
-function liveFeed() {
-    let live_feed_url = api_server_url + "feed";
-    let live_feed_req = new XMLHttpRequest();
-    live_feed_req.open("POST", live_feed_url, true);
-    live_feed_req.setRequestHeader("Content-Type", "application/json");
-
-    live_feed_req.onload = function (e) {
-        if (live_feed_req.readyState === live_feed_req.DONE) {
-          if (live_feed_req.status === 201) {
-            response_code.innerHTML = "status code=" + live_feed_req.status
-            livefeed_button.disabled = true
-            isLivefeeding = true
-            startPlaybackTimer()
-          } else {
-            console.log("create new live feed failed. Status code:" + create_job_req.status);
-          }
-        }
-    }
-
-    let feed_body = ""
-    if (ingest_url != "") {
-        body = {}
-        body.RtmpIngestUrl = ingest_url
-        feed_body = JSON.stringify(body)
-        live_feed_req.send(feed_body);
-    } else {
-        console.log("create new live feed failed.")
-        return
-    }
-}
-
-function stopLiveFeed() {
-    if (!isLivefeeding) {
-        return
-    }
-
-    let stop_live_feed_url = api_server_url + "feed";
-    let stop_live_feed_req = new XMLHttpRequest();
-    stop_live_feed_req.open("DELETE", stop_live_feed_url, true);
-
-    stop_live_feed_req.onload = function (e) {
-        if (stop_live_feed_req.readyState === stop_live_feed_req.DONE) {
-          if (stop_live_feed_req.status === 201) {
-            response_code.innerHTML = "status code=" + stop_live_feed_req.status
-            livefeed_button.disabled = false
-          } else {
-            console.log("stop live feed failed. Status code:" + stop_live_feed_req.status);
-          }
-        }
-    }
-    
-    stop_live_feed_req.send();
-}
-*/
-
-/*function get_detection_playlist(buf, detection_video_bitrate) {
-  let detection_playlist = "";
-  const lines = buf.split('\n');
-  let prev_key = "";
-  let stream;
-  lines.forEach((line) => {
-      let pos_sharp = line.indexOf("#");
-      let key = "";
-      let val = "";
-      if (pos_sharp >= 0) {
-          let pos_colon = line.indexOf(":");
-          if (pos_colon >= 0) {
-              key = line.substring(pos_sharp+1, pos_colon);
-              val = line.substring(pos_colon+1);
-          } else {
-              key = line.substring(pos_sharp+1);
-          }
-
-          prev_key = key;
-      } else {
-          console.log(line);
-          if (prev_key == "EXT-X-STREAM-INF" && line.includes(detection_video_bitrate)) {
-            detection_playlist = line;
-            console.log("detection_playlist: " + detection_playlist);
-          }
-      }
-  });
-
-  return detection_playlist;
-}*/
-
 function showJob() {
     showJobTimer = setTimeout(showJob, 5000);
 
@@ -296,7 +203,10 @@ function showJob() {
 
             let je = {};
             je.playback_url = j.Playback_url;
-            je.detection_playlist_url = detection_playlist_url;
+            if (detection_enabled) {
+              je.detection_playlist_url = detection_playlist_url;
+            }
+            
             je.rtmp_ingest_url = j.RtmpIngestUrl;
             je.drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
             je.drm_key = j.DrmEncryptionKeyInfo.Key;
@@ -310,11 +220,9 @@ function showJob() {
             response_code.innerHTML = "status code=" + show_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
 
-            console.log("Before checking for detection config: \n" + j);
-            if (j.Output.Detection.Input_video_bitrate) {
+            if (j.Spec.Output.Detection.Input_video_bitrate) {
               detection_enabled = true;
-              detection_video_bitrate = j.Output.Detection.Input_video_bitrate;
-              console.log("detection_video_bitrate " + detection_video_bitrate);
+              detection_video_bitrate = j.Spec.Output.Detection.Input_video_bitrate;
             }
           } else {
             let job_resp = this.response;
@@ -325,51 +233,13 @@ function showJob() {
     
     show_job_req.send();
 
-    const url = new URL(playback_url);
-    const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
-    console.log("baseUrlPathname: " + baseUrlPathname);
-    const baseUrl = `${url.origin}${baseUrlPathname}`;
-    console.log("baseUrl: " + baseUrl);
+    if (detection_enabled) {
+      const url = new URL(playback_url);
+      const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
+      const baseUrl = `${url.origin}${baseUrlPathname}`;
 
-    detection_playlist_url = baseUrl + "video_" + detection_video_bitrate + "/playlist_detected.m3u8";
-    console.log("detection_playlist_url: " + detection_playlist_url);
-
-    // If detection is enabled and job has been created before 20 secs ago (i.e., job is streamable), do the following
-    // - Download the new live stream master playlist,
-    // - Parse the downloaded playlist and get the detection variant playlist pathname,
-    // - Concatenate with the base URL to form the full detection variant playlist,
-    // - Display detection variant playlist in job essential section.
-    /*curr_time = Date.now()
-    if (detection_enabled && playback_url !== init_playback_url && curr_time - time_job_created >= playback_ready_wait_time) {
-      let download_master_playlist_req = new XMLHttpRequest();
-      download_master_playlist_req.open("GET", playback_url, true);
-
-      download_master_playlist_req.onload = function (e) {
-        console.log("download_master_playlist_req loaded");
-        if (download_master_playlist_req.readyState === download_master_playlist_req.DONE) {
-          console.log("download_master_playlist_req done");
-          if (download_master_playlist_req.status === 200) {
-            console.log("download_master_playlist_req 200");
-            let master_playlist_data = download_master_playlist_req.response;
-            console.log("Master playlist\n");
-            console.log(master_playlist_data);
-            let detection_playlist_pathname = get_detection_playlist(master_playlist_data, detection_video_bitrate);
-            console.log("detection_playlist_pathname: " + detection_playlist_pathname);
-            
-            const url = new URL(playback_url);
-            const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
-            console.log("baseUrlPathname: " + baseUrlPathname);
-            const baseUrl = `${url.origin}${baseUrlPathname}`;
-            console.log("baseUrl: " + baseUrl);
-
-            detection_playlist_url = baseUrl + detection_playlist_pathname;
-            console.log("detection_playlist_url: " + detection_playlist_url);
-          }
-        }
-      }
-
-      download_master_playlist_req.send();
-    }*/
+      detection_playlist_url = baseUrl + "/video_" + detection_video_bitrate + "/playlist_detected.m3u8";
+    }
 }
 
 function createJob() {
