@@ -16,8 +16,8 @@ var video;
 var job_id;
 var listJobsTimer = null;
 const listJobsInterval = 2000;
-var time_job_created;
-var playback_ready_wait_time = 20000; // 20 secs
+//var time_job_created;
+//var playback_ready_wait_time = 20000; // 20 secs
 var detection_enabled = false;
 
 // Download sample jobs from the server.
@@ -244,7 +244,7 @@ function stopLiveFeed() {
 }
 */
 
-function get_detection_playlist(buf, detection_video_bitrate) {
+/*function get_detection_playlist(buf, detection_video_bitrate) {
   let detection_playlist = "";
   const lines = buf.split('\n');
   let prev_key = "";
@@ -273,7 +273,7 @@ function get_detection_playlist(buf, detection_video_bitrate) {
   });
 
   return detection_playlist;
-}
+}*/
 
 function showJob() {
     showJobTimer = setTimeout(showJob, 5000);
@@ -310,8 +310,8 @@ function showJob() {
             response_code.innerHTML = "status code=" + show_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
 
-            console.log("Before checking for detection config\n");
-            if (j.Output?.Detection) {
+            console.log("Before checking for detection config: \n" + j);
+            if (j.Output.Detection.Input_video_bitrate) {
               detection_enabled = true;
               detection_video_bitrate = j.Output.Detection.Input_video_bitrate;
               console.log("detection_video_bitrate " + detection_video_bitrate);
@@ -325,12 +325,21 @@ function showJob() {
     
     show_job_req.send();
 
+    const url = new URL(playback_url);
+    const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
+    console.log("baseUrlPathname: " + baseUrlPathname);
+    const baseUrl = `${url.origin}${baseUrlPathname}`;
+    console.log("baseUrl: " + baseUrl);
+
+    detection_playlist_url = baseUrl + "video_" + detection_video_bitrate + "/playlist_detected.m3u8";
+    console.log("detection_playlist_url: " + detection_playlist_url);
+
     // If detection is enabled and job has been created before 20 secs ago (i.e., job is streamable), do the following
     // - Download the new live stream master playlist,
     // - Parse the downloaded playlist and get the detection variant playlist pathname,
     // - Concatenate with the base URL to form the full detection variant playlist,
     // - Display detection variant playlist in job essential section.
-    curr_time = Date.now()
+    /*curr_time = Date.now()
     if (detection_enabled && playback_url !== init_playback_url && curr_time - time_job_created >= playback_ready_wait_time) {
       let download_master_playlist_req = new XMLHttpRequest();
       download_master_playlist_req.open("GET", playback_url, true);
@@ -358,9 +367,9 @@ function showJob() {
           }
         }
       }
-    }
 
-    download_master_playlist_req.send();
+      download_master_playlist_req.send();
+    }*/
 }
 
 function createJob() {
