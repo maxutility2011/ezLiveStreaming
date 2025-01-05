@@ -56,8 +56,8 @@ All other fields are for re-encoding the annotated images to a single output vid
 | Field | Definition | Data type | Comments | Default value |
 | --- | --- | --- | --- | --- |
 | Encode_codec | Codec used by the video transcoder and re-encoder | string | The video transcoder and video re-encoder use the same codec as specified by *Encode_codec*. Only h264 and h265 are allowed. | "h264" |
-| Encode_preset | Preset used by the video re-encoder | string | "veryfast" | 
-| Encode_crf | CRF used by video re-encoder | integer | 25 | 
+| Encode_preset | Preset used by the video re-encoder | string | | "veryfast" | 
+| Encode_crf | CRF used by video re-encoder | integer | | 25 | 
 
 Note that the transcoder only uses H.264 and H.265 for transcoding the **detection target output**. AV1 is not used. Configuring AV1 for *Encode_codec* would result in job validation warnings and the default value *h264* being used instead.
 
