@@ -1,4 +1,4 @@
-# live real-time object detection in ezLiveStreaming
+# Live real-time object detection in ezLiveStreaming
 ezLiveStreaming uses AI models to enables real-time object detection, allowing for the identification of objects in live video streams. The current release of ezLiveStreaming supports a separate video output with object annotation. The annotated video output can enable a wide range of real-time RoI (Region of Interests) identification applications, such as identification of match score and jersey number in sports matches, object counting, crowd monitoring, obstacle detection and traffic sign recognition, intruder detection. This document reviews its overall system design and AI inference and video processing workflow in detail. 
 
 ## Overview
