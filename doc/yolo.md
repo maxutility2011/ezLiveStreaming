@@ -87,7 +87,7 @@ On my c5.4xlarge instance without GPU acceleration, inferring one 320x180 image 
 
 For each input media segment file, a subfolder is created to hold the intermediate files and log files, e.g., input images, output images, Yolo script log files, FFmpeg re-encoder's log file. For example, od.sh creates subfolder *seg_1* under */tmp/output_efa8d130-a969-4139-b899-afa16115c473/video_150k/* when processing input video file, *seg_1.mp4*. The input images and output images are held under */tmp/output_efa8d130-a969-4139-b899-afa16115c473/video_150k/inputs and */tmp/output_efa8d130-a969-4139-b899-afa16115c473/video_150k/outputs*.
 
-![screenshot](doc/diagrams/yolo_working_dir.png)
+![screenshot](diagrams/yolo_working_dir.png)
 
 ### Re-encoding
 Next, the script [od.sh](https://github.com/maxutility2011/od_yolov8/blob/main/od.sh) uses FFmpeg to merge and re-encode the annotated output images into a single output video file in fragmented MP4 format. The output video is an annotated video segment. The MP4 video segment contains MOOV, SIDX, MOOF and MDAT boxes. Another argument to FFmpeg is the video timescale used in the original input video segment. We will cover this in the next section. Note that, the script [od.sh](https://github.com/maxutility2011/od_yolov8/blob/main/od.sh) does not change the duration of the video segment, so the annotated segment duration is same as the un-annotated segment duration.
