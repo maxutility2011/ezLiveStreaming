@@ -195,7 +195,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 	// Fatal error. Video_outputs cannot be empty
 	// TODO: if we are supporting audio-only transcoding in the future, empty video outputs would become valid.
-	if len((*j).Output.Video_outputs) == 0 {
+	if len((*j).Output.Video_outputs) == 0 && !NeedObjectDetection(*j) {
 		return errors.New("no_video_output"), warnings
 	}
 

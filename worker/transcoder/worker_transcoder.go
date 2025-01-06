@@ -613,7 +613,7 @@ func executeNextDetectionJob() {
 
 	// Run detection in a separate thread
 	go func() {
-		Log.Printf("Exexuting new detection job. Input path: %s.\n", frontJob.Merged_segment_path)
+		Log.Printf("Executing new detection job. Input path: %s.\n", frontJob.Merged_segment_path)
 		executeDetectionJob(frontJob) 
 	}()
 }
