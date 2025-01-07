@@ -34,6 +34,7 @@ type Upload_item struct {
 }
 
 type detectionJob struct {
+	Time_enqueued int64
 	Merged_segment_path string
 	LiveJob job.LiveJobSpec
 	Original_media_data_segment_path string
@@ -607,6 +608,12 @@ func executeNextDetectionJob() {
 		return
 	}
 
+
+	if time.Now().UnixMilli() - frontJob.Time_enqueued > int64(frontJob.LiveJob.Output.Segment_duration * 1000) {
+		Log.Printf("Job timed out (not executed)!!! Time job enqueued: %d, current time: %d, time in queue: %d, segment duration (ms): %d\n", frontJob.Time_enqueued, time.Now().UnixMilli(), time.Now().UnixMilli() - frontJob.Time_enqueued, frontJob.LiveJob.Output.Segment_duration * 1000)
+		return
+	}
+
 	num_concurrent_detection_jobs = num_concurrent_detection_jobs + 1
 	// Pop out the front job from queue
 	queued_detection_jobs = queued_detection_jobs[1:]
@@ -967,6 +974,7 @@ func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_outpu
 							dj.Remote_media_output_path = remote_media_output_path // The S3 media output path: the detected segment will be uploaded right after detection
 							dj.BaseMediaDecodeTime = baseMediaDecodeTime
 							dj.Sidx_timescale = sidx_timescale
+							dj.Time_enqueued = time.Now().UnixMilli()
 
 							queued_detection_jobs = append(queued_detection_jobs, dj)
 						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
