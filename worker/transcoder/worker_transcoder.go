@@ -608,7 +608,6 @@ func executeNextDetectionJob() {
 		return
 	}
 
-
 	if time.Now().UnixMilli() - frontJob.Time_enqueued > int64(frontJob.LiveJob.Output.Segment_duration * 1000) {
 		Log.Printf("Job timed out (not executed)!!! Time job enqueued: %d, current time: %d, time in queue: %d, segment duration (ms): %d\n", frontJob.Time_enqueued, time.Now().UnixMilli(), time.Now().UnixMilli() - frontJob.Time_enqueued, frontJob.LiveJob.Output.Segment_duration * 1000)
 		return

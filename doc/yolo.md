@@ -61,6 +61,8 @@ All other fields are for re-encoding the annotated images to a single output vid
 
 Note that the transcoder only uses H.264 and H.265 for transcoding the **detection target output**. AV1 is not used. Configuring AV1 for *Encode_codec* would result in job validation warnings and the default value *h264* being used instead.
 
+You can also configure detected/annotated output only without outputting any main transcoder outputs. To do that, add the *Detection* block but leave the *Video_outputs* block empty. In this way, users can stream a fixed-bitrate annotated video only without outputting any ABR transcoded video.
+
 The API server validates the detection configuration before it creates the live job. If fields are missing, their default values shall be used, and validation warnings are returned.  
 
 ## Pre-detection processing
