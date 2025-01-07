@@ -15,6 +15,7 @@ var job_id;
 var listJobsTimer = null;
 const listJobsInterval = 2000;
 var detection_enabled = false;
+var detection_video_bitrate = ""
 
 // Download sample jobs from the server.
 var sample_live_job = '';
@@ -190,7 +191,6 @@ function showJob() {
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
     show_job_req.open("GET", show_job_url, true);
-    let detection_video_bitrate = ""
 
     show_job_req.onload = function (e) {
         if (show_job_req.readyState === show_job_req.DONE) {
