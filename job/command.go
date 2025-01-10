@@ -278,12 +278,10 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 
 		if vo.Codec == H264_CODEC || vo.Codec == H265_CODEC {
 			var h26xProfile string
-			if vo.Height <= 480 {
-				h26xProfile = "baseline"
-			} else if vo.Height > 480 && vo.Height <= 720 {
-				h26xProfile = "main"
-			} else if vo.Height > 720 {
+			if vo.Height > 720 {
 				h26xProfile = "high"
+			} else {
+				h26xProfile = "main"
 			}
 
 			ffmpegArgs = append(ffmpegArgs, "-profile:v")
