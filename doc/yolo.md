@@ -55,11 +55,11 @@ Any fields with "Input_" prefix are the encoding parameters used by transcoder a
 All other fields are for re-encoding the annotated images to a single output video segment. 
 | Field | Definition | Data type | Comments | Default value |
 | --- | --- | --- | --- | --- |
-| Encode_codec | Codec used by the video transcoder and re-encoder | string | The video transcoder and video re-encoder use the same codec as specified by *Encode_codec*. Only h264 and h265 are allowed. | "h264" |
+| Encode_codec | Codec used by the video transcoder and re-encoder | string | The video transcoder and video re-encoder use the same codec as specified by *Encode_codec*. Only h264 is allowed (h265 to be supported). | "h264" |
 | Encode_preset | Preset used by the video re-encoder | string | | "veryfast" | 
 | Encode_crf | CRF used by video re-encoder | integer | | 25 | 
 
-Note that the transcoder only uses H.264 and H.265 for transcoding the **detection target output**. AV1 is not used. Configuring AV1 for *Encode_codec* would result in job validation warnings and the default value *h264* being used instead.
+Note that the transcoder only uses H.264 for transcoding the **detection target output**. AV1 is not used. Configuring AV1 or h265 for *Encode_codec* would result in job validation warnings and the default value *h264* being used instead.
 
 You can also configure detected/annotated output only without outputting any main transcoder outputs. To do that, add the *Detection* block but leave the *Video_outputs* block empty. In this way, users can stream a fixed-bitrate annotated video only without outputting any ABR transcoded video.
 
@@ -110,6 +110,3 @@ The variant playlist url of the annotated video output is always formatted as fo
 http://[base_url]/video_[detection_target_output_bitrate]/playlist_detected.m3u8
 ``
 For example, *https://bzhang-test-bucket-public.s3.us-east-1.amazonaws.com/output_efa8d130-a969-4139-b899-afa16115c473/video_150k/playlist_detected.m3u8*.
-
-## Limitations
-1. Only H.264 (libx264) and H.265 (libx265) is allowed to be the codec format for re-encoding and converting annotated images to live video segments, AV1 is not supported.
