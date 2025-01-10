@@ -470,6 +470,14 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
 	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
+
+	// Time out and kill the current iftop command before the next bandwidth reading comes
+	d, _ := time.ParseDuration(job_status_check_interval)
+	time.AfterFunc(d, func() {
+		log.Println("Iftop command timeout, killing the process...")
+		iftopCmd.Process.Kill() // Kill the process if it's still running
+	})
+
 	var r int64
 	r = 0
 	if err != nil {
