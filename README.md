@@ -19,7 +19,7 @@ If you have any questions regarding this project, please email to Bo Zhang at ma
 ## Supported media codecs
 Video: 
 - h.264,
-- h.265,
+- h.265 (currently unavailable due to an issue with Shaka packager),
 - av1
 
 Audio:
