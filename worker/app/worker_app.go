@@ -472,7 +472,7 @@ func readIngressBandwidth(j job.LiveJob) int64 {
 	out, err := iftopCmd.CombinedOutput()
 
 	// Time out and kill the current iftop command before the next bandwidth reading comes
-	d, _ := time.ParseDuration(job_status_check_interval)
+	//d, _ := time.ParseDuration(job_status_check_interval)
 	time.AfterFunc(2*time.Second, func() {
 		log.Println("Iftop command timeout, killing the process...")
 		iftopCmd.Process.Kill() // Kill the process if it's still running
