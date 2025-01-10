@@ -161,7 +161,11 @@ func GenerateDetectionCommand(input_video_frame_rate float64, encode_codec strin
 	detectorArgs = append(detectorArgs, strconv.Itoa(int(sidx_timescale)))
 
 	// Parameter #7 - Codec of re-encoder 
-	detectorArgs = append(detectorArgs, encode_codec)
+	if encode_codec == H264_CODEC {
+		detectorArgs = append(detectorArgs, FFMPEG_H264)
+	} else if encode_codec == H265_CODEC {
+		detectorArgs = append(detectorArgs, FFMPEG_H265)
+	}
 
 	// Parameter #8 - Preset of re-encoder
 	detectorArgs = append(detectorArgs, encode_preset)
