@@ -566,7 +566,7 @@ func run_detection(j job.LiveJobSpec, input_segment_path string, sidx_timescale 
 	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
 	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
 
-	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, input_segment_path, detected_segment_path, sidx_timescale)
+	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, j.Output.Detection.Encode_codec, j.Output.Detection.Encode_preset, j.Output.Detection.Encode_crf, input_segment_path, detected_segment_path, sidx_timescale)
 	Log.Println("Detector arguments: ")
 	Log.Println(job.ArgumentArrayToString(detectorArgs))
 
@@ -668,6 +668,10 @@ func executeDetectionJob(dj detectionJob) {
 	}
 
 	utils.Write_file(seg_data, new_media_segment_path)
+
+	// Delete detected mp4 segment which is an intermediate file
+	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
+	os.Remove(detection_output_segment_path)
 
 	// Delete detected mp4 segment which is an intermediate file
 	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
