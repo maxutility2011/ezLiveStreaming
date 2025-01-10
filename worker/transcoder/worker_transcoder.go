@@ -84,21 +84,26 @@ func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
 	}
 }
 
-// Monitor ffmpeg and shaka packager
-// ffmpeg and packager must both be running.
-// If one dies, the other should be killed.
+// Monitor shaka packager, ffmpeg and ffprobe. 
+// ffmpeg and packager must both be running. If one dies, the other should be killed.
+// If ffmpeg exits, ffprobe must exit too.
 // If neither ffmpeg nor the packager is running, worker_transcoder should exit.
-func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
+// command1: Shaka packager, command2: ffmpeg, command3: ffprobe
+func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd, command3 *exec.Cmd) {
 	process1, err1 := os.FindProcess(int(command1.Process.Pid))
 	process2, err2 := os.FindProcess(int(command2.Process.Pid))
+	process3, _ := os.FindProcess(int(command3.Process.Pid))
 
 	if err1 != nil && err2 != nil {
 		Log.Println("Neither ffmpeg nor packager is found. Worker_transcoder exiting...")
+		// Terminate ffprobe if it is still running
+		err := process3.Signal(syscall.Signal(syscall.SIGTERM))
+		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
 		os.Exit(0)
 	} else if err1 == nil && err2 != nil {
 		err := process1.Signal(syscall.Signal(syscall.SIGTERM))
 		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
-		// Return instead of os.Exit(0). if SIGTERM fails to kill the process, worker_transcoder will
+		// Return instead of os.Exit(0). If SIGTERM fails to kill the process, worker_transcoder will
 		// exit the next time this function is called.
 		return
 	} else if err1 != nil && err2 == nil {
@@ -115,6 +120,8 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
 
 	if err1 != nil && err2 != nil {
 		Log.Println("Neither ffmpeg nor packager is running. Worker_transcoder exiting...")
+		err := process3.Signal(syscall.Signal(syscall.SIGTERM))
+		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
 		os.Exit(0)
 	} else if err1 == nil && err2 != nil {
 		err := process1.Signal(syscall.Signal(syscall.SIGTERM))
@@ -1289,7 +1296,7 @@ func main() {
 			case <-ticker.C:
 				{
 					if !ffmpegAlone {
-						manageCommands(packagerCmd, ffmpegCmd)
+						manageCommands(packagerCmd, ffmpegCmd, ffprobeCmd)
 					} else {
 						manageFfmpegAlone(ffmpegCmd)
 					}
