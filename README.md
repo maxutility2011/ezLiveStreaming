@@ -71,16 +71,17 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 
 - Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. The worker server should have at least 100GB of disk space.
 
-- You need to install **docker**, **docker-compose**, **git**, **aws-cli** and optionally **redis-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker. If you choose to use Amazon Linux, **aws-cli** is pre-installed in the AMI image.
+- You need to install **docker**, **docker-compose**, **git**, **aws-cli** and optionally **redis-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker. If you choose to use Amazon Linux, **aws-cli** is pre-installed in the AMI image. If you are on other Linux OSes, follow [this guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) install aws-cli.
 
-- You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on any machine with camera.
 
 - You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You also need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
+
+You also need a machine to be the live capturing/contributing device. This machine can be your PC with a built-in or externally connected camera. On that machine, you need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or FFmpeg. You can choose to live-stream from camera source, your PC's screen, a local video file source, or any test pattern generated with FFmpeg. 
 
 The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 24.04. Within the base image, ffmpeg 6.1.1 is pre-installed. 
 
 ## Step 1: Launch the servers
-Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
+Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-small one with 100GiB disk). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance. If you only run a single live job with moderate video output bitrate, you may also use less powerful instances, such as c5-large. If you need to run more 3-4 live jobs on a same instance, or you need to run a live job with real-time object detection enabled, you probably need a more powerful instance, such as c5-4xlarge.
 
 ## Step 2: Get ezLiveStreaming source
 On both management and worker servers, get the source code from github.
@@ -114,13 +115,25 @@ Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueS
 
 The api_server, job scheduler, ezKey_server and worker_app all have their own configuration files.
 
+On the management server, configure the api_server and the job scheduler as follow,
 In [api_server/config.json](api_server/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
 In [scheduler/config.json](scheduler/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
 No change is needed in *drm_key_server/config.json*.
 
+On the worker machine, configure the worker as follows,
 In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. *SchedulerUrl* allows the worker to find the job scheduler. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). If you have a cluster of job scheduler running behind a load balancer, you can put the URL of the load balance in *SchedulerUrl*. You can leave other configuration options as is. 
+
+Every time you make configuration changes to any of the services, you need to rebuild the docker images (step 7).
+
+##Local setup ONLY**
+If you run the api_server, scheduler and worker all on a local machine without public Internet, worker wouldn't be using and won't be available from a public IP address. In that case, you need to configure *MyPublicIP* in [worker/app/worker_app_config.json](worker/app/worker_app_config.json), e.g., 
+```
+......
+"MyPublicIP": "192.168.50.147",
+......
+```
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 
@@ -130,9 +143,9 @@ List of public ports that need to be opened,
 | Port/Port range | Server | Service | Protocol | Use | 
 | --- | --- | --- | --- | --- |
 | 1080 | management | api_server| HTTP (TCP) | Used by api_server to receive live job requests from users | 
-| 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
 | 3080 | management | job scheduler | HTTP (TCP) | Used by job scheduler to communicate with workers | 
 | 4080 | management | Nginx | HTTP (TCP) | Used by Nginx to serve the demo UI. |
+| 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
 | 1935-1950 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
 
 The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same host server as api_server, port 5080 does not need to be made public.
