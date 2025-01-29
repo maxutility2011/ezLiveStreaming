@@ -29,9 +29,9 @@ RUN cp /home/streamer/src/od_yolov8/yolo.py /home/streamer/bins/ \
     && curl https://file-examples.com/storage/fe00d37cde6728af4966ebc/2017/04/file_example_MP4_480_1_5MG.mp4 -o /home/streamer/src/od_yolov8/sample.mp4
 
 ENV PATH="${PATH}:/home/streamer/bins"
-ENV FFREPORT=file="/home/streamer/log/ffmpeg_transcoder.log":level=32
 
 EXPOSE 1080
 EXPOSE 4080
 
+CMD export FFREPORT=file="/home/streamer/log/ffmpeg_transcoder.log":level=32
 CMD /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.json
