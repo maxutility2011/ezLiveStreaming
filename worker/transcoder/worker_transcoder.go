@@ -1065,10 +1065,13 @@ func main() {
 	// A file watcher (fsnotify) is responsible for checking new stream files written to the file system
 	// and uploading them to cloud storage
 	local_media_output_path = ("/tmp/" + job.Media_output_path_prefix + *jobIdPtr + "/")
-	err1 = os.Mkdir(local_media_output_path, 0777)
-	if err1 != nil {
-		Log.Println("Failed to mkdir: ", local_media_output_path, " Error: ", err1)
-		os.Exit(1)
+	if errors.Is(err_fstat, os.ErrNotExist) {
+		Log.Printf("Path %s does not exist. Creating it...\n", local_media_output_path)
+		err1 = os.Mkdir(local_media_output_path, 0777)
+		if err1 != nil {
+			Log.Println("Failed to mkdir: ", local_media_output_path, " Error: ", err1)
+			os.Exit(1)
+		}
 	}
 
 	// When output video codec is "av1", start ffmpeg only to perform both transcoding and packaging.

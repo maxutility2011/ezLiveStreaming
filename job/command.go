@@ -362,7 +362,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	ffprobe_output_url := generateFfprobeOutputUrl(port_base)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
-	ffmpegArgs = append(ffmpegArgs, "-report")
+	//ffmpegArgs = append(ffmpegArgs, "-report")
 	return ffmpegArgs
 }
 
@@ -805,6 +805,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
-	ffmpegArgs = append(ffmpegArgs, "-report")
+	//ffmpegArgs = append(ffmpegArgs, "-report")
 	return ffmpegArgs, local_media_output_path_subdirs
 }
