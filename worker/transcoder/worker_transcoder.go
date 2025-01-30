@@ -1065,6 +1065,7 @@ func main() {
 	// A file watcher (fsnotify) is responsible for checking new stream files written to the file system
 	// and uploading them to cloud storage
 	local_media_output_path = ("/tmp/" + job.Media_output_path_prefix + *jobIdPtr + "/")
+	_, err_fstat := os.Stat(local_media_output_path)
 	if errors.Is(err_fstat, os.ErrNotExist) {
 		Log.Printf("Path %s does not exist. Creating it...\n", local_media_output_path)
 		err1 = os.Mkdir(local_media_output_path, 0777)
