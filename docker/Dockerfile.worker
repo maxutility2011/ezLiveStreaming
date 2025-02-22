@@ -8,8 +8,8 @@ RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src/ \
     && git clone -b yolo https://github.com/maxutility2011/ezLiveStreaming.git \
-    && git checkout b158453bf6af56593d8611f02eca9729e891f59f \
     && cd ezLiveStreaming \
+    && git checkout b158453bf6af56593d8611f02eca9729e891f59f \
     && git clone -b main https://github.com/maxutility2011/od_yolov8.git
 
 RUN cd /home/streamer/src/ezLiveStreaming/worker/app \
