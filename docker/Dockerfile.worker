@@ -8,9 +8,6 @@ RUN mkdir /home/streamer/bins \
     && mkdir /home/streamer/log \
     && cd /home/streamer/src/ \
     && git clone -b yolo https://github.com/maxutility2011/ezLiveStreaming.git \
-    && cd ezLiveStreaming \
-    && git checkout fe2a69687dce22cee450f57a13dc507dd5c06e06 \
-    && cd /home/streamer/src/ \
     && git clone -b main https://github.com/maxutility2011/od_yolov8.git
 
 COPY ../worker/app/worker_app_config.json /home/streamer/conf/worker_app_config.json
