@@ -474,7 +474,7 @@ func readIngressBandwidth(rj RunningJob) int64 {
 	rj.Bandwidth_reader_pid = iftopCmd.Process.Pid
 
 	// Time out and kill the current iftop command before the next bandwidth reading comes
-	d, _ := time.ParseDuration(job_status_check_interval)
+	/*d, _ := time.ParseDuration(job_status_check_interval)
 	time.AfterFunc(d, func() {
 		Log.Printf("Bandwidth reader command timeout. Killing the reader and its child processes...")
 		if err := syscall.Kill(iftopCmd.Process.Pid, syscall.SIGKILL); err != nil {
@@ -482,7 +482,7 @@ func readIngressBandwidth(rj RunningJob) int64 {
 		} else {
 			Log.Printf("Bandwidth reader (process id: %d) of job=%s killed\n", rj.Bandwidth_reader_pid, rj.Job.Id)
 		}
-	})
+	})*/
 
 	var r int64
 	r = 0
@@ -559,11 +559,11 @@ func checkJobStatus() {
 			}
 
 			// Killing bandwidth reader of the terminated job
-			if err := syscall.Kill(j.Bandwidth_reader_pid, syscall.SIGKILL); err != nil {
+			/*if err := syscall.Kill(j.Bandwidth_reader_pid, syscall.SIGKILL); err != nil {
 				Log.Printf("Failed to kill the bandwidth reader (process id: %d) of job=%d. Error: %v\n", j.Bandwidth_reader_pid, j.Job.Id, err)
 			} else {
 				Log.Printf("Bandwidth reader (process id: %d) of job %s killed\n", j.Bandwidth_reader_pid, j.Job.Id)
-			}
+			}*/
 		}
 
 		prev_e = e
