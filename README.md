@@ -128,12 +128,13 @@ In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put i
 Every time you make configuration changes to any of the services, you need to rebuild the docker images (step 7).
 
 ##Local setup ONLY**
-If you run the api_server, scheduler and worker all on a local machine without public Internet, worker wouldn't be using and won't be available from a public IP address. In that case, you need to configure *MyPublicIP* in [worker/app/worker_app_config.json](worker/app/worker_app_config.json), e.g., 
+If you run the api_server, scheduler and worker on local machines without public Internet, worker won't be using a public IP address and job scheduler won't be able to find your worker using get_my_ip services such as https://api.ipify.org?format=json. In that case, you need to configure *MyPublicIP* in [worker/app/worker_app_config.json](worker/app/worker_app_config.json), e.g., 
 ```
 ......
 "MyPublicIP": "192.168.50.147",
 ......
 ```
+Your configured IP address will be sent to the job scheduler when the worker registers itself initially. The job scheduler will use the received IP address to find the worker. The field *MyPublicIP* might also be used when your worker VM has multiple network interfaces and multiple IP addresses and you want to use a specific one to communicate with the job scheduler. However, if your worker VM do have a public IP address, do not configure *MyPublicIP*.
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 

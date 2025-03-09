@@ -1,7 +1,6 @@
 {
-    "SchedulerUrl": "http://192.168.0.138:3080",
+    "SchedulerUrl": "http://192.168.50.147:3080",
     "GetPublicIpUrl" : "https://api.ipify.org?format=json",
-    "MyPublicIP": "192.168.0.138",
     "WorkerPort": "2080",
     "WorkerUdpPortBase": 10001,
     "CpuCapacity": 5000,
