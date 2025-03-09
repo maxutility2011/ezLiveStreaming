@@ -259,6 +259,8 @@ In the above screen, copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.18
 2. The TCP port (e.g., 1936) for RTMP ingest isn't open on the worker server. Please check your AWS EC2 security group for a list of open ports. A worker instance can run multiple concurrent live channels (limit to 15 channels in the code). Each channel is assigned its own port between 1935 and 1950. When a new channel is created, it is assigned the next higher port number, starting from 1935. When a channel stops, its port is reclaimed and returned to the available port pool. 
 3. Also, check the hostname/ip_address in *rtmp_ingest_url*. Make sure it is a public IP. The worker service queries a IP detection service, "api.ipify.org" for its own public IP and put the IP in *rtmp_ingest_url*. 
 
+Also, every time you create a new live job, the RTMP ingest port number increment by 1, so remember to change the port number in the ingest URL.
+
 It is also possible that Step 9 does not succeed and the new channel is not even created. If that is the case, you will not see any server response in the demo UI when you run Step 9. Also, make sure you have successfully started the worker service in Step 8. If that is the case, run "docker ps" on the worker server to verify worker container is running.
 
 ## Step 11: Verify live channel output to S3

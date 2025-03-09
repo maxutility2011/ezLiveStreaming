@@ -51,7 +51,7 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 12px;
+  font-size: 16px;
   font-family: Garamond, serif;
   margin: 4px 2px;
   cursor: pointer;
@@ -109,7 +109,7 @@
 </head>
 
 <div class="row">
-  <div class="columnleft" style="background-color:#a07c05;">
+  <div class="columnleft" style="background-color:#221f7e;">
     <form>
 		<b><label id=livestream style="font-family: Garamond, serif; font-size: 25px; display: block; text-align: center">Live job request</label></b>
 		<br>
@@ -129,14 +129,14 @@
 		<button class="button" id=resume type=button>Resume</button>
     <button class="button" id=delete type=button>Del</button>
 		<button class="button" id=show type=button>Show</button>
-		<label id=response_code style="font-size: 12px; background-color:#e8f2e9a0;">response code</label>
+		<label id=response_code style="font-size: 16px; background-color:#e8f2e9a0;">response code</label>
 		<!--<button class="button" id=livefeed type=button>livefeed</button>
 		<button class="button" id=stoplivefeed type=button>stoplivefeed</button>-->
-		<label id=obs style="font-size: 12px; background-color:#745904;">Use OBS to live feed</label>
+		<!--<label id=obs style="font-size: 12px; background-color:#745904;">Use OBS to live feed</label>-->
 		<button class="button" id=play type=button>Play</button>
     	</form>
   </div>
-  <div class="columnright" style="background-color:#161452;">
+  <div class="columnright" style="background-color:#221f7e;">
 	<center> 
 		<body>
 			<video id="video"
@@ -149,10 +149,10 @@
 		<!--<video id="video" autoplay="true" muted="true" width="640" height="360" controls playsinline></video>-->
 	</center>
   </div>
-  <div class="bottomleft" style="background-color:#745904;">
+  <div class="bottomleft" style="background-color:#221f7e;">
 	<textarea id="response_body" name="response_body" rows="18" cols="70" readonly style="background-color:#f5fafaa0;"></textarea>
   </div>
-  <div class="bottomright" style="background-color:#161452;">
+  <div class="bottomright" style="background-color:#221f7e;">
 	<textarea id="job_essentials" name="job_essentials" rows="18" cols="84" readonly style="background-color:#f5fafaa0;"></textarea>
   </div>
 </div>
