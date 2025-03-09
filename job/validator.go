@@ -3,34 +3,38 @@ package job
 import (
 	"strconv"
 	"errors"
+	"ezliveStreaming/utils"
 )
 
 var valid_stream_type_values = []string{"hls", "dash"}
 var valid_segment_format_values = []string{"fmp4"}
 var valid_video_codec_values = []string{"h264", "h265", "av1"}
+var valid_detection_codec_values = []string{"h264", "h265"}
 var valid_audio_codec_values = []string{"aac", "mp3"}
 var valid_bitrate_units = []string{"k", "K"}
 var valid_h26x_presets = []string{"placebo", "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "superfast", "ultrafast"}
 
-const max_fragment_duration = 10            // second
-const max_segment_duration = 10             // second
-const default_time_shift_buffer_depth = 120 // second
-const max_time_shift_buffer_depth = 14400   // second
+const max_fragment_duration = 10            		// second
+const max_segment_duration = 30             		// second
+const default_time_shift_buffer_depth = 120 		// second
+const max_time_shift_buffer_depth = 14400   		// second
 const max_video_outputs = 10
 const max_audio_outputs = 5
-const max_video_framerate = 60                    // fps
-const min_video_framerate = 0                     // fps
-const max_video_resolution_height = 1080          // pixel
-const max_video_resolution_width = 1920           // pixel
-const max_video_output_bitrate = 5000             // kbps
-const max_audio_output_bitrate = 256              // kbps
-const max_peak_to_average_bitrate_ratio = 2       // X 2
-const max_buffersize_to_average_bitrate_ratio = 2 // X 2
+const max_video_framerate = 60                    	// fps
+const min_video_framerate = 0                     	// fps
+const max_video_resolution_height = 1080          	// pixel
+const max_video_resolution_width = 1920           	// pixel
+const max_video_output_bitrate = 10000.0           	// kbps
+const max_audio_output_bitrate = 256.0              // kbps
+const max_peak_to_average_bitrate_ratio = 2       	// X 2
+const max_buffersize_to_average_bitrate_ratio = 2 	// X 2
 const min_libsvtav1_preset = 12
-const min_h26x_preset = 5 // "fast"
-const min_h26x_crf = 0
+const min_h26x_preset = 5 							// "fast"
+const min_h26x_crf = 0 								// ffmpeg allows crf = 0 (lossless compression). However, this is practically impossible for live encoding.
+const practical_min_h26x_crf = 23 					// Return a warning when crf is lower than this value.
 const max_h26x_crf = 51
 const min_av1_crf = 0
+const practical_min_av1_crf = 23 					// Return a warning when crf is lower than this value.
 const max_av1_crf = 63
 const min_h26x_threads = 2
 const min_av1_threads = 4
@@ -90,11 +94,6 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 	// Low_latency_mode defaults to 0. No need to validate.
 
-	// Default to 120 seconds
-	if (*j).Output.Time_shift_buffer_depth <= 0 {
-		(*j).Output.Time_shift_buffer_depth = default_time_shift_buffer_depth
-	}
-
 	// Time_shift_buffer_depth NOT to be higher than 4 hours
 	if (*j).Output.Time_shift_buffer_depth > max_time_shift_buffer_depth {
 		(*j).Output.Time_shift_buffer_depth = max_time_shift_buffer_depth
@@ -124,6 +123,70 @@ func Validate(j *LiveJobSpec) (error, []string) {
 		}
 	}
 
+	// Validate object detection params. 
+	if NeedObjectDetection(*j) {
+		// Validate detection frame rate
+		detection_frame_rate := (*j).Output.Detection.Input_video_frame_rate
+		// Frame rate is not required, so this is a warning
+		if detection_frame_rate == 0 {
+			w := "Missing object detection input frame rate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// Frame rate cannot be out of range, so this is an error
+		if detection_frame_rate < min_video_framerate ||
+			detection_frame_rate > max_video_framerate {
+			return errors.New("detection_framerate_out_of_range"), warnings
+		}
+
+		// If video resolution height is missing, the default value will be used and a warning will be added.
+		if (*j).Output.Detection.Input_video_resolution_height == 0 {
+			w := "Missing object detection input video resolution height. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// If video resolution height is missing, the default value will be used and a warning will be added.
+		if (*j).Output.Detection.Input_video_resolution_width == 0 {
+			w := "Missing object detection input video resolution width. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_bitrate == "" {
+			w := "Missing object detection input video bitrate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_max_bitrate == "" {
+			w := "Missing object detection input video max_bitrate. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		if (*j).Output.Detection.Input_video_buf_size == "" {
+			w := "Missing object detection input video buf_size. Default value will be used."
+			warnings = append(warnings, w)
+		}
+
+		// Post-detection video re-encoding only uses h264 or h265, not av1
+		if (*j).Output.Detection.Encode_codec == "" || 
+			!contains_string(valid_detection_codec_values, (*j).Output.Detection.Encode_codec) {
+			return errors.New("bad_detection_video_codec"), warnings
+		}
+
+		if (*j).Output.Detection.Encode_preset == "" ||
+			!contains_string(valid_h26x_presets, (*j).Output.Detection.Encode_preset) {
+			return errors.New("bad_detection_video_preset"), warnings
+		}
+
+		if (*j).Output.Detection.Encode_crf == 0 ||
+			((*j).Output.Detection.Encode_crf < min_h26x_crf || (*j).Output.Detection.Encode_crf > max_h26x_crf) {
+				return errors.New("bad_detection_video_crf"), warnings
+		} else if (*j).Output.Detection.Encode_crf < practical_min_h26x_crf {
+			(*j).Output.Detection.Encode_crf = practical_min_h26x_crf
+			w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf) + " to perform object detection reencode"
+			warnings = append(warnings, w)
+		}
+	}
+
 	// Fatal error. Output bucket is required
 	// TODO: Need to verify output bucket (e.g., upload a small file to verify)
 	if (*j).Output.S3_output.Bucket == "" {
@@ -132,7 +195,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 	// Fatal error. Video_outputs cannot be empty
 	// TODO: if we are supporting audio-only transcoding in the future, empty video outputs would become valid.
-	if len((*j).Output.Video_outputs) == 0 {
+	if len((*j).Output.Video_outputs) == 0 && !NeedObjectDetection(*j) {
 		return errors.New("no_video_output"), warnings
 	}
 
@@ -154,6 +217,11 @@ func Validate(j *LiveJobSpec) (error, []string) {
 			return errors.New("video_framerate_out_of_range"), warnings
 		}
 
+		err, _ := utils.BitrateString2Float64(vo.Bitrate)
+		if err != nil {
+			return errors.New("bad_video_output_bitrate"), warnings
+		}
+
 		// Video resolution valiation
 		if vo.Width <= 0 || vo.Width > max_video_resolution_width {
 			return errors.New("bad_video_resolution_width"), warnings
@@ -165,7 +233,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video (average) bitrate validation
 		bs := vo.Bitrate[:len(vo.Bitrate)-1]
-		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
+		bi, err_bitrate := strconv.ParseFloat(bs, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_video_bitrate"), warnings
 		}
@@ -180,7 +248,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video max bitrate validation
 		mbs := vo.Max_bitrate[:len(vo.Max_bitrate)-1]
-		mbi, err_maxbitrate := strconv.ParseInt(mbs, 10, 64)
+		mbi, err_maxbitrate := strconv.ParseFloat(mbs, 64)
 		if err_maxbitrate != nil {
 			return errors.New("bad_video_max_bitrate"), warnings
 		}
@@ -200,7 +268,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Video buffer size validation
 		buf_s := vo.Buf_size[:len(vo.Buf_size)-1]
-		buf_i, err_bufsize := strconv.ParseInt(buf_s, 10, 64)
+		buf_i, err_bufsize := strconv.ParseFloat(buf_s, 64)
 		if err_bufsize != nil {
 			return errors.New("bad_video_buffer_size"), warnings
 		}
@@ -230,6 +298,11 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				warnings = append(warnings, w)
 			}
 
+			if vo.Crf < practical_min_av1_crf {
+				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_av1_crf)
+				warnings = append(warnings, w)
+			}
+
 			if vo.Crf < min_av1_crf || vo.Crf > max_av1_crf {
 				return errors.New("libsvtav1_crf_out_of_range"), warnings
 			}
@@ -251,6 +324,11 @@ func Validate(j *LiveJobSpec) (error, []string) {
 				return errors.New("invalid_h264_encoder_preset"), warnings
 			} else if preset_index < min_h26x_preset {
 				w := "- libx264/libx265 presets lower than " + valid_h26x_presets[min_h26x_preset] + " will not be fast enough for real-time (live) encoding. "
+				warnings = append(warnings, w)
+			}
+
+			if vo.Crf < practical_min_h26x_crf {
+				w := "- It's not recommended to use crf lower than " + strconv.Itoa(practical_min_h26x_crf)
 				warnings = append(warnings, w)
 			}
 
@@ -286,7 +364,7 @@ func Validate(j *LiveJobSpec) (error, []string) {
 
 		// Audio bitrate validation
 		bs := ao.Bitrate[:len(ao.Bitrate)-1]
-		bi, err_bitrate := strconv.ParseInt(bs, 10, 64)
+		bi, err_bitrate := strconv.ParseFloat(bs, 64)
 		if err_bitrate != nil {
 			return errors.New("bad_audio_bitrate"), warnings
 		}

@@ -32,8 +32,8 @@ type LiveWorker struct {
 type WorkerInfo struct {
 	ServerIp          string
 	ServerPort        string
-	CpuCapacity       string
-	BandwidthCapacity string
+	CpuCapacity       int
+	BandwidthCapacity int
 	HeartbeatInterval string
 }
 

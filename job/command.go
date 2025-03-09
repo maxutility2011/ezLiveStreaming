@@ -3,6 +3,7 @@ package job
 import (
 	"encoding/json"
 	"ezliveStreaming/models"
+	"ezliveStreaming/utils"
 	"strconv"
 	"strings"
 )
@@ -30,6 +31,17 @@ const HLS_MASTER_PLAYLIST_FILE_NAME = "master.m3u8"
 const Media_output_path_prefix = "output_"
 const drm_label_allmedia = "allmedia"
 const Input_json_file_name = "input_info.json"
+const default_detection_frame_rate = 10	// fps
+const default_detection_input_video_resolution_height = 320 // pixels
+const default_detection_input_video_resolution_width = 180 // pixels
+const default_detection_input_video_bitrate = "150k"
+const default_detection_input_video_max_bitrate = "250k"
+const default_detection_input_video_buf_size = "250k"
+const default_detection_encode_codec = H264_CODEC
+const default_detection_encode_preset = "veryfast"
+const default_detection_encode_crf = 25
+const Mp4box_segment_template_prefix = "segment_"
+const mp4box_segment_template = Mp4box_segment_template_prefix + "$Number$"
 
 func ArgumentArrayToString(args []string) string {
 	return strings.Join(args, " ")
@@ -50,6 +62,145 @@ func HasAV1Output(j LiveJobSpec) bool {
 	return r
 }
 
+func NeedObjectDetection(j LiveJobSpec) bool {
+	return j.Output.Detection != (ObjectDetectionConfig{})
+}
+
+func AddDetectionVideoOutput(j *LiveJobSpec) {
+	video_outputs_contain_detection_output := false
+	var i int
+	for i = range (*j).Output.Video_outputs {
+		vo := (*j).Output.Video_outputs[i]
+		// Detection video output already exists in job video output configuration. No need to add detection output.
+		if vo.Bitrate == (*j).Output.Detection.Input_video_bitrate {
+			video_outputs_contain_detection_output = true
+		}
+	}
+
+	if !video_outputs_contain_detection_output {
+		var detection_video_output LiveVideoOutputSpec
+		detection_video_output.Framerate = (*j).Output.Detection.Input_video_frame_rate
+		if detection_video_output.Framerate == 0.0 {
+			detection_video_output.Framerate = default_detection_frame_rate
+		}
+
+		detection_video_output.Height = (*j).Output.Detection.Input_video_resolution_height 
+		if detection_video_output.Height == 0 {
+			detection_video_output.Height = default_detection_input_video_resolution_height
+		}
+	
+		detection_video_output.Width = (*j).Output.Detection.Input_video_resolution_width
+		if detection_video_output.Width == 0 {
+			detection_video_output.Width = default_detection_input_video_resolution_width
+		}
+
+		detection_video_output.Bitrate = (*j).Output.Detection.Input_video_bitrate
+		if detection_video_output.Bitrate == "" {
+			detection_video_output.Bitrate = default_detection_input_video_bitrate
+		}
+		
+		detection_video_output.Max_bitrate = (*j).Output.Detection.Input_video_max_bitrate
+		if detection_video_output.Max_bitrate == "" {
+			detection_video_output.Max_bitrate = default_detection_input_video_max_bitrate
+		}
+		
+		detection_video_output.Buf_size = (*j).Output.Detection.Input_video_buf_size
+		if detection_video_output.Buf_size == "" {
+			detection_video_output.Buf_size = default_detection_input_video_buf_size
+		}
+		
+		detection_video_output.Codec = (*j).Output.Detection.Encode_codec
+		if detection_video_output.Codec == "" {
+			detection_video_output.Codec = default_detection_encode_codec
+		}
+
+		detection_video_output.Preset = (*j).Output.Detection.Encode_preset
+		if detection_video_output.Preset == "" {
+			detection_video_output.Preset = default_detection_encode_preset
+		}
+		
+		detection_video_output.Crf = (*j).Output.Detection.Encode_crf
+		if detection_video_output.Crf == 0 {
+			detection_video_output.Crf = default_detection_encode_crf
+		}
+
+		j.Output.Video_outputs = append((*j).Output.Video_outputs, detection_video_output)
+	}
+}
+
+// Generate object detection command
+// sh /home/streamer/bins/od.sh /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.merged 25 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k seg_1 /tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k/seg_1.detected
+func GenerateDetectionCommand(input_video_frame_rate float64, encode_codec string, encode_preset string, encode_crf int, input_file string, output_file string, sidx_timescale uint32) []string {
+	var detectorArgs []string
+	detectorArgs = append(detectorArgs, "/home/streamer/bins/od.sh")
+	// Parameter #1 - Input file to Yolo script, i.e., ".merged" files
+	detectorArgs = append(detectorArgs, input_file)
+
+	// Parameter #2 - Yolo re-encoder's output frame rate. 
+	// This is also the number of Yolo input images per second. 
+	if input_video_frame_rate == 0.0 {
+		detectorArgs = append(detectorArgs, strconv.FormatFloat(default_detection_frame_rate, 'e', 2, 64))
+	} else {
+		detectorArgs = append(detectorArgs, strconv.FormatFloat(input_video_frame_rate, 'e', 2, 64))
+	}
+
+	// Parameter #3 - detection output subdir, e.g., "/tmp/output_b8302654-9e77-4743-96f0-91ed8dcc75d2/video_150k"
+	detection_output_subdir := utils.Get_path_dir(input_file) 
+	detectorArgs = append(detectorArgs, detection_output_subdir)
+
+	// Parameter #4 - segment file name (without file extension)
+	media_data_segment_filename := utils.Get_path_filename(input_file)
+	pos_dot := strings.LastIndex(media_data_segment_filename, ".")
+	seg_name := media_data_segment_filename[:pos_dot]
+	detectorArgs = append(detectorArgs, seg_name)
+
+	// Parameter #5 - Output file from Yolo script, i.e., ".detected" files
+	detectorArgs = append(detectorArgs, output_file)
+
+	// Parameter #6 - SIDX timescale that shall be used by ffmpeg re-encoder
+	detectorArgs = append(detectorArgs, strconv.Itoa(int(sidx_timescale)))
+
+	// Parameter #7 - Codec of re-encoder 
+	if encode_codec == H264_CODEC {
+		detectorArgs = append(detectorArgs, FFMPEG_H264)
+	} else if encode_codec == H265_CODEC {
+		detectorArgs = append(detectorArgs, FFMPEG_H265)
+	}
+
+	// Parameter #8 - Preset of re-encoder
+	detectorArgs = append(detectorArgs, encode_preset)
+
+	// Parameter #9 - CRF of re-encoder
+	detectorArgs = append(detectorArgs, strconv.Itoa(encode_crf))
+
+	return detectorArgs
+}
+
+// MP4Box -dash 4000 -segment-name 'segment_$Number$' -out 1.m3u8 /tmp/1.mp4
+func GenerateFmp4ConversionCommand(input string, seg_duration int) []string {
+	var detectorArgs []string
+
+	// segment duration
+	detectorArgs = append(detectorArgs, "-dash") // MP4 fmp4 segmenter always use option "-dash" regardless of dash or hls output
+	seg_duration = seg_duration * 1000 // convert to ms
+	detectorArgs = append(detectorArgs, strconv.Itoa(seg_duration))
+
+	// segment template
+	detectorArgs = append(detectorArgs, "-segment-name")
+	detectorArgs = append(detectorArgs, mp4box_segment_template)
+
+	// output m3u8 path
+	// All we need is the fmp4 init and data segment. We don't upload the m3u8 playlist.
+	detectorArgs = append(detectorArgs, "-out")
+	detectorArgs = append(detectorArgs, utils.Get_path_dir(input) + "/dummy.m3u8") 
+
+	// Input path
+	detectorArgs = append(detectorArgs, input)
+	return detectorArgs
+}
+
+// This function is for ffmpeg video transcoding ONLY. 
+// It is Shaka packager's job to perform media packaging.
 // ffmpeg -i /tmp/1.mp4 -force_key_frames 'expr:gte(t,n_forced*4)' -map v:0 -s:0 640x360 -c:v libx264 -profile:v baseline -b:v:0 365k -maxrate 500k -bufsize 500k -preset faster -threads 2 -map a:0 -c:a aac -b:a 128k -f mpegts udp://127.0.0.1:10001 -map v:0 -s:1 768x432 -c:v libx264 -profile:v baseline -b:v:1 550k -maxrate 750k -bufsize 750k -preset faster -threads 2 -an -f mpegts udp://127.0.0.1:10002
 func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	var ffmpegArgs []string
@@ -94,16 +245,19 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	for i = range j.Output.Video_outputs {
 		vo := j.Output.Video_outputs[i]
 
-		ffmpegArgs = append(ffmpegArgs, "-map")
-		ffmpegArgs = append(ffmpegArgs, "v:0")
+		kf := "expr:gte(t,n_forced*"
+		kf += strconv.Itoa(j.Output.Fragment_duration) // TODO: need to support sub-second fragment size.
+		kf += ")"
 
-		s := "-s:"
-		s += strconv.Itoa(i)
-		ffmpegArgs = append(ffmpegArgs, s)
+		ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+		ffmpegArgs = append(ffmpegArgs, kf)
 
-		resolution := strconv.Itoa(vo.Width)
-		resolution += "x"
-		resolution += strconv.Itoa(vo.Height)
+		video_filter := "-vf" 
+		ffmpegArgs = append(ffmpegArgs, video_filter)
+		
+		resolution := "scale=w=" 
+		resolution += strconv.Itoa(vo.Width)
+		resolution += ":" + "h=" + strconv.Itoa(vo.Height) 
 		ffmpegArgs = append(ffmpegArgs, resolution)
 
 		ffmpegArgs = append(ffmpegArgs, "-c:v")
@@ -117,20 +271,17 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 		// If frame rate is not specified or an invalid value is specified, the job validator sets it to 0 so we
 		// don't use frame rate filter and  the original frame rate of the input stream will remain in the output stream.
 		if vo.Framerate > 0 {
-			ffmpegArgs = append(ffmpegArgs, "-filter:v")
-			fps := "fps="
-			fps += strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
+			ffmpegArgs = append(ffmpegArgs, "-r")
+			fps := strconv.FormatFloat(vo.Framerate, 'f', -1, 64)
 			ffmpegArgs = append(ffmpegArgs, fps)
 		}
 
 		if vo.Codec == H264_CODEC || vo.Codec == H265_CODEC {
 			var h26xProfile string
-			if vo.Height <= 480 {
-				h26xProfile = "baseline"
-			} else if vo.Height > 480 && vo.Height <= 720 {
-				h26xProfile = "main"
-			} else if vo.Height > 720 {
+			if vo.Height > 720 {
 				h26xProfile = "high"
+			} else {
+				h26xProfile = "main"
 			}
 
 			ffmpegArgs = append(ffmpegArgs, "-profile:v")
@@ -211,6 +362,7 @@ func JobSpecToFFmpegArgs(j LiveJobSpec, media_output_path string) []string {
 	ffprobe_output_url := generateFfprobeOutputUrl(port_base)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
+	//ffmpegArgs = append(ffmpegArgs, "-report")
 	return ffmpegArgs
 }
 
@@ -229,6 +381,7 @@ func GenerateFfprobeArgs(j LiveJobSpec, media_output_path string) []string {
 	return ffprobeArgs
 }
 
+// This function is for media packaging ONLY.
 func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path string, drmKeyInfo string) ([]string, []string) {
 	var packagerArgs []string
 	var local_media_output_path_subdirs []string
@@ -351,10 +504,22 @@ func JobSpecToShakaPackagerArgs(job_id string, j LiveJobSpec, media_output_path 
 		mpd_output_path := media_output_path + DASH_MPD_FILE_NAME
 		packagerArgs = append(packagerArgs, mpd_output_path)
 	} else if j.Output.Stream_type == HLS {
-		time_shift_buffer_depth_option := "--time_shift_buffer_depth"
-		packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
-		time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
-		packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+		frag_duration_option := "--fragment_duration"
+		packagerArgs = append(packagerArgs, frag_duration_option)
+		frag_duration_value := strconv.Itoa(j.Output.Fragment_duration)
+		packagerArgs = append(packagerArgs, frag_duration_value)
+
+		seg_duration_option := "--segment_duration"
+		packagerArgs = append(packagerArgs, seg_duration_option)
+		seg_duration_value := strconv.Itoa(j.Output.Segment_duration)
+		packagerArgs = append(packagerArgs, seg_duration_value)
+
+		if j.Output.Time_shift_buffer_depth > 0 { 
+			time_shift_buffer_depth_option := "--time_shift_buffer_depth"
+			packagerArgs = append(packagerArgs, time_shift_buffer_depth_option)
+			time_shift_buffer_depth_value := strconv.Itoa(j.Output.Time_shift_buffer_depth)
+			packagerArgs = append(packagerArgs, time_shift_buffer_depth_value)
+		}
 
 		preserved_segments_outside_live_window_option := "--preserved_segments_outside_live_window"
 		packagerArgs = append(packagerArgs, preserved_segments_outside_live_window_option)
@@ -440,13 +605,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	ffmpegArgs = append(ffmpegArgs, "-i")
 	ffmpegArgs = append(ffmpegArgs, ffmpegListeningUrl)
 
-	kf := "expr:gte(t,n_forced*"
-	kf += strconv.Itoa(j.Output.Segment_duration)
-	kf += ")"
-
-	ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
-	ffmpegArgs = append(ffmpegArgs, kf)
-
 	var local_media_output_path_subdirs []string
 	i := 0
 	// Video encoding params
@@ -465,6 +623,13 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 		resolution += "x"
 		resolution += strconv.Itoa(vo.Height)
 		ffmpegArgs = append(ffmpegArgs, resolution)
+
+		kf := "expr:gte(t,n_forced*"
+		kf += strconv.Itoa(j.Output.Fragment_duration)
+		kf += ")"
+
+		ffmpegArgs = append(ffmpegArgs, "-force_key_frames")
+		ffmpegArgs = append(ffmpegArgs, kf)
 
 		ffmpegArgs = append(ffmpegArgs, "-c:v")
 		if vo.Codec == AV1_CODEC {
@@ -640,5 +805,6 @@ func JobSpecToEncoderArgs(j LiveJobSpec, media_output_path string) ([]string, []
 	ffprobe_output_url := generateFfprobeOutputUrl(j.Input.JobUdpPortBase)
 	ffmpegArgs = append(ffmpegArgs, ffprobe_output_url)
 
+	//ffmpegArgs = append(ffmpegArgs, "-report")
 	return ffmpegArgs, local_media_output_path_subdirs
 }

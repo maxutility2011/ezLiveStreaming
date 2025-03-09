@@ -1,0 +1,58 @@
+{
+    "Output": {
+        "Stream_type": "hls",
+        "Segment_format": "fmp4",
+        "Fragment_duration": 5,
+        "Segment_duration": 10,
+        "Low_latency_mode": 0,
+        "Time_shift_buffer_depth": 120,
+        "Detection": {
+            "Input_video_frame_rate": 5,
+            "Input_video_resolution_height": 360,
+            "Input_video_resolution_width": 640,
+            "Input_video_bitrate": "150k",
+            "Input_video_max_bitrate": "250k",
+            "Input_video_buf_size": "250k",
+            "Encode_codec": "h264",
+            "Encode_preset": "veryfast",
+            "Encode_crf": 25
+        },
+        "S3_output": {
+            "Bucket": "bzhang-test-bucket-public"
+        },
+        "Video_outputs": [
+            {
+                "Label": "video365k",
+                "Codec": "h264",
+                "Framerate": 25,
+                "Width": 640,
+                "Height": 360,
+                "Bitrate": "365k",
+                "Max_bitrate": "500k",
+                "Buf_size": "500k",
+                "Preset": "faster",
+                "Crf": 27,
+                "Threads": 2
+            },
+            {
+                "Label": "video550k",
+                "Codec": "h264",
+                "Framerate": 25,
+                "Width": 768,
+                "Height": 432,
+                "Bitrate": "550k",
+                "Max_bitrate": "750k",
+                "Buf_size": "750k",
+                "Preset": "faster",
+                "Crf": 27,
+                "Threads": 2
+            }
+        ],
+        "Audio_outputs": [
+            {
+                "Codec": "aac",
+                "Bitrate": "128k"
+            }
+        ]
+    }
+}

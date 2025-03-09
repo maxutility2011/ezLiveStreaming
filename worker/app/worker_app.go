@@ -26,14 +26,18 @@ import (
 type WorkerAppConfig struct {
 	SchedulerUrl      string
 	GetPublicIpUrl    string
+	MyPublicIP		  string
 	WorkerPort        string
 	WorkerUdpPortBase int
+	CpuCapacity 	  int
+	BandwidthCapacity int
 }
 
 type RunningJob struct {
 	Job     job.LiveJob
 	Command *exec.Cmd
 	Stats   models.LiveJobStats
+	Bandwidth_reader_pid int
 }
 
 type IPIFY_RESPONSE struct {
@@ -272,12 +276,12 @@ var worker_app_config WorkerAppConfig
 
 const cpu_utilization_threshold = 5.0
 
-func getCpuCapacity() string {
-	return "5000"
+func getCpuCapacity() int {
+	return worker_app_config.CpuCapacity
 }
 
-func getBandwidthCapacity() string {
-	return "100m"
+func getBandwidthCapacity() int { 
+	return worker_app_config.BandwidthCapacity // kbps
 }
 
 func allocateRtmpIngestPort() int {
@@ -463,14 +467,27 @@ func readCpuUtil(j RunningJob) string {
 	return r
 }
 
-func readIngressBandwidth(j job.LiveJob) int64 {
+func readIngressBandwidth(rj RunningJob) int64 {
 	// Use iftop to monitor per-port (per-job) ingress bandwidth
-	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(j.RtmpIngestPort))
+	iftopCmd := exec.Command("sh", "/home/streamer/bins/start_iftop.sh", strconv.Itoa(rj.Job.RtmpIngestPort))
 	out, err := iftopCmd.CombinedOutput()
+	rj.Bandwidth_reader_pid = iftopCmd.Process.Pid
+
+	// Time out and kill the current iftop command before the next bandwidth reading comes
+	/*d, _ := time.ParseDuration(job_status_check_interval)
+	time.AfterFunc(d, func() {
+		Log.Printf("Bandwidth reader command timeout. Killing the reader and its child processes...")
+		if err := syscall.Kill(iftopCmd.Process.Pid, syscall.SIGKILL); err != nil {
+			Log.Printf("Failed to kill the bandwidth reader (process id: %d) of job=%s. Error: %v\n", iftopCmd.Process.Pid, rj.Job.Id, err)
+		} else {
+			Log.Printf("Bandwidth reader (process id: %d) of job=%s killed\n", rj.Bandwidth_reader_pid, rj.Job.Id)
+		}
+	})*/
+
 	var r int64
 	r = 0
 	if err != nil {
-		Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", j.Id, err, string(out))
+		Log.Printf("Errors starting iftop for job id = %s. Error: %v, iftop output: %s\n", rj.Job.Id, err, string(out))
 	} else {
 		var bandwidth float64
 		iftop_output := string(out)
@@ -540,6 +557,13 @@ func checkJobStatus() {
 			if err2 != nil {
 				jobProcessRunning = false
 			}
+
+			// Killing bandwidth reader of the terminated job
+			/*if err := syscall.Kill(j.Bandwidth_reader_pid, syscall.SIGKILL); err != nil {
+				Log.Printf("Failed to kill the bandwidth reader (process id: %d) of job=%d. Error: %v\n", j.Bandwidth_reader_pid, j.Job.Id, err)
+			} else {
+				Log.Printf("Bandwidth reader (process id: %d) of job %s killed\n", j.Bandwidth_reader_pid, j.Job.Id)
+			}*/
 		}
 
 		prev_e = e
@@ -568,7 +592,7 @@ func checkJobStatus() {
 			// so is this goroutine. So, to avoid iftop blocking, we call iftop to read bandwidth only when cpu
 			// utilization goes above a threshold value so we know for sure that the transcoder is ingesting.
 			if cpu_float >= cpu_utilization_threshold {
-				bw = readIngressBandwidth(j.Job)
+				bw = readIngressBandwidth(j)
 			} else {
 				bw = 0
 			}
@@ -676,7 +700,12 @@ func registerWorker(conf WorkerAppConfig) error {
 		return err
 	}
 
-	new_worker_request.ServerIp = public_ip
+	if worker_app_config.MyPublicIP != "" {
+		new_worker_request.ServerIp = worker_app_config.MyPublicIP // local testing uses configured IP address
+	} else {
+		new_worker_request.ServerIp = public_ip
+	}
+
 	new_worker_request.ServerPort = conf.WorkerPort
 	new_worker_request.CpuCapacity = getCpuCapacity()
 	new_worker_request.BandwidthCapacity = getBandwidthCapacity()

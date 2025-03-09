@@ -129,7 +129,7 @@ func createJob(j job.LiveJobSpec, warnings []string) (error, job.LiveJob) {
 	lj.Delete = false // Set to true when the client wants to delete this job
 	lj.State = job.JOB_STATE_CREATED
 
-	warning_message := "\nWarnings: \n"
+	warning_message := "Warnings: "
 	for _, e := range warnings {
 		warning_message += e
 	}
@@ -392,6 +392,17 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if jspec.Api_test == 1 {
+				warning_message := "Warnings: "
+				for _, e := range warnings {
+					warning_message += e
+				}
+
+				w.Header().Set("Content-Type", "text/plain")
+				fmt.Fprintln(w, warning_message)
+				return
+			}
+
 			e1, j := createJob(jspec, warnings)
 			if e1 != nil {
 				http.Error(w, "500 internal server error\n  Error: ", http.StatusInternalServerError)
@@ -489,7 +500,7 @@ func main_server_handler(w http.ResponseWriter, r *http.Request) {
 					}
 
 					w.WriteHeader(http.StatusAccepted)
-					e1 := stopJob(j) // Update Redis
+					e1 := stopJob(j) // This function only updates Redis records
 					j.Stop = true // Set Stop flag to true for the local variable
 
 					if e1 != nil {

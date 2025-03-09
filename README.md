@@ -19,7 +19,7 @@ If you have any questions regarding this project, please email to Bo Zhang at ma
 ## Supported media codecs
 Video: 
 - h.264,
-- h.265,
+- h.265 (currently unavailable due to an issue with Shaka packager),
 - av1
 
 Audio:
@@ -69,18 +69,19 @@ All the microservices in ezLiveStreaming run in docker and can be built, created
 
 ## Prerequisites:
 
-- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. 
+- Two physical or virtual servers: they can be your own PCs, or cloud virtual machines on AWS EC2 or Google Cloud Compute. In my demo setup, I use Ubuntu 24.04 for the management server and Amazon Linux 2023 for the live worker server. In reality, all the ezLiveStreaming services can be packed on a single machine. This is what I have been doing for my own dev and test. However, for a more general demonstration, I choose to use a two server setup. The worker server should have at least 100GB of disk space.
 
-- You need to install **docker**, **docker-compose**, **git**, **aws-cli** and optionally **redis-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker. If you choose to use Amazon Linux, **aws-cli** is pre-installed in the AMI image.
+- You need to install **docker**, **docker-compose**, **git**, **aws-cli** and optionally **redis-cli**. On some OSes such as Amazon Linux, docker-compose needs to installed separately from docker. If you choose to use Amazon Linux, **aws-cli** is pre-installed in the AMI image. If you are on other Linux OSes, follow [this guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) install aws-cli.
 
-- You need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or ffmpeg on any machine with camera.
 
 - You need to create a S3 or GCS bucket to store the media output from ezLiveStreaming's transcoder. You also need to get a copy of the AWS access key and secret key pair as they will be passed to ezLiveStreaming for accessing AWS SQS or uploading transcoder outputs to AWS S3.
+
+You also need a machine to be the live capturing/contributing device. This machine can be your PC with a built-in or externally connected camera. On that machine, you need to install live broadcasting software such as OBS studio (https://obsproject.com/download), Wirecast or FFmpeg. You can choose to live-stream from camera source, your PC's screen, a local video file source, or any test pattern generated with FFmpeg. 
 
 The microservices of ezLiveStreaming runs on a base docker image built out of Ubuntu 24.04. Within the base image, ffmpeg 6.1.1 is pre-installed. 
 
 ## Step 1: Launch the servers
-Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-micro one which is free-tier eligible). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance (I use a c5-large one). But if you only run a single live job with low bitrate output, you may also use less powerful instances.
+Launch two EC2 instances, one for running ezLiveStreaming's management services such as API server, job scheduler, DRM key server and Redis, and another one for running a live transcoding worker. The management services do not eat a lot of resource so they can run on relatively low-end instances (I use a t2-small one with 100GiB disk). The live worker services could run multiple live ABR transcoding jobs so they must run on a more powerful instance. If you only run a single live job with moderate video output bitrate, you may also use less powerful instances, such as c5-large. If you need to run more 3-4 live jobs on a same instance, or you need to run a live job with real-time object detection enabled, you probably need a more powerful instance, such as c5-4xlarge.
 
 ## Step 2: Get ezLiveStreaming source
 On both management and worker servers, get the source code from github.
@@ -114,13 +115,26 @@ Create an AWS SQS queue by following https://docs.aws.amazon.com/AWSSimpleQueueS
 
 The api_server, job scheduler, ezKey_server and worker_app all have their own configuration files.
 
+On the management server, configure the api_server and the job scheduler as follow,
 In [api_server/config.json](api_server/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
 In [scheduler/config.json](scheduler/config.json), put your own job queue name in *Sqs.Queue_name*. 
 
 No change is needed in *drm_key_server/config.json*.
 
+On the worker machine, configure the worker as follows,
 In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. *SchedulerUrl* allows the worker to find the job scheduler. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). If you have a cluster of job scheduler running behind a load balancer, you can put the URL of the load balance in *SchedulerUrl*. You can leave other configuration options as is. 
+
+Every time you make configuration changes to any of the services, you need to rebuild the docker images (step 7).
+
+##Local setup ONLY**
+If you run the api_server, scheduler and worker on local machines without public Internet, worker won't be using a public IP address and job scheduler won't be able to find your worker using get_my_ip services such as https://api.ipify.org?format=json. In that case, you need to configure *MyPublicIP* in [worker/app/worker_app_config.json](worker/app/worker_app_config.json), e.g., 
+```
+......
+"MyPublicIP": "192.168.50.147",
+......
+```
+Your configured IP address will be sent to the job scheduler when the worker registers itself initially. The job scheduler will use the received IP address to find the worker. The field *MyPublicIP* might also be used when your worker VM has multiple network interfaces and multiple IP addresses and you want to use a specific one to communicate with the job scheduler. However, if your worker VM do have a public IP address, do not configure *MyPublicIP*.
 
 ## Step 6: Network setup
 As a general note, please ensure all the url, hostname/ip_address, network port you put into the configurations files are accessible from other services. For example, make sure the worker service can reach the job scheduler service using the configured *SchedulerUrl* ([worker/app/worker_app_config.json](worker/app/worker_app_config.json)). Please also make sure any configured network ports are open in the firewall. 
@@ -130,9 +144,9 @@ List of public ports that need to be opened,
 | Port/Port range | Server | Service | Protocol | Use | 
 | --- | --- | --- | --- | --- |
 | 1080 | management | api_server| HTTP (TCP) | Used by api_server to receive live job requests from users | 
-| 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
 | 3080 | management | job scheduler | HTTP (TCP) | Used by job scheduler to communicate with workers | 
 | 4080 | management | Nginx | HTTP (TCP) | Used by Nginx to serve the demo UI. |
+| 2080 | worker | worker | HTTP (TCP) | Used by worker to communicate with job scheduler | 
 | 1935-1950 | worker | worker | RTMP (TCP) | Used by a worker to receive live rtmp input streams, one port per stream |
 
 The ezKey_server uses port 5080 for serving DRM key requests. However, since ezKey_server runs on the same host server as api_server, port 5080 does not need to be made public.
@@ -148,7 +162,7 @@ On the worker server, build the live transcoding worker service,
 ```
 docker compose build worker --no-cache
 ```
-The build process will take about 1-2 minutes on its initial run. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
+Building worker will take several minutes on its initial run, but following build should be much faster. The docker compose file, [compose.yaml](compose.yaml) will create docker images for all the services and set up the management and worker cluster. All the ezLiveStreaming docker images will be created out of a base image,
 https://hub.docker.com/repository/docker/maxutility2011/ezlivestreaming_baseimage/general.
 
 On fresh installation, you probably need to start docker as a service after installing it, e.g., *sudo service start docker*. And on some OSes, you may need to change the permission of */var/run/docker.sock*, e.g., *sudo chmod 666 /var/run/docker.sock*.
@@ -245,6 +259,8 @@ In the above screen, copy-paste the RTMP URL address, e.g., "rtmp://54.91.250.18
 2. The TCP port (e.g., 1936) for RTMP ingest isn't open on the worker server. Please check your AWS EC2 security group for a list of open ports. A worker instance can run multiple concurrent live channels (limit to 15 channels in the code). Each channel is assigned its own port between 1935 and 1950. When a new channel is created, it is assigned the next higher port number, starting from 1935. When a channel stops, its port is reclaimed and returned to the available port pool. 
 3. Also, check the hostname/ip_address in *rtmp_ingest_url*. Make sure it is a public IP. The worker service queries a IP detection service, "api.ipify.org" for its own public IP and put the IP in *rtmp_ingest_url*. 
 
+Also, every time you create a new live job, the RTMP ingest port number increment by 1, so remember to change the port number in the ingest URL.
+
 It is also possible that Step 9 does not succeed and the new channel is not even created. If that is the case, you will not see any server response in the demo UI when you run Step 9. Also, make sure you have successfully started the worker service in Step 8. If that is the case, run "docker ps" on the worker server to verify worker container is running.
 
 ## Step 11: Verify live channel output to S3
@@ -262,7 +278,9 @@ to view the worker log. Remember to replace the random string in the log file na
 
 ## Step 12: Playback
 The live channel playback URL can be found in the botton-right corner of the demo UI, e.g., "https://bzhang-test-bucket-public.s3.amazonaws.com/output_4f115985-f9be-4fea-9d0c-0421115715a1/master.m3u8".
-In the demo UI, I integrated Shaka player to play the live channel. After you started live OBS broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI, you will see playback starts. The 10 seconds wait time is for the transcoder to start up (initialize, generate the first 2-3 media segments then upload to S3 bucket). You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. If you stream with av1 video codec, I recommend using hls.js demo player (https://hlsjs.video-dev.org/demo) to play the streams. Shaka player also worked for av1, but I also had issues with some of its nightly builds. You must also check whether your browser supports av1 decoding. The latest version of Chrome supports AV1. If you are having issues with AV1, please feel free to contact me. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
+In the demo UI, I integrated Shaka player to play the live channel. After you started live OBS broadcasting in step 10, wait about 10-15 seconds then click the "play" button in the UI, you will see playback starts. The 10 seconds wait time is for the transcoder to start up (initialize, generate the first 2-3 media segments then upload to S3 bucket). You can also use Shaka player's official demo page (https://shaka-player-demo.appspot.com/demo) to play your live channel. 
+
+If you stream with av1 video codec, I recommend using hls.js demo player (https://hlsjs.video-dev.org/demo) to play the streams. Shaka player may also work to play av1, but I have had issues with some of its nightly builds. You must also check whether your browser supports av1 decoding. Safari does not seem to support AV1. The latest version of Chrome supports AV1. If you are having issues with AV1, please feel free to contact me. If you haven't enabled allow-cors (cross-origin) in S3, the playback could fail due to CORS errors. In that case, you can install **Moesif CORS** browser extension and enable CORS then click "play" button again.
 
 ## Trouble-shooting
 
@@ -447,7 +465,7 @@ ezLiveStreaming supports display of live transcoding/streaming stats. To receive
 ## Stop a job
 Stop a job given by its ID. Upon request, the associated worker_transcoder instance will be stopped but the job info and states will remain in Redis. When the job is resumed in the future, the job ID, stream key and all the transcoding and packaging parameters remain the same. <br>
 
-**PUT /jobs/[job_id]** <br>
+**PUT /jobs/[job_id]/stop** <br>
 **Request body**: None <br>
 **Response code** <br>
 - on success: 202 Accepted <br>
@@ -461,7 +479,7 @@ Stop a job given by its ID. Upon request, the associated worker_transcoder insta
 ## Resume a job
 Resume a job given by its ID. Upon request, the stopped job will be resumed. A new worker_transcoder instance will be launched. The job ID and stream key and all the transcoding and packaging parameters will be reused. <br>
 
-**PUT /jobs/[job_id]** <br>
+**PUT /jobs/[job_id]/resume** <br>
 **Request body**: None <br>
 **Response code** <br>
 - on success: 202 Accepted <br>
@@ -651,6 +669,10 @@ To view all jobs in redis-cli, run "hgetall jobs". <br>
 Jobs that are pulled from the SQS job queue by job scheduler, but yet to be scheduled. <br>
 **Data structure**: list <br>
 **value**: string of "type LiveJob struct" (job/job.go) <br>
+
+To view all queued jobs in redis-cli, run "lrange queued_jobs [start_index] [end_index]"
+
+To pop the queue, run "rpop queued_jobs".
 
 ## "workers":
 The set of live workers currently being managed by the job scheduler. <br>

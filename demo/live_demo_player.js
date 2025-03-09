@@ -1,19 +1,21 @@
-var playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd";
+var init_playback_url = "https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd"
+var playback_url = init_playback_url;
+var detection_playlist_url = "";
 var ingest_url = "";
 var create_button;
 var stop_button;
 var resume_button;
 var show_button;
 var play_button;
-var livefeed_button;
-var stoplivefeed_button;
 var response_code;
 var response_body;
 var job_request;
 var video;
 var job_id;
 var listJobsTimer = null;
-var listJobsInterval = 2000
+const listJobsInterval = 2000;
+var detection_enabled = false;
+var detection_video_bitrate = ""
 
 // Download sample jobs from the server.
 var sample_live_job = '';
@@ -34,7 +36,11 @@ $.getJSON(url3, function(json) {
   sample_live_job_av1 = JSON.stringify(json, null, 2);
 });
 
-var isLivefeeding = false
+var sample_live_job_object_detection = '';
+var url4 = "http://" + location.host + "/specs/sample_live_job_object_detection.json";
+$.getJSON(url4, function(json) {
+  sample_live_job_object_detection = JSON.stringify(json, null, 2);
+});
 
 async function initPlayer() {
     // Create a Player instance.
@@ -63,15 +69,18 @@ function changeJob() {
  	var job_list = document.getElementById("liveJobList");
 	var job_request = document.getElementById("job_request");
 	if (job_list.options[job_list.selectedIndex].text == "hls live with clear-key drm") {
-		j = JSON.parse(sample_live_job)
-		job_request.innerHTML = JSON.stringify(j, null, 2)
+		  j = JSON.parse(sample_live_job)
+		  job_request.innerHTML = JSON.stringify(j, null, 2)
 	} else if (job_list.options[job_list.selectedIndex].text == "hls live without drm") {
-		j = JSON.parse(sample_live_job_without_drm)
-                job_request.innerHTML = JSON.stringify(j, null, 2)
+		  j = JSON.parse(sample_live_job_without_drm)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
 	} else if (job_list.options[job_list.selectedIndex].text == "hls live with av1 codec") {
-                j = JSON.parse(sample_live_job_av1)
-                job_request.innerHTML = JSON.stringify(j, null, 2)
-        }
+      j = JSON.parse(sample_live_job_av1)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
+  } else if (job_list.options[job_list.selectedIndex].text == "hls live with Yolo object detection") {
+      j = JSON.parse(sample_live_job_object_detection)
+      job_request.innerHTML = JSON.stringify(j, null, 2)
+  }
 }
 
 function onError(e) {
@@ -136,18 +145,6 @@ window.addEventListener("DOMContentLoaded", (event) => {
         showJob();
     });
 
-	/*
-    livefeed_button = document.getElementById('livefeed');
-    livefeed_button.addEventListener('click', (event) => {
-        liveFeed();
-    });
-
-    stoplivefeed_button = document.getElementById('stoplivefeed');
-    stoplivefeed_button.addEventListener('click', (event) => {
-        stopLiveFeed();
-    });
-	*/
-
     play_button = document.getElementById('play');
     play_button.addEventListener('click', (event) => {
         playVideo();
@@ -186,66 +183,10 @@ function startPlaybackTimer() {
     playbackTimer = setTimeout(playVideo, 16000);
 }
 
-function startLiveFeedTimer() {
-    showJobTimer = setTimeout(liveFeed, 500);
-}
-
-function liveFeed() {
-    let live_feed_url = api_server_url + "feed";
-    let live_feed_req = new XMLHttpRequest();
-    live_feed_req.open("POST", live_feed_url, true);
-    live_feed_req.setRequestHeader("Content-Type", "application/json");
-
-    live_feed_req.onload = function (e) {
-        if (live_feed_req.readyState === live_feed_req.DONE) {
-          if (live_feed_req.status === 201) {
-            response_code.innerHTML = "status code=" + live_feed_req.status
-            livefeed_button.disabled = true
-            isLivefeeding = true
-            startPlaybackTimer()
-          } else {
-            console.log("create new live feed failed. Status code:" + create_job_req.status);
-          }
-        }
-    }
-
-    let feed_body = ""
-    if (ingest_url != "") {
-        body = {}
-        body.RtmpIngestUrl = ingest_url
-        feed_body = JSON.stringify(body)
-        live_feed_req.send(feed_body);
-    } else {
-        console.log("create new live feed failed.")
-        return
-    }
-}
-
-function stopLiveFeed() {
-    if (!isLivefeeding) {
-        return
-    }
-
-    let stop_live_feed_url = api_server_url + "feed";
-    let stop_live_feed_req = new XMLHttpRequest();
-    stop_live_feed_req.open("DELETE", stop_live_feed_url, true);
-
-    stop_live_feed_req.onload = function (e) {
-        if (stop_live_feed_req.readyState === stop_live_feed_req.DONE) {
-          if (stop_live_feed_req.status === 201) {
-            response_code.innerHTML = "status code=" + stop_live_feed_req.status
-            livefeed_button.disabled = false
-          } else {
-            console.log("stop live feed failed. Status code:" + stop_live_feed_req.status);
-          }
-        }
-    }
-    
-    stop_live_feed_req.send();
-}
-
 function showJob() {
     showJobTimer = setTimeout(showJob, 5000);
+
+    // Get Job state
     let show_job_url = api_server_url + "jobs/";
     show_job_url += job_id;
     let show_job_req = new XMLHttpRequest();
@@ -259,29 +200,30 @@ function showJob() {
             job_id = j.Id;
 
             playback_url = j.Playback_url;
-            ingest_url = j.RtmpIngestUrl;
-            drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
-            drm_key = j.DrmEncryptionKeyInfo.Key;
-            warnings = j.Job_validation_warnings;
-            jstate = j.State;
-            bw = j.Ingress_bandwidth_kbps;
-            cpu = j.Transcoding_cpu_utilization;
-            input_info = j.Input_info_url;
 
             let je = {};
-            je.playback_url = playback_url;
-            je.rtmp_ingest_url = ingest_url;
-            je.drm_key_id = drm_key_id;
-            je.drm_key = drm_key;
-            je.job_state = jstate;
-            je.validation_warnings = warnings;
-            je.ingress_bandwidth_kbps = bw; 
-            je.transcoding_cpu_utilization = cpu;  
-            je.input_info = input_info;
+            je.playback_url = j.Playback_url;
+            if (detection_enabled) {
+              je.detection_playlist_url = detection_playlist_url;
+            }
+            
+            je.rtmp_ingest_url = j.RtmpIngestUrl;
+            je.drm_key_id = j.DrmEncryptionKeyInfo.Key_id;
+            je.drm_key = j.DrmEncryptionKeyInfo.Key;
+            je.job_state = j.State;
+            je.validation_warnings = j.Job_validation_warnings;
+            je.ingress_bandwidth_kbps = j.Ingress_bandwidth_kbps; 
+            je.transcoding_cpu_utilization = j.Transcoding_cpu_utilization;  
+            je.input_info = j.Input_info_url;
 
             job_essentials.innerHTML = JSON.stringify(je, null, 2);
             response_code.innerHTML = "status code=" + show_job_req.status;
             response_body.innerHTML = JSON.stringify(j, null, 2);
+
+            if (j.Spec.Output.Detection.Input_video_bitrate) {
+              detection_enabled = true;
+              detection_video_bitrate = j.Spec.Output.Detection.Input_video_bitrate;
+            }
           } else {
             let job_resp = this.response;
             window.alert(job_resp);
@@ -290,6 +232,14 @@ function showJob() {
     }
     
     show_job_req.send();
+
+    if (detection_enabled) {
+      const url = new URL(playback_url);
+      const baseUrlPathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
+      const baseUrl = `${url.origin}${baseUrlPathname}`;
+
+      detection_playlist_url = baseUrl + "/video_" + detection_video_bitrate + "/playlist_detected.m3u8";
+    }
 }
 
 function createJob() {
@@ -346,10 +296,12 @@ function createJob() {
     }
     
     create_job_req.send(job_body);
+    time_job_created = Date.now()
+
 }
 
 function cleanup() {
-  stopLiveFeed()
+  //stopLiveFeed()
   stopJob()
 }
 

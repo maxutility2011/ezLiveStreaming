@@ -407,6 +407,37 @@ func scheduleOneJob() {
 				return
 			}
 
+			// Check worker capacity before sending the job to it.
+			w, ok := getWorkerById(assigned_worker_id)
+			if !ok {
+				Log.Println("Failed to getWorkerById")
+				bufferJob(j)
+				return
+			}
+
+			var w_load models.WorkerLoad
+			v := getWorkerLoadById(assigned_worker_id)
+			if v != "" {
+				err := json.Unmarshal([]byte(v), &w_load)
+				if err != nil {
+					Log.Println("Failed to unmarshal Redis result (scheduleOneJob). Error: ", err)
+					bufferJob(j)
+					return // Found worker load in Redis but got bad data
+				}
+			}
+
+			if w_load.CpuLoad >= w.Info.CpuCapacity {
+				Log.Println("Out of CPU capacity")
+				bufferJob(j)
+				return
+			}
+
+			if w_load.BandwidthLoad >= w.Info.BandwidthCapacity {
+				Log.Println("Out of bandwidth capacity")
+				bufferJob(j)
+				return
+			}
+
 			err := sendJobToWorker(j, assigned_worker_id)
 			if err != nil {
 				Log.Println("Failed to send job to a worker")

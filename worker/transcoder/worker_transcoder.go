@@ -9,8 +9,10 @@ import (
 	"ezliveStreaming/job"
 	"ezliveStreaming/models"
 	"ezliveStreaming/s3"
+	"ezliveStreaming/utils"
 	"flag"
 	"fmt"
+	"github.com/maxutility2011/media_utils"
 	"github.com/fsnotify/fsnotify"
 	"io/ioutil"
 	"log"
@@ -20,6 +22,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"bufio"
+	"math"
 )
 
 type Upload_item struct {
@@ -29,6 +33,16 @@ type Upload_item struct {
 	Remote_media_output_path string
 }
 
+type detectionJob struct {
+	Time_enqueued int64
+	Merged_segment_path string
+	LiveJob job.LiveJobSpec
+	Original_media_data_segment_path string
+	Remote_media_output_path string
+	BaseMediaDecodeTime uint32
+	Sidx_timescale uint32
+}
+
 var Log *log.Logger
 var upload_list *list.List
 var init_segments_to_upload = make(map[string]Upload_item) // map key (string): rendition name; map value: Upload_item representing the init segments
@@ -36,12 +50,23 @@ var local_media_output_path string
 
 const transcoder_status_check_interval = "2s"
 const stream_file_upload_interval = "0.1s"
+const process_detection_job_interval = "0.2s"
 const upload_input_info_file_wait_time = "20s"
 const max_upload_retries = 3
-const num_concurrent_uploads = 5
+const max_concurrent_uploads = 5
+const max_concurrent_detection_jobs = 1
+var num_concurrent_detection_jobs = 0
+var original_detection_target_init_segment_path_local string // The original detection target init segment output by Shaka packager (before detection)
+var original_detection_target_hls_playlist_path_local string // The original detection target HLS playlist output by Shaka packager (before detection)
+var upload_candidate_detection_init_segment string // The new init segment output by Yolo detector which is ready to upload
+const init_segment_local_filename = "init.mp4"
+const detection_output_init_segment_local_filename = job.Mp4box_segment_template_prefix + "init.mp4" // This must match MP4Box init segment filename
+const undefined_bitrate = "undefined"
 
 // The wait time from when a stream file is created by the packager, till when we are safe to upload the file (assuming the file is fully written)
 const stream_file_write_delay_ms = 200
+
+var queued_detection_jobs []detectionJob
 
 func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
 	// According to https://pkg.go.dev/os#FindProcess,
@@ -59,21 +84,26 @@ func manageFfmpegAlone(ffmpegCmd *exec.Cmd) {
 	}
 }
 
-// Monitor ffmpeg and shaka packager
-// ffmpeg and packager must both be running.
-// If one dies, the other should be killed.
+// Monitor shaka packager, ffmpeg and ffprobe. 
+// ffmpeg and packager must both be running. If one dies, the other should be killed.
+// If ffmpeg exits, ffprobe must exit too.
 // If neither ffmpeg nor the packager is running, worker_transcoder should exit.
-func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
+// command1: Shaka packager, command2: ffmpeg, command3: ffprobe
+func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd, command3 *exec.Cmd) {
 	process1, err1 := os.FindProcess(int(command1.Process.Pid))
 	process2, err2 := os.FindProcess(int(command2.Process.Pid))
+	process3, _ := os.FindProcess(int(command3.Process.Pid))
 
 	if err1 != nil && err2 != nil {
 		Log.Println("Neither ffmpeg nor packager is found. Worker_transcoder exiting...")
+		// Terminate ffprobe if it is still running
+		err := process3.Signal(syscall.Signal(syscall.SIGTERM))
+		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
 		os.Exit(0)
 	} else if err1 == nil && err2 != nil {
 		err := process1.Signal(syscall.Signal(syscall.SIGTERM))
 		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
-		// Return instead of os.Exit(0). if SIGTERM fails to kill the process, worker_transcoder will
+		// Return instead of os.Exit(0). If SIGTERM fails to kill the process, worker_transcoder will
 		// exit the next time this function is called.
 		return
 	} else if err1 != nil && err2 == nil {
@@ -90,6 +120,8 @@ func manageCommands(command1 *exec.Cmd, command2 *exec.Cmd) {
 
 	if err1 != nil && err2 != nil {
 		Log.Println("Neither ffmpeg nor packager is running. Worker_transcoder exiting...")
+		err := process3.Signal(syscall.Signal(syscall.SIGTERM))
+		Log.Printf("process.Signal.SIGTERM on pid %d returned: %v\n", command1.Process.Pid, err)
 		os.Exit(0)
 	} else if err1 == nil && err2 != nil {
 		err := process1.Signal(syscall.Signal(syscall.SIGTERM))
@@ -211,7 +243,7 @@ func uploadInputInfoFile(local_media_output_path string, remote_media_output_pat
 // A stream file is qualified for upload if all of the following conditions are met,
 // - it is created more than "stream_file_write_delay_ms (200ms)" ago,
 // - its upload retry count does not exceed "max_upload_retries (3)",
-// - it is within the first "num_concurrent_uploads (3)" items in upload_list.
+// - it is within the first "max_concurrent_uploads" items in upload_list.
 func uploadFiles() {
 	i := 1
 	var f Upload_item
@@ -234,11 +266,11 @@ func uploadFiles() {
 		Log.Printf("%d - Upload item: \n file: %s (size: %d bytes)\n time_created: %d (time_elapsed: %d)\n num_retried: %d\n remote_path: %s\n", now, f.File_path, fs.Size(), time_created, now-time_created, f.Num_retried, f.Remote_media_output_path)
 
 		if now-time_created > stream_file_write_delay_ms {
-			if i > num_concurrent_uploads {
-				Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, num_concurrent_uploads)
+			if i > max_concurrent_uploads {
+				Log.Printf("Current upload: %d > Max. uploads: %d. Let's upload later.\n", i, max_concurrent_uploads)
 				break
 			} else {
-				Log.Printf("Current upload: %d < Max. uploads: %d. Proceed to upload.\n", i, num_concurrent_uploads)
+				Log.Printf("Current upload: %d < Max. uploads: %d. Proceed to upload.\n", i, max_concurrent_uploads)
 			}
 
 			// Do not call s3 upload SDK in a go routine because it does not seem to be thread-safe.
@@ -316,17 +348,18 @@ func uploadOneFile(local_file string, remote_path_base string) error {
 	}
 
 	// This is the first media data segment. Let's also upload the init segment of this rendition.
-	// FFmpeg media data segment template: "stream_%v/seg_%05d". The first segment looks like e.g., seg_00000.m4s.
-	// Shaka packager template: "stream_%v/seg_$Number$.m4s". The first segment looks like e.g., seg_1.m4s.
+	// FFmpeg (AV1) media data segment template: "stream_%v/seg_%05d". The first segment is seg_00000.m4s.
+	// Shaka packager (H.26x) template: "video_%v/seg_$Number$.m4s". The first segment is seg_1.m4s.
+	// MP4Box (object detection) template: "video_%v/segment_$Number$.m4s". The first segment is segment_1.m4s.
 	// TODO: remove dependency on data segment template.
-	if isMediaDataSegment(local_file) && (strings.Contains(local_file, "seg_00000") || strings.Contains(local_file, "seg_1")) {
+	if isMediaDataSegment(local_file) && (strings.Contains(local_file, "seg_00000.") || strings.Contains(local_file, "seg_1.") || strings.Contains(local_file, "segment_1.")) {
 		item, ok := init_segments_to_upload[rendition_name[:len(rendition_name)-1]]
 		if !ok {
 			Log.Printf("Failed to find init segment item with rendition_name = %s\nAre you sure %s is a valid path and is the first media data segment?\n", rendition_name[:len(rendition_name)-1], local_file)
 			return nil // This is NOT a fatal error, let's return nil.
 		}
 
-		Log.Printf("Add %s to UploadList\n", local_file)
+		Log.Printf("Add %s to UploadList\n", item.File_path)
 		upload_list.PushBack(item)
 	}
 
@@ -342,9 +375,10 @@ func isStreamFile(file_name string) bool {
 		!strings.Contains(file_name, ".tmp")
 }
 
+// For H.26x output, media data segments always look like "seg_x.m4s" (template: "seg_$number$.m4s")
+// For AV1 output, media data segments always look like "seg_xxxxx.m4s" (template: "seg_%5d.m4s")
 func isMediaDataSegment(file_name string) bool {
-	return (strings.Contains(file_name, ".mp4") ||
-		strings.Contains(file_name, ".ts") ||
+	return (strings.Contains(file_name, ".ts") ||
 		strings.Contains(file_name, ".m4s")) &&
 		!strings.Contains(file_name, ".tmp")
 }
@@ -355,13 +389,128 @@ func isFmp4InitSegment(file_name string) bool {
 }
 
 func isHlsVariantPlaylist(file_name string) bool {
-	return strings.Contains(file_name, "playlist.m3u8") &&
+	return (strings.Contains(file_name, "playlist.m3u8") || strings.Contains(file_name, "playlist_detected.m3u8")) &&
 		!strings.Contains(file_name, ".tmp")
 }
 
-func isHlsmasterPlaylist(file_name string) bool {
+func isHlsMasterPlaylist(file_name string) bool {
 	return strings.Contains(file_name, "master.m3u8") &&
 		!strings.Contains(file_name, ".tmp")
+}
+
+// The detection target rendition is an encoder output rendition that is used for object detection
+func isDetectionTarget(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate)
+}
+
+// A media data segment of the detection target rendition
+func isDetectionTargetTypeMediaDataSegment(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && isMediaDataSegment(file_name) && strings.Contains(file_name, "seg_")
+}
+
+// A media init segment of the detection target rendition. 
+func isDetectionTargetTypeMediaInitSegment(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && strings.Contains(file_name, init_segment_local_filename) && !strings.Contains(file_name, detection_output_init_segment_local_filename)
+}
+
+// A variant playlist of the detection target rendition
+func isDetectionTargetTypeHlsVariantPlaylist(file_name string, detection_target_bitrate string) bool {
+	return strings.Contains(file_name, detection_target_bitrate) && isHlsVariantPlaylist(file_name)
+}
+
+func read_baseMediaDecodeTime(segment_path string) (uint32, error) {
+	var err error
+	var seg_data []byte
+	var result uint32 = math.MaxUint32
+	seg_data, err = utils.Read_file(segment_path)
+	if err != nil {
+		Log.Printf("Failed to read media segment: %s. Error: %v", segment_path, err)
+		return result, err
+	}
+
+	var tfdt media_utils.Tfdt_box 
+	tfdt, err = media_utils.GetTfdt(seg_data)
+	return tfdt.BaseMediaDecodeTime_v0, nil
+}
+
+func read_sidx_timescale(segment_path string) (uint32, error) {
+	var err error
+	var seg_data []byte
+	var result uint32 = math.MaxUint32
+	seg_data, err = utils.Read_file(segment_path)
+	if err != nil {
+		Log.Printf("Failed to read media segment: %s. Error: %v", segment_path, err)
+		return result, err
+	}
+
+	var sidx media_utils.Sidx_box 
+	sidx, err = media_utils.GetSidx(seg_data)
+	return sidx.Timescale, nil
+}
+
+func merge_init_and_data_segments(init_segment_path string, data_segment_path string) (string, error) {
+	// Wait 200ms before data segment becomes fully written
+	time.Sleep(200 * time.Millisecond)
+	Log.Printf("Merging init segment %s and data segment %s\n", init_segment_path, data_segment_path)
+	
+	var merged_segment_path string = ""
+	var merged_segment_buffer []byte
+	var err error
+	var bytes_init []byte
+	var bytes_data []byte
+	bytes_init, err = utils.Read_file(init_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detection output init segment: %s. Error: %v", init_segment_path, err)
+		return merged_segment_path, err
+	}
+
+	bytes_data, err = utils.Read_file(data_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detection output data segment: %s. Error: %v", data_segment_path, err)
+		return merged_segment_path, err
+	}
+
+	if len(bytes_data) == 0 {
+		Log.Printf("Empty detection output data segment: %s", data_segment_path)
+		return merged_segment_path, errors.New("empty_detection_media_data")
+	}
+
+	merged_segment_buffer = append(merged_segment_buffer, bytes_init...)
+	merged_segment_buffer = append(merged_segment_buffer, bytes_data...)
+
+	// Change file extension from ".m4s" to ".merged" so that the merged segment 
+	// would not be uploaded
+	merged_segment_path = utils.Change_file_extension(data_segment_path, ".merged")
+	utils.Write_file(merged_segment_buffer, merged_segment_path)
+
+	return merged_segment_path, nil
+}
+
+// This function calls MP4Box to convert a single MP4 segment to a fMP4 stream consisting exactly one init segment and one fMP4 segment.
+// MP4Box command: MP4Box -dash 4000 -segment-name 'segment_$Number$' -out 1.m3u8 /tmp/1.mp4
+// Output: "1.mpd  segment_1.m4s  segment_2.m4s  segment_3.m4s  segment_4.m4s  segment_5.m4s  segment_6.m4s  segment_7.m4s  segment_8.m4s  segment_init.mp4"
+func mp4_to_fmp4(input string, seg_duration int) (string, string, error) {
+	mp4box_init_segment_filename := utils.Get_path_dir(input) + "/" + detection_output_init_segment_local_filename
+
+	// The MP4Box command guarantees the output segment name would always be "segment_1.m4s"
+	// The input MP4 file consists of only one media data segment. The MP4Box output will consist of only one segment as well, hence the segment number will always be "1".
+	mp4box_media_data_segment_filename := utils.Get_path_dir(input) + "/segment_1.m4s"
+	var err error
+
+	converterArgs := job.GenerateFmp4ConversionCommand(input, seg_duration)
+	Log.Println("Fmp4Converter arguments: ")
+	Log.Println(job.ArgumentArrayToString(converterArgs))
+
+	converterCmd := exec.Command("MP4Box", converterArgs...)
+	var errConverter error = nil
+	var out []byte
+	out, errConverter = converterCmd.CombinedOutput() // This line blocks when converterCmd launch succeeds
+	if errConverter != nil {
+		Log.Println("Errors starting converter: ", errConverter, " converter output: ", string(out))
+		return mp4box_init_segment_filename, mp4box_media_data_segment_filename, errors.New("error_starting_converter")
+	}
+
+	return mp4box_init_segment_filename, mp4box_media_data_segment_filename, err
 }
 
 func getRenditionNameFromPath(path string) string {
@@ -404,7 +553,7 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 			Log.Printf("Add %s to init segment table under rendition name = %s\n", file_path, rendition_name)
 			init_segments_to_upload[rendition_name] = it
 		} else {
-			Log.Printf("Failed to add %s to init segment tabele. Invalid rendition name: %s\n", file_path, rendition_name)
+			Log.Printf("Failed to add %s to init segment table. Invalid rendition name: %s\n", file_path, rendition_name)
 		}
 	} else { // Add media data segments to upload_list
 		Log.Printf("Add %s to UploadList\n", file_path)
@@ -412,8 +561,303 @@ func addToUploadList(file_path string, remote_media_output_path string) {
 	}
 }
 
+// Run detection on ".merged" segment file (containing both fmp4 initialization 
+// section and media data section), and output a ".detected" segment file
+func run_detection(j job.LiveJobSpec, input_segment_path string, sidx_timescale uint32) (string, error) {
+	// Use file extension ".detected" so that it would not be uploaded
+	// ".detected" files contain both an fmp4 initialization section and media
+	// data section, and are NOT immediately uploadable. We need to 
+	// 1. Extract the initialization section from the ".detected" file 
+	// and output a new initialization segment. This needs to be done only once.
+	// 2. Strip off the initialization section from every ".detected" file.
+	detected_segment_path := utils.Change_file_extension(input_segment_path, ".detected")
+	Log.Printf("Running detection on input segment: %s. Output path: %s\n", input_segment_path, detected_segment_path)
+
+	detectorArgs := job.GenerateDetectionCommand(j.Output.Detection.Input_video_frame_rate, j.Output.Detection.Encode_codec, j.Output.Detection.Encode_preset, j.Output.Detection.Encode_crf, input_segment_path, detected_segment_path, sidx_timescale)
+	Log.Println("Detector arguments: ")
+	Log.Println(job.ArgumentArrayToString(detectorArgs))
+
+	detectorCmd := exec.Command("sh", detectorArgs...)
+	var errDetector error = nil
+	var out []byte
+	out, errDetector = detectorCmd.CombinedOutput() // This line blocks when detectorCmd launch succeeds
+	if errDetector != nil {
+		errMessage := string(out)
+		Log.Println("Errors starting detector: ", errDetector, " detector output: ", errMessage)
+		
+		ignoreError := false
+		// The following error can be ignored as it does not stop detector from running successfully.
+		// "[W1213 11:31:21.107731264 NNPACK.cpp:61] Could not initialize NNPACK! Reason: Unsupported hardware."
+		if strings.Contains(errMessage, "NNPACK") {
+			ignoreError = true
+		}
+
+		if !ignoreError {
+			return detected_segment_path, errors.New("error_starting_detector")
+		}
+	}
+
+	// When detection finishes, the output 
+	return detected_segment_path, nil
+}
+
+// Pop a detection job from the queue and execute it
+func executeNextDetectionJob() {
+	if len(queued_detection_jobs) == 0 {
+		return
+	}
+
+	var frontJob detectionJob
+	frontJob = queued_detection_jobs[0]
+
+	if num_concurrent_detection_jobs >= max_concurrent_detection_jobs {
+		Log.Printf("Job not executed!! Cannot process more than %d jobs (but %d jobs running currently) at same time. Wait until current jobs finish.\n", max_concurrent_detection_jobs, num_concurrent_detection_jobs)
+		return
+	}
+
+	if time.Now().UnixMilli() - frontJob.Time_enqueued > int64(frontJob.LiveJob.Output.Segment_duration * 1000) {
+		Log.Printf("Job timed out (not executed)!!! Time job enqueued: %d, current time: %d, time in queue: %d, segment duration (ms): %d\n", frontJob.Time_enqueued, time.Now().UnixMilli(), time.Now().UnixMilli() - frontJob.Time_enqueued, frontJob.LiveJob.Output.Segment_duration * 1000)
+		return
+	}
+
+	num_concurrent_detection_jobs = num_concurrent_detection_jobs + 1
+	// Pop out the front job from queue
+	queued_detection_jobs = queued_detection_jobs[1:]
+
+	// Run detection in a separate thread
+	go func() {
+		Log.Printf("Executing new detection job. Input path: %s.\n", frontJob.Merged_segment_path)
+		executeDetectionJob(frontJob) 
+	}()
+}
+
+func executeDetectionJob(dj detectionJob) {
+	// Run Yolo object detection on the merged segment (dj.Merged_segment_path) using the given detection configuration (dj.LiveJob)
+	// For each input file (dj.Merged_segment_path), the detector outputs a detected segment file (detection_output_segment_path)
+	detection_start_time_ms := time.Now().UnixMilli()
+	detection_output_segment_path, err := run_detection(dj.LiveJob, dj.Merged_segment_path, dj.Sidx_timescale)
+	detection_end_time_ms := time.Now().UnixMilli()
+	if err != nil {
+		Log.Printf("Failed to run detection on input = %s. Error: %v\n", dj.Merged_segment_path, err)
+		// TODO: When detection fails, we shall just show the original non-detected segment.
+		//       1. Rename seg_xxxxx.m4s to segment_xxxxx.m4s and upload
+		//       2. Update playlist accordingly and upload
+		return
+	}
+
+	num_concurrent_detection_jobs = num_concurrent_detection_jobs - 1
+	Log.Printf("Object detection completed in %d milliseconds. Detection output media segment: %s\n", detection_end_time_ms - detection_start_time_ms, detection_output_segment_path)
+
+	// Delete the merged segment to save space as it is no longer needed
+	Log.Printf("Deleting merged segment: %s\n", dj.Merged_segment_path)
+	os.Remove(dj.Merged_segment_path)
+
+	// Convert detected mp4 segment to fragmented mp4 format by spliting into an init seg and a media data seg 
+	Log.Printf("Converting detected mp4 segment: %s to fmp4 segment\n", detection_output_segment_path)
+	new_init_segment_path, new_media_segment_path, err_conversion := mp4_to_fmp4(detection_output_segment_path, dj.LiveJob.Output.Segment_duration)
+
+	// Read the detected fmp4 segment and set TFDT BaseMediaDecodeTime
+	var seg_data []byte
+	seg_data, err = utils.Read_file(new_media_segment_path)
+	if err != nil {
+		Log.Printf("Failed to read detected fmp4 segment: %s. Can not set BaseMediaDecodeTime. Error: %v", new_media_segment_path, err)
+		// Failing to set BaseMediaDecodeTime will cause PTS discontinuity and HLS playback issue. Let's see if player can recover from the discontinuity.
+	}
+
+	media_utils.SetTfdtUint32(seg_data, dj.BaseMediaDecodeTime)
+
+	// Verify BaseMediaDecodeTime is set correctly
+	var tfdt media_utils.Tfdt_box 
+	tfdt, err = media_utils.GetTfdt(seg_data)
+	if tfdt.BaseMediaDecodeTime_v0 != dj.BaseMediaDecodeTime {
+		Log.Printf("Failed to set TFDT BaseMediaDecodeTime. Target value: %d, set value: %d\n", dj.BaseMediaDecodeTime, tfdt.BaseMediaDecodeTime_v0)
+		// Failing to set BaseMediaDecodeTime will cause PTS discontinuity and HLS playback issue. Let's see if player can recover from the discontinuity.
+	}
+
+	utils.Write_file(seg_data, new_media_segment_path)
+
+	// Delete detected mp4 segment which is an intermediate file
+	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
+	os.Remove(detection_output_segment_path)
+
+	// Delete detected mp4 segment which is an intermediate file
+	Log.Printf("Deleting detected mp4 segment: %s\n", detection_output_segment_path)
+	os.Remove(detection_output_segment_path)
+
+	if err_conversion != nil {
+		Log.Printf("Failed to convert detected segment: %s. Error: %v\n", detection_output_segment_path, err_conversion)
+		// TODO: When detection fails, we shall just show the original non-detected segment.
+		//       1. Rename seg_xxxxx.m4s to segment_xxxxx.m4s and upload
+		//       2. Update playlist accordingly and upload
+		return
+	}
+
+	// Upload the new init segment only once
+	if upload_candidate_detection_init_segment == "" {
+		upload_candidate_detection_init_segment = new_init_segment_path
+		addToUploadList(upload_candidate_detection_init_segment, dj.Remote_media_output_path)
+	} 
+
+	// Rename detection output media segment to follow "segment_%d.m4s" template. 
+	// For example, "/tmp/output_b11b6b55-9306-4212-a15a-3d4aa79d3fb1/video_150k/seg_6.m4s" is renamed to "/tmp/output_b11b6b55-9306-4212-a15a-3d4aa79d3fb1/video_150k/segment_6.m4s"
+	// "segment_%d.m4s" will be found by function watchStreamFiles. However, function isDetectionTargetTypeMediaDataSegment will filter them out.
+	pos_seg := strings.LastIndex(dj.Original_media_data_segment_path, "seg_") 
+	pos_underscore := strings.LastIndex(dj.Original_media_data_segment_path, "_") 
+	// Rename segment while still keeps the segment number.
+	upload_candidate_detection_media_data_segment := dj.Original_media_data_segment_path[:pos_seg] + "segment_" + dj.Original_media_data_segment_path[pos_underscore+1 :]
+	os.Rename(new_media_segment_path, upload_candidate_detection_media_data_segment)
+
+	// Upload local media data segment file
+	Log.Printf("Uploading detection output media data segment: %s\n", upload_candidate_detection_media_data_segment)
+	addToUploadList(upload_candidate_detection_media_data_segment, dj.Remote_media_output_path)
+
+	// Add the detected segment to the end (live playhead) of the detection target playlist
+	// TODO: Ideally, a segment should be added to the playlist ONLY after it is successfully uploaded.
+	err, upload_candidate_detection_playlist := updatePlaylistNewDetectedSegment(original_detection_target_hls_playlist_path_local, dj.Original_media_data_segment_path)
+	if err != nil {
+		Log.Printf("Failed to update playlist to add newly detected segment %d\n", upload_candidate_detection_playlist)
+		return
+	}
+
+	Log.Printf("Uploading detection HLS playlist: %s\n", upload_candidate_detection_playlist)
+	addToUploadList(upload_candidate_detection_playlist, dj.Remote_media_output_path)
+}
+
+func updatePlaylistNewDetectedSegment(playlistFile string, original_segment_path string) (error, string) {
+	pos_dot := strings.LastIndex(playlistFile, ".")
+	updated_playlist_path := playlistFile[: pos_dot] + "_detected" + playlistFile[pos_dot :]
+
+	// Load input playlist
+	playlist, err := os.Open(playlistFile)
+	if err != nil {
+		Log.Printf("Failed to read HLS variant playerlist: %s. Error: %v", playlistFile, err)
+		return errors.New("error_reading_playlist"), updated_playlist_path
+	}
+
+	defer playlist.Close()
+	scanner := bufio.NewScanner(playlist)
+
+	// Load output playlist
+	newPlaylist, err := os.Create(updated_playlist_path)
+	if err != nil {
+		Log.Printf("Failed to create new HLS variant playerlist: %s. Error: %v", updated_playlist_path, err)
+        return err, updated_playlist_path
+    }
+
+	defer newPlaylist.Close()
+	writer := bufio.NewWriter(newPlaylist)
+
+	segment_found_in_playlist := false
+	pos_lastslash := strings.LastIndex(original_segment_path, "/")
+	original_segment_name := original_segment_path[pos_lastslash+1 :]
+	// Scan every line until we reach the line containing URI of the latest detected media data segment
+	// Write every line before the target line (include the target line) to the output playlist.
+	// Then, skip all following lines which essentially skip all the following media segments.
+	// Any segments before the latest one are not ready to stream yet.
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "init.mp4") {
+			pos_init := strings.LastIndex(line, "init.mp4")
+			newLine := line[: pos_init] + "segment_init.mp4\""
+			writer.WriteString(newLine + "\n")
+			continue
+		}
+
+		if strings.Contains(line, original_segment_name) {
+			segment_found_in_playlist = true
+			pos_seg := strings.LastIndex(line, "seg_")
+			newLine := line[: pos_seg] + "segment_" + line[pos_seg+4 :]
+			writer.WriteString(newLine + "\n")
+			break
+		}
+
+		if strings.Contains(line, "seg_") {
+			pos_seg := strings.LastIndex(line, "seg_")
+			newLine := line[: pos_seg] + "segment_" + line[pos_seg+4 :]
+			writer.WriteString(newLine + "\n")
+		} else {
+			writer.WriteString(line + "\n")
+		}
+	}
+
+	if !segment_found_in_playlist {
+		Log.Printf("Failed to update detection target variant playlist %s. Segment %s not found\n", playlistFile, original_segment_path)
+		return errors.New("segment_not_found_in_playlist"), updated_playlist_path
+	}
+
+	writer.Flush()
+	return nil, updated_playlist_path
+	
+	/*if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}*/
+}
+
+// Get detection target rendition from master playlist and return its url. Also, remove detection target rendition from master playlist.
+func removeDetectionTargetRendition(master_playlist_path string, detection_target_bitrate string) (string, error) {
+	var err error
+	var detection_target_var_playlist_url string
+	var output_playlist_data []byte
+	
+	// Load master playlist
+	playlist, err := os.Open(master_playlist_path)
+	if err != nil {
+		Log.Printf("Failed to read HLS master playlist: %s. Error: %v", master_playlist_path, err)
+		return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+	}
+
+	scanner := bufio.NewScanner(playlist)
+
+	var prev_line string
+	for scanner.Scan() {              
+		line := scanner.Text()
+		if strings.Contains(line, "EXT-X-STREAM-INF") {
+			prev_line = line
+			continue
+		}
+
+		if strings.Contains(prev_line, "EXT-X-STREAM-INF") {
+			// Output non-detection target rendition (EXT-X-STREAM-INF)
+			if !strings.Contains(line, detection_target_bitrate) {
+				prev_line = prev_line + "\n"
+                line = line + "\n"
+                output_playlist_data = append(output_playlist_data, []byte(prev_line)...)
+                output_playlist_data = append(output_playlist_data, []byte(line)...)
+			} else { // Return detection target rendition
+				detection_target_var_playlist_url = line
+			}
+
+			continue
+		}
+
+		// Output any playlist lines other than "EXT-X-STREAM-INF" and the rendition URL
+		line = line + string("\n")
+        output_playlist_data = append(output_playlist_data, []byte(line)...)
+		prev_line = line
+	}
+
+	playlist.Close()
+
+	// Rewrite master playlist with detection target rendition removed
+	truncated_playlist, err := os.OpenFile(master_playlist_path, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		Log.Printf("Failed to truncate HLS master playlist: %s. Error: %v", master_playlist_path, err)
+        return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+    }
+
+	defer truncated_playlist.Close()
+	_, err = truncated_playlist.Write(output_playlist_data)
+	if err != nil {
+		Log.Printf("Failed to write new master playlist: %s. Error: %v", master_playlist_path, err)
+		return detection_target_var_playlist_url, errors.New("error_reading_playlist")
+	}
+
+	return detection_target_var_playlist_url, nil
+}
+
 // https://github.com/fsnotify/fsnotify
-func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmpegAlone bool) error {
+func watchStreamFiles(j job.LiveJobSpec, watch_dirs []string, remote_media_output_path string, ffmpegAlone bool, detection_target_bitrate string) error {
 	// Create the upload list: the running list of stream files to upload to cloud.
 	upload_list = list.New()
 
@@ -429,27 +873,135 @@ func watchStreamFiles(watch_dirs []string, remote_media_output_path string, ffmp
 	go func() {
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					Log.Println("Failed to receive a file system event (watchStreamFiles)")
-					continue
-				}
-
-				// After a stream file (e.g., media segments, playlists) is created on disk, add the file to
-				// the upload list to make it ready for upload. The file will be uploaded in the next file
-				// upload opportunity
-				if event.Op == fsnotify.Create {
-					if isStreamFile(event.Name) {
-						addToUploadList(event.Name, remote_media_output_path)
-					} else {
-						Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
+				case event, ok := <-watcher.Events:
+					if !ok {
+						Log.Println("Failed to receive a file system event (watchStreamFiles)")
+						continue
 					}
-				}
-			case _, ok := <-watcher.Errors:
-				if !ok {
-					Log.Println("Error while receiving an file system event (watchStreamFiles)")
-					continue
-				}
+
+					// After a stream file (e.g., media segments, playlists) is created on disk, add the file to
+					// the upload list to make it ready for upload. The file will be uploaded in the next file
+					// upload opportunity
+					if event.Op == fsnotify.Create {
+						if isStreamFile(event.Name) { 
+							// The file is a stream file but not a detection target, upload it right away
+							if !isDetectionTarget(event.Name, detection_target_bitrate) {
+								// If object detection is enabled, we need to get the detection target
+								// variant playlist url from the master playlist.
+								// Then, we delete detection target variant playlist from the master.
+								// We can't leave the detection target variant playlist in the master.
+								if isHlsMasterPlaylist(event.Name) {
+									if detection_target_bitrate != undefined_bitrate {
+										//detection_target_var_playlist_url, err := removeDetectionTargetRendition(event.Name, detection_target_bitrate)
+										_, err := removeDetectionTargetRendition(event.Name, detection_target_bitrate)
+										if err != nil {
+											Log.Printf("Failed to update master playlist: %s. Error: %v\n", event.Name, err)
+											// If reading master playlist fails, we will not know the detection target variant playlist url,
+											// we will not remove the detection target variant playlist url from the master playlist.
+											// This is not good, but acceptable. We can still try again later. 
+											// So this is not a fatal error.
+										}
+									}
+								}
+
+								addToUploadList(event.Name, remote_media_output_path)
+								continue
+							}
+						} else { // The file is not a stream file, do nothing
+							Log.Printf("Skip %s from uploading - Not a stream file\n", event.Name)
+							continue
+						}
+
+						// The file is a stream file and is a detection target media data segment, do the following,
+						// - Merge it with the init segment,
+						// - Save the merged file to disk,
+						// - Run Yolo inference (detection) on the merged file,
+						// - Upload it.
+
+						// The following diagram shows the object detection workflow
+						// filename in parenthesis are intermediate files that will be replaced or removed
+						// seg.mp4 and init_detection.mp4 are annotated by Yolo and uploaded
+						// "init.mp4" is also an intermediate file, but it is always needed for detection.
+						
+						//          merge             detect               split
+						// init.mp4 -----> (seg.merged) --> (seg.detected) -----> seg.m4s 
+						//            |                                    |
+						// (seg.m4s)---                                    --> init.detected.mp4
+						if isDetectionTargetTypeMediaDataSegment(event.Name, detection_target_bitrate) {
+							Log.Printf("Media data segment to detect: %s\n", event.Name)
+							if original_detection_target_init_segment_path_local == "" {
+								Log.Printf("Not ready to merge data segment %s due to missing init segment\n", event.Name)
+								// TODO: When merge fails, shall we show a slate segment instead?
+								continue
+							}
+
+							var err error
+							var baseMediaDecodeTime uint32
+							baseMediaDecodeTime, err = read_baseMediaDecodeTime(event.Name)
+							if err != nil {
+								Log.Printf("Failed to read baseMediaDecodeTime from media segment. Error: %v\n", err)
+								// Should we give a warning or error on this?
+								// If reading baseMediaDecodeTime fails, this media segment won't have correct timestamp and 
+								// playback could have troubles. 
+							}
+
+							// Read video timescale from media data segment's SIDX box.
+							// The timescale is passed to detector's (od.sh) ffmpeg reencoder.
+							// The ffmpeg reencoder uses the same timescale when re-encoding the 
+							// detected images to video segment.
+
+							// We must use the same timescale before and after detection. 
+							// This is because we will set the same TFDT baseMediaDecode time before and after detection.
+							// The timescales for baseMediaDecode must be consistent too.
+							var sidx_timescale uint32
+							sidx_timescale, err = read_sidx_timescale(event.Name)
+							if err != nil {
+								Log.Printf("Failed to read SIDX timescale from media segment. Error: %v\n", err)
+								// Should we give a warning or error on this?
+								// If reading SIDX timescale fails, od.sh's ffmpeg re-encoder will use the default timescale
+								// when re-encoding the annotated images. This won't match the timescale used by baseMediaDecodeTime.
+								// There will be timing issues when playing the converted media segment.
+							}
+
+							var merged_segment_path string
+							// Merge init and media data segments to a single inited media data segment.
+							merged_segment_path, err = merge_init_and_data_segments(original_detection_target_init_segment_path_local, event.Name)
+							if err != nil {
+								Log.Printf("Failed to merge detection target init and data segments. Error: %v\n", err)
+								return
+							}
+							
+							// Delete the original media data segment as it is already merged.
+							// Do not delete the original init segment.
+							Log.Printf("Deleting original media segment: %s\n", event.Name)
+							os.Remove(event.Name)
+
+							// Create a new detection job then enqueue
+							var dj detectionJob
+							dj.Merged_segment_path = merged_segment_path // Merged segment: this is the input file to the detector
+							dj.LiveJob = j // Live job spec: this includes detection configuration
+							dj.Original_media_data_segment_path = event.Name // The path to the original media data segment. Although this file was already deleted, the path name contains segment sequence number which is necessary for naming the detected data segment.
+							dj.Remote_media_output_path = remote_media_output_path // The S3 media output path: the detected segment will be uploaded right after detection
+							dj.BaseMediaDecodeTime = baseMediaDecodeTime
+							dj.Sidx_timescale = sidx_timescale
+							dj.Time_enqueued = time.Now().UnixMilli()
+
+							queued_detection_jobs = append(queued_detection_jobs, dj)
+						} else if isDetectionTargetTypeMediaInitSegment(event.Name, detection_target_bitrate) { // The file is the init segment of the encoder detection output, save the file path as we will need to merge the init seg with media data segs.
+							Log.Printf("Media init segment to detect: %s", event.Name)
+							original_detection_target_init_segment_path_local = event.Name
+							// Do not upload original detection init segment, e.g., init.mp4. 
+							// We only upload the new detected init segment, e.g., init.detected.mp4.
+						} else if isDetectionTargetTypeHlsVariantPlaylist(event.Name, detection_target_bitrate) { // The file is the variant playlist of the detection output, update it.
+							Log.Printf("HLS variant playerlist to detect: %s", event.Name)
+							original_detection_target_hls_playlist_path_local = event.Name
+						}
+					}
+				case _, ok := <-watcher.Errors:
+					if !ok {
+						Log.Println("Error while receiving an file system event (watchStreamFiles)")
+						continue
+					}
 			}
 		}
 	}()
@@ -513,10 +1065,14 @@ func main() {
 	// A file watcher (fsnotify) is responsible for checking new stream files written to the file system
 	// and uploading them to cloud storage
 	local_media_output_path = ("/tmp/" + job.Media_output_path_prefix + *jobIdPtr + "/")
-	err1 = os.Mkdir(local_media_output_path, 0777)
-	if err1 != nil {
-		Log.Println("Failed to mkdir: ", local_media_output_path, " Error: ", err1)
-		os.Exit(1)
+	_, err_fstat := os.Stat(local_media_output_path)
+	if errors.Is(err_fstat, os.ErrNotExist) {
+		Log.Printf("Path %s does not exist. Creating it...\n", local_media_output_path)
+		err1 = os.Mkdir(local_media_output_path, 0777)
+		if err1 != nil {
+			Log.Println("Failed to mkdir: ", local_media_output_path, " Error: ", err1)
+			os.Exit(1)
+		}
 	}
 
 	// When output video codec is "av1", start ffmpeg only to perform both transcoding and packaging.
@@ -539,6 +1095,11 @@ func main() {
 	packagerCmd = nil
 	ffmpegCmd = nil
 	remote_media_output_path_base := j.Output.S3_output.Bucket + "/output_" + *jobIdPtr + "/"
+
+	// If object detection is configured, add an extra output rendition for object detection
+	if job.NeedObjectDetection(j) {
+		job.AddDetectionVideoOutput(&j)
+	}
 
 	if !ffmpegAlone {
 		// Start Shaka packager first
@@ -596,7 +1157,7 @@ func main() {
 			Log.Println("Errors starting ffmpeg: ", errEncoder, " ffmpeg output: ", string(out))
 			//os.Exit(1)
 		}
-	} else { // Start ffmpeg-alone
+	} else { // Start ffmpeg-alone (e.g., AV1 transcoding)
 		ffmpegArgs, local_media_output_path_subdirs = job.JobSpecToEncoderArgs(j, local_media_output_path)
 		Log.Println("FFmpeg-alone arguments: ")
 		Log.Println(job.ArgumentArrayToString(ffmpegArgs))
@@ -649,6 +1210,16 @@ func main() {
 	//    Also, FFprobe exits and does not cause FFmpeg to crash.
 	// 5. It takes FFprobe ~5 seconds to analyze the input stream, so be patient if you don't see input_info.json.
 
+	// Create a subdirectory for video detection output.
+	// The Yolo script (object detector) will be launched on the fly when new video segments 
+	// in the lowest bitrate rendition are written to its output subdir and be found by the
+	// file watcher. The Yolo model will be used to 
+	// 1. Split video segments into frames, 
+	// 2. Detect and mark objects in video frames, 
+	// 3. Encode the marked frames into a single video segment,
+	// 4. Output the marked video segments to the video detection output subdir,
+	// The file watcher keeps watching the video detection output subdir, and upload the marked segments.
+	
 	// Create local output paths. Shaka packager may have already created the paths.
 	for _, sd := range local_media_output_path_subdirs {
 		sd = local_media_output_path + sd
@@ -663,6 +1234,12 @@ func main() {
 		}
 	}
 
+	// Tell file watcher to also watch for detection target output files
+	var detection_target_bitrate string = undefined_bitrate
+	if job.NeedObjectDetection(j) {
+		detection_target_bitrate = j.Output.Detection.Input_video_bitrate
+	}
+
 	// Start a file watcher to check for new stream output from the packager and upload to remote origin server.
 	var errWatchFiles error
 	go func() {
@@ -672,7 +1249,7 @@ func main() {
 			watch_dirs = append(watch_dirs, local_media_output_path+subdir+"/")
 		}
 
-		errWatchFiles = watchStreamFiles(watch_dirs, remote_media_output_path_base, ffmpegAlone)
+		errWatchFiles = watchStreamFiles(j, watch_dirs, remote_media_output_path_base, ffmpegAlone, detection_target_bitrate)
 	}()
 
 	if errWatchFiles != nil {
@@ -723,7 +1300,7 @@ func main() {
 			case <-ticker.C:
 				{
 					if !ffmpegAlone {
-						manageCommands(packagerCmd, ffmpegCmd)
+						manageCommands(packagerCmd, ffmpegCmd, ffprobeCmd)
 					} else {
 						manageFfmpegAlone(ffmpegCmd)
 					}
@@ -745,8 +1322,21 @@ func main() {
 			select {
 			case <-ticker.C:
 				{
-					// Periodically call function uploadFiles every "stream_file_upload_interval" time units
 					uploadFiles()
+				}
+			}
+		}
+	}(ticker)
+
+	// Periodically handle queued object detection jobs
+	d3, _ := time.ParseDuration(process_detection_job_interval)
+	ticker = time.NewTicker(d3)
+	go func(ticker *time.Ticker) {
+		for {
+			select {
+			case <-ticker.C:
+				{
+					executeNextDetectionJob()
 				}
 			}
 		}
