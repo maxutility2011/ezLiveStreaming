@@ -12,6 +12,7 @@ If you have any questions regarding this project, please email to Bo Zhang at ma
 - live channel management API,
 - live HLS streaming with AV1 video codec,
 - clear key DRM protection, 
+- real-time object detection using YOLOv8.
 - uploading transcoder outputs to AWS S3,
 - displaying live transcoding stats and live input stream info,
 - standard-compliant media transcoding and formatting which potentially works with any video players.
@@ -203,10 +204,11 @@ The docker file for api_server copies the demo UI source to the Nginx web root (
 
 ![screenshot](doc/diagrams/demo_ui.png)
 
-The demo UI provides a list of job request templates. Please choose one and the full job request will be shown in the editor section. Currently, 3 templates are provided,
+The demo UI provides a list of job request templates. Please choose one and the full job request will be shown in the editor section. Currently, 4 templates are provided,
 - hls live with clear-key drm
 - hls live without drm 
 - hls live with av1 codec
+- hls live with real-time object detection
 
 After the job request is loaded in the editor, put your S3 bucket name in *S3_output.Bucket* of the live job request, then click the "create" button. This will send a create_job request to the api_server to create a new live channel. The server response will be shown on the bottom-left corner of the UI which includes the details of the new job. Among other things, you will see a job ID, e.g., "4f115985-f9be-4fea-9d0c-0421115715a1". The bottom-right corner will show the essential information needed to set up the live RTMP input feed and to play the live HLS/DASH stream after the live RTMP input is up. 
 
@@ -427,6 +429,8 @@ The api_server will validate the specification of each new job. A new job reques
 | Audio_outputs | json | array of audio outputs | n/a |
 | Codec (Audio_outputs) | string | audio codec | "aac", "mp3" |
 
+For a list of real-time object detection configuration, please refer to [doc/yolo.md](doc/yolo.md).
+
 ## Get all the jobs
 Show all the jobs including currently running jobs and already finished jobs. <br>
 **GET /jobs** <br>
@@ -525,6 +529,8 @@ Delete a job given by its ID. A job must be stopped first before it can be delet
 [doc/ezLiveStreaming.postman_collection.json](doc/ezLiveStreaming.postman_collection.json) provides sample API requests to ezLiveStreaming in a postman collection. <br>
 
 # Design of scheduler and worker
+
+First, please refer to [doc/yolo.md](doc/yolo.md) for the design of real-time object detection. 
 
 ezLiveStreaming comes with five executables, **api_server**, **job scheduler**, **worker_app**, **worker_transcoder** and **ezKey_server**. The entire live transcoding system consists of a cluster of api_server(s), a cluster of job schedulers, a cluster of redis servers and a cluster of live workers. Neither an api_server nor a job scheduler maintains any states of the live transcoding requests. The stateless design allows easy scalability and failover. As a result, one can put a load balancer (such as Nginx) in front of the api_server cluster and the job scheduler cluster. For example, you can use the "*upstream*" directive (https://docs.nginx.com/nginx/admin-guide/load-balancer/tcp-udp-load-balancer/) to specify a cluster of equivalent api_server instances which any one of them can handle the live transcoding requests. The api_server and job scheduler does not communicate directly, rather they communicate via the AWS SQS job queue and Redis. 
 
