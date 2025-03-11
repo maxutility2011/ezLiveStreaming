@@ -188,15 +188,15 @@ If you see docker containers exit abnormally with error 255 or 137, e.g.,
 api_server-1  | exec /home/streamer/bins/start_server.sh: exec format error
 api_server-1 exited with code 255
 ```
-That is because of how your docker daemon launches the service commands. On some latest OS versions, the docker "CMD" must be expressed as an array of JSON arguments, e.g.,
+This is because of how your docker daemon launches the service commands. On some latest OS flavors/versions, the docker "CMD" must be expressed as an array of JSON arguments, e.g.,
 ```
 CMD ["/home/streamer/bins/worker_app", "-config=/home/streamer/conf/worker_app_config.json"]
 ```
-While on some older OS versions, its docker "CMD" is expressed in the following way,
+While on some older OS flavors/versions, docker "CMD" are expressed as a single command line, e.g.,
 ```
 CMD /home/streamer/bins/worker_app -config=/home/streamer/conf/worker_app_config.json
 ```
-So, if you see abnormal container exit, change the "CMD" format and it should fix the issue.
+So, if you see abnormal container exit, change the "CMD" format to the other one and it should fix the issue.
 
 ## Step 9: Start your live channel from the UI
 The docker file for api_server copies the demo UI source to the Nginx web root (e.g., /var/www/html/demo/). When the API server is running, a Nginx web server will be running too and can serve the demo UI at the following URL, http://[api_server_hostname]:[api_server_port]/demo/demo.html. For example, http://ec2-34-202-195-77.compute-1.amazonaws.com:4080/demo/demo.html. On your web browser, load the ezLiveStreaming demo UI page. Again, please make sure port 4080 is open to the Internet. 
