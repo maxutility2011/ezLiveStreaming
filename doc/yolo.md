@@ -1,5 +1,9 @@
 # Real-time object detection in ezLiveStreaming
-ezLiveStreaming uses AI models to enables real-time object detection, allowing for the identification of objects in live video streams. The current release of ezLiveStreaming supports a separate video output with object annotation. The annotated video output can enable a wide range of real-time RoI (Region of Interests) identification applications, such as identification of match score and jersey number in sports matches, object counting, crowd monitoring, obstacle detection and traffic sign recognition, intruder detection. This document reviews its overall system design, AI inference and video processing workflow in detail. 
+ezLiveStreaming leverages AI models to enables real-time object detection, enabling the identification of objects in live video streams. Users can enable object detection in their live job specifications and configure detected video outputs with object annotations in HLS streaming format. Though many video-based applications support video object detection, to my knowledge, ezLiveStreaming is the first open-source live transcoding service to offer this feature. 
+
+With object detection, ezLiveStreaming enables a wide range of real-time RoI (Region of Interests) identification applications, such as match score and jersey number recognition in sports, object counting, crowd monitoring, obstacle detection, traffic sign recognition and intruder detection. 
+
+This document provides a detailed review of its overall system design, AI inference process, and video processing workflow.
 
 ## Overview
 ezLiveStreaming uses YOLOv8 (You Only Look Once) AI model for detecting objects in live video streams. In the JSON live job requests, users can configure the object detection settings. For example, they can request a separate annotated (detected) video output in addition to the main transcoded video outputs. They can also specify the video codec, resolution, frame rate and other encoder settings to be used for generating the annotated video output. The annotated output is packaged in HLS format which can be streamed in the same way as the main outputs.
