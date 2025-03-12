@@ -69,6 +69,8 @@ You can also configure detected/annotated output only without outputting any mai
 
 The API server validates the detection configuration before it creates the live job. If fields are missing, their default values shall be used, and validation warnings are returned.  
 
+The demo UI provides a [sample object detection job](diagrams/detection_job.png).
+
 ## Pre-detection processing
 When a live job with detection enabled (called **live detection job**) is launched on a worker, a worker_transcoder process is created to handle both live transcoding and object detection. The worker_transcoder first checks to see if detection is enabled in a job spec. If so, worker_transcoder combines the detection target output with the list of main video outputs so that the transcoder (FFmpeg) and packager (Shaka packager) can generate the target output for the consumption of object detector. Worker_transcoder also adds the subfolder holding the detection target output data (HLS playlist and media segments) to its watch folder list. When new segments and playlist are written/updated under that subfolder, worker_transcoder is notified and a series of video processing and object detection tasks will be executed to process the files. 
 
