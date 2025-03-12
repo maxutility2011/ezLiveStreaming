@@ -12,7 +12,7 @@ If you have any questions regarding this project, please email to Bo Zhang at ma
 - live channel management API,
 - live HLS streaming with AV1 video codec,
 - clear key DRM protection, 
-- real-time object detection using YOLOv8 ($${\color{red}New!!}$$).
+- real-time object detection using YOLOv8 (**$${\color{red}New!!}$$**).
 - uploading transcoder outputs to AWS S3,
 - displaying live transcoding stats and live input stream info,
 - standard-compliant media transcoding and formatting which potentially works with any video players.
