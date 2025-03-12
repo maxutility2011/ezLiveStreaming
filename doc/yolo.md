@@ -1,4 +1,4 @@
-# Real-time object detection in ezLiveStreaming
+# Real-time object detection with ezLiveStreaming
 ezLiveStreaming leverages AI models to enables real-time object detection, enabling the identification of objects in live video streams. Users can enable object detection in their live job specifications and configure detected video outputs with object annotations in HLS streaming format. Though many video-based applications support video object detection, to my knowledge, ezLiveStreaming is the first open-source live transcoding service to offer this feature. 
 
 With object detection, ezLiveStreaming enables a wide range of real-time RoI (Region of Interests) identification applications, such as match score and jersey number recognition in sports, object counting, crowd monitoring, obstacle detection, traffic sign recognition and intruder detection. 
