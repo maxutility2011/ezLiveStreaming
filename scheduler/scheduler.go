@@ -92,12 +92,52 @@ func randomAssign(j job.LiveJob) (string, bool) {
 }
 
 func assignWorker(j job.LiveJob) (string, bool) {
-	wid, ok := randomAssign(j)
-	if !ok {
-		return "", false
+	jobCpuLoad, jobBandwidthLoad := estimateJobLoad(j)
+
+	var wid string
+	workers, err := getAllAvailableWorkers()
+	if err != nil {
+		Log.Println("Failed to getAllAvailableWorkers. Error: ", err)
+		return wid, false
 	}
 
-	return wid, true
+	worker_found := false
+	for wid, w := range workers {
+		var w_load models.WorkerLoad
+		v := getWorkerLoadById(wid)
+		if v != "" {
+			err := json.Unmarshal([]byte(v), &w_load)
+			if err != nil {
+				Log.Println("Failed to unmarshal Redis result (scheduleOneJob). Error: ", err)
+				continue
+			}
+		}
+
+		if jobCpuLoad > w.Info.CpuCapacity - w_load.CpuLoad {
+			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of CPU capacity", j.Id, wid)
+			continue
+		}
+
+		if jobBandwidthLoad > w.Info.BandwidthCapacity - w_load.BandwidthLoad {
+			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of bandwidth capacity", j.Id, wid)
+			continue
+		}
+
+		worker_found = true
+		break
+	}
+
+	var assigned_worker_id string
+	var assignment_result bool
+	if worker_found {
+		assigned_worker_id = wid
+		assignment_result = true
+	} else {
+		assigned_worker_id = ""
+		assignment_result = false
+	}
+
+	return assigned_worker_id, assignment_result
 }
 
 func createUpdateJob(j job.LiveJob) error {
@@ -407,7 +447,7 @@ func scheduleOneJob() {
 				return
 			}
 
-			// Check worker capacity before sending the job to it.
+			// Check capacity of the worker before sending the job to it.
 			w, ok := getWorkerById(assigned_worker_id)
 			if !ok {
 				Log.Println("Failed to getWorkerById")
