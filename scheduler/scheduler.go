@@ -91,20 +91,18 @@ func randomAssign(j job.LiveJob) (string, bool) {
 	return r, true
 }
 
-func assignWorker(j job.LiveJob) (string, bool) {
+func assignWorker(j job.LiveJob) string {
+	var assigned_worker_id string
 	jobCpuLoad, jobBandwidthLoad := estimateJobLoad(j)
-
-	var wid string
 	workers, err := getAllAvailableWorkers()
 	if err != nil {
 		Log.Println("Failed to getAllAvailableWorkers. Error: ", err)
-		return wid, false
+		return assigned_worker_id
 	}
 
-	worker_found := false
-	for wid, w := range workers {
+	for _, w := range workers {
 		var w_load models.WorkerLoad
-		v := getWorkerLoadById(wid)
+		v := getWorkerLoadById(w.Id)
 		if v != "" {
 			err := json.Unmarshal([]byte(v), &w_load)
 			if err != nil {
@@ -114,30 +112,20 @@ func assignWorker(j job.LiveJob) (string, bool) {
 		}
 
 		if jobCpuLoad > w.Info.CpuCapacity - w_load.CpuLoad {
-			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of CPU capacity", j.Id, wid)
+			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of CPU capacity", j.Id, w.Id)
 			continue
 		}
 
 		if jobBandwidthLoad > w.Info.BandwidthCapacity - w_load.BandwidthLoad {
-			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of bandwidth capacity", j.Id, wid)
+			Log.Println("Assigning job id=%s: Skip worker id=%s due to out of bandwidth capacity", j.Id, w.Id)
 			continue
 		}
 
-		worker_found = true
+		assigned_worker_id = w.Id
 		break
 	}
 
-	var assigned_worker_id string
-	var assignment_result bool
-	if worker_found {
-		assigned_worker_id = wid
-		assignment_result = true
-	} else {
-		assigned_worker_id = ""
-		assignment_result = false
-	}
-
-	return assigned_worker_id, assignment_result
+	return assigned_worker_id
 }
 
 func createUpdateJob(j job.LiveJob) error {
@@ -440,8 +428,8 @@ func scheduleOneJob() {
 		popBufferedJob()
 
 		if !(j.Stop || j.Delete) { // create_job or resume_job
-			assigned_worker_id, ok := assignWorker(j)
-			if !ok {
+			assigned_worker_id := assignWorker(j)
+			if assigned_worker_id == "" {
 				Log.Println("Failed to assign job id=", j.Id, " to a worker")
 				bufferJob(j) // Add failed jobs back to the queue and retry later
 				return
