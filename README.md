@@ -124,6 +124,8 @@ In [scheduler/config.json](scheduler/config.json), put your own job queue name i
 No change is needed in *drm_key_server/config.json*.
 
 On the worker machine, configure the worker as follows,
+If you are running ezLiveStreaming on a (local) machine without a public IP address, copy [worker/app/worker_app_config_local.json](worker/app/worker_app_config_local.json) to [worker/app/worker_app_config.json](worker/app/worker_app_config.json). You will need to configure the local IP address for your worker in order for the local scheduler to find it. If you are running ezLiveStreaming on a (cloud) instance with a public IP address, copy [worker/app/worker_app_config_cloud.json](worker/app/worker_app_config_cloud.json) to [worker/app/worker_app_cloud.json](worker/app/worker_app_cloud.json). The scheduler will find the worker via the configured *GetPublicIpUrl*. 
+
 In [worker/app/worker_app_config.json](worker/app/worker_app_config.json), put in your own *SchedulerUrl*. *SchedulerUrl* allows the worker to find the job scheduler. The host name part of *SchedulerUrl* is the host name or IP address of your management server. The network port part of *SchedulerUrl* is 3080 by default, otherwise it must match that scheduler port configured in [scheduler/config.json](scheduler/config.json). If you have a cluster of job scheduler running behind a load balancer, you can put the URL of the load balance in *SchedulerUrl*. You can leave other configuration options as is. 
 
 Every time you make configuration changes to any of the services, you need to rebuild the docker images (step 7).
